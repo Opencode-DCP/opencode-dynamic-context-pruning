@@ -9,6 +9,7 @@ export interface PluginConfig {
     enabled: boolean
     debug: boolean
     protectedTools: string[]
+    model?: string // Format: "provider/model" (e.g., "anthropic/claude-haiku-4-5")
 }
 
 const defaultConfig: PluginConfig = {
@@ -51,6 +52,11 @@ function createDefaultConfig(): void {
   // Enable debug logging to ~/.config/opencode/logs/dcp/YYYY-MM-DD.log
   "debug": false,
 
+  // Optional: Specify a model to use for analysis instead of the session model
+  // Format: "provider/model" (same as agent model config in opencode.jsonc)
+  // NOTE: Anthropic OAuth sonnet 4+ tier models are currently not supported
+  // "model": "anthropic/claude-haiku-4-5",
+
   // List of tools that should never be pruned from context
   // The 'task' tool is protected by default to preserve subagent coordination
   "protectedTools": ["task"]
@@ -67,7 +73,7 @@ function createDefaultConfig(): void {
  */
 export function getConfig(): PluginConfig {
     const configPath = getConfigPath()
-    
+
     // Create default config if neither file exists
     if (!existsSync(configPath)) {
         createDefaultConfig()
@@ -82,7 +88,8 @@ export function getConfig(): PluginConfig {
         return {
             enabled: userConfig.enabled ?? defaultConfig.enabled,
             debug: userConfig.debug ?? defaultConfig.debug,
-            protectedTools: userConfig.protectedTools ?? defaultConfig.protectedTools
+            protectedTools: userConfig.protectedTools ?? defaultConfig.protectedTools,
+            model: userConfig.model
         }
     } catch (error: any) {
         // Log errors to file (always enabled for config errors)

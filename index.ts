@@ -56,7 +56,7 @@ const plugin: Plugin = (async (ctx) => {
     const stateManager = new StateManager()
     const toolParametersCache = new Map<string, any>() // callID -> parameters
     const modelCache = new Map<string, { providerID: string; modelID: string }>() // sessionID -> model info
-    const janitor = new Janitor(ctx.client, stateManager, logger, toolParametersCache, config.protectedTools, modelCache)
+    const janitor = new Janitor(ctx.client, stateManager, logger, toolParametersCache, config.protectedTools, modelCache, config.model)
 
     const cacheToolParameters = (messages: any[], component: string) => {
         for (const message of messages) {
@@ -122,6 +122,7 @@ const plugin: Plugin = (async (ctx) => {
         enabled: config.enabled,
         debug: config.debug,
         protectedTools: config.protectedTools,
+        model: config.model,
         configFile: join(homedir(), ".config", "opencode", "dcp.jsonc"),
         logDirectory: join(homedir(), ".config", "opencode", "logs", "dcp"),
         globalFetchWrapped: true

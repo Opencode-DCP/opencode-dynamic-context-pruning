@@ -119,18 +119,61 @@ function getBigPickleModel(): LanguageModel {
  * Main model selection function with intelligent fallback logic
  * 
  * Selection hierarchy:
- * 1. Try the current session's model
- * 2. If tier 1, fall back to tier 2 from same provider
- * 3. Try tier 2 models from other authenticated providers
- * 4. Ultimate fallback to big-pickle (free, no auth)
+ * 1. Try the config-specified model (if provided)
+ * 2. Try the current session's model
+ * 3. If tier 1, fall back to tier 2 from same provider
+ * 4. Try tier 2 models from other authenticated providers
+ * 5. Ultimate fallback to big-pickle (free, no auth)
  * 
  * @param currentModel - The model being used in the current session (optional)
  * @param logger - Logger instance for debug output
+ * @param configModel - Model string in "provider/model" format (e.g., "anthropic/claude-haiku-4-5")
  * @returns Selected model with metadata about the selection
  */
-export async function selectModel(currentModel?: ModelInfo, logger?: Logger): Promise<ModelSelectionResult> {
-    logger?.info('model-selector', 'Model selection started', { currentModel });
+export async function selectModel(
+    currentModel?: ModelInfo, 
+    logger?: Logger,
+    configModel?: string
+): Promise<ModelSelectionResult> {
+    logger?.info('model-selector', 'Model selection started', { currentModel, configModel });
     const opencodeAI = new OpencodeAI();
+
+    // Step 0: Try to use the config-specified model if provided
+    if (configModel) {
+        const parts = configModel.split('/')
+        if (parts.length !== 2) {
+            logger?.warn('model-selector', '✗ Invalid config model format, expected "provider/model"', {
+                configModel
+            });
+        } else {
+            const [providerID, modelID] = parts
+            logger?.debug('model-selector', 'Step 0: Attempting to use config-specified model', {
+                providerID,
+                modelID
+            });
+
+            try {
+                const model = await opencodeAI.getLanguageModel(providerID, modelID);
+                logger?.info('model-selector', '✓ Successfully using config-specified model', {
+                    providerID,
+                    modelID
+                });
+                return {
+                    model,
+                    modelInfo: { providerID, modelID },
+                    tier: 'primary',
+                    reason: 'Using model specified in dcp.jsonc config'
+                };
+            } catch (error: any) {
+                // Log warning but continue to fallback logic
+                logger?.warn('model-selector', '✗ Failed to use config-specified model, falling back', {
+                    providerID,
+                    modelID,
+                    error: error.message
+                });
+            }
+        }
+    }
 
     // Step 1: Try to use the current session's model
     if (currentModel) {

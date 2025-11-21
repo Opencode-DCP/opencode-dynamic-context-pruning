@@ -12,7 +12,8 @@ export class Janitor {
         private logger: Logger,
         private toolParametersCache: Map<string, any>,
         private protectedTools: string[],
-        private modelCache: Map<string, { providerID: string; modelID: string }>
+        private modelCache: Map<string, { providerID: string; modelID: string }>,
+        private configModel?: string // Format: "provider/model"
     ) { }
 
     async run(sessionID: string) {
@@ -203,7 +204,7 @@ export class Janitor {
                 })
             }
 
-            const modelSelection = await selectModel(currentModelInfo, this.logger)
+            const modelSelection = await selectModel(currentModelInfo, this.logger, this.configModel)
 
             this.logger.info("janitor", "Model selected for analysis", {
                 sessionID,
