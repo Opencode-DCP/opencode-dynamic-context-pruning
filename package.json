@@ -1,7 +1,7 @@
 {
   "$schema": "https://json.schemastore.org/package.json",
   "name": "@tarquinen/opencode-dcp",
-  "version": "0.1.11",
+  "version": "0.1.12",
   "type": "module",
   "description": "OpenCode plugin that optimizes token usage by pruning obsolete tool outputs from conversation context",
   "main": "./dist/index.js",
@@ -23,6 +23,14 @@
     "optimization",
     "tokens"
   ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Tarquinen/opencode-dynamic-context-pruning.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Tarquinen/opencode-dynamic-context-pruning/issues"
+  },
+  "homepage": "https://github.com/Tarquinen/opencode-dynamic-context-pruning#readme",
   "author": "tarquinen",
   "license": "MIT",
   "peerDependencies": {

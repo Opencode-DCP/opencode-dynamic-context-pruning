@@ -27,19 +27,20 @@ Restart OpenCode. The plugin will automatically start optimizing your sessions.
 
 ## Updating
 
-The plugin does **not** automatically update when you launch OpenCode. To update to the latest version:
+OpenCode automatically installs plugins from npm to `~/.cache/opencode/node_modules/`. To force an update to the latest version:
 
 ```bash
-cd ~/.config/opencode
-npm install @tarquinen/opencode-dcp@latest
+cd ~/.cache/opencode
+rm -rf node_modules/@tarquinen
+sed -i.bak '/"@tarquinen\/opencode-dcp"/d' package.json
 ```
 
-Then restart OpenCode.
+Then restart OpenCode, and it will automatically install the latest version.
 
 To check your current version:
 
 ```bash
-npm list @tarquinen/opencode-dcp
+cat ~/.cache/opencode/node_modules/@tarquinen/opencode-dcp/package.json | grep version
 ```
 
 To check the latest available version:
