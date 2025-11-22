@@ -17,6 +17,37 @@ export class Janitor {
         private showModelErrorToasts: boolean = true // Whether to show toast for model errors
     ) { }
 
+    /**
+     * Sends an ignored message to the session UI (user sees it, AI doesn't)
+     */
+    private async sendIgnoredMessage(sessionID: string, text: string) {
+        try {
+            await this.client.session.prompt({
+                path: {
+                    id: sessionID
+                },
+                body: {
+                    noReply: true, // Don't wait for AI response
+                    parts: [{
+                        type: 'text',
+                        text: text,
+                        ignored: true
+                    }]
+                }
+            })
+            this.logger.debug("janitor", "Sent ignored message to session", {
+                sessionID,
+                textLength: text.length
+            })
+        } catch (error: any) {
+            this.logger.error("janitor", "Failed to send ignored message", {
+                sessionID,
+                error: error.message
+            })
+            // Don't fail the operation if sending the message fails
+        }
+    }
+
     async run(sessionID: string) {
         this.logger.info("janitor", "Starting analysis", { sessionID })
 
@@ -378,29 +409,29 @@ export class Janitor {
                             if (metadata.parameters) {
                                 // For read tool, show filePath
                                 if (toolName === "read" && metadata.parameters.filePath) {
-                                    paramInfo = truncate(shortenPath(metadata.parameters.filePath), 50)
+                                    paramInfo = truncate(shortenPath(metadata.parameters.filePath), 80)
                                 }
                                 // For list tool, show path
                                 else if (toolName === "list" && metadata.parameters.path) {
-                                    paramInfo = truncate(shortenPath(metadata.parameters.path), 50)
+                                    paramInfo = truncate(shortenPath(metadata.parameters.path), 80)
                                 }
                                 // For bash/command tools, prefer description over command
                                 else if (toolName === "bash") {
                                     if (metadata.parameters.description) {
-                                        paramInfo = truncate(metadata.parameters.description, 50)
+                                        paramInfo = truncate(metadata.parameters.description, 80)
                                     } else if (metadata.parameters.command) {
-                                        paramInfo = truncate(metadata.parameters.command, 50)
+                                        paramInfo = truncate(metadata.parameters.command, 80)
                                     }
                                 }
                                 // For other tools, show the first relevant parameter
                                 else if (metadata.parameters.path) {
-                                    paramInfo = truncate(shortenPath(metadata.parameters.path), 50)
+                                    paramInfo = truncate(shortenPath(metadata.parameters.path), 80)
                                 }
                                 else if (metadata.parameters.pattern) {
-                                    paramInfo = truncate(metadata.parameters.pattern, 50)
+                                    paramInfo = truncate(metadata.parameters.pattern, 80)
                                 }
                                 else if (metadata.parameters.command) {
-                                    paramInfo = truncate(metadata.parameters.command, 50)
+                                    paramInfo = truncate(metadata.parameters.command, 80)
                                 }
                             }
 
@@ -415,10 +446,13 @@ export class Janitor {
                         }
                     }
 
-                    // Format the message with tool details
+                    // Format the message with tool details using improved UI
                     const toolText = newlyPrunedIds.length === 1 ? 'tool' : 'tools';
-                    const title = `Pruned ${newlyPrunedIds.length} ${toolText} from context`;
-                    let message = `~${estimatedTokensSaved.toLocaleString()} tokens saved\n`
+                    const tokensFormatted = estimatedTokensSaved >= 1000 
+                        ? `~${Math.round(estimatedTokensSaved / 1000)}K` 
+                        : `~${estimatedTokensSaved}`
+                    
+                    let message = `🧹 DCP: Saved ${tokensFormatted} tokens (${newlyPrunedIds.length} ${toolText} pruned)\n`
 
                     for (const [toolName, params] of toolsSummary.entries()) {
                         if (params.length > 0) {
@@ -438,16 +472,10 @@ export class Janitor {
                         }
                     }
 
-                    await this.client.tui.showToast({
-                        body: {
-                            title: title,
-                            message: message.trim(),
-                            variant: "success",
-                            duration: 8000 // Longer duration since we're showing more info
-                        }
-                    })
+                    // Send as an ignored message (user sees, AI doesn't)
+                    await this.sendIgnoredMessage(sessionID, message.trim())
 
-                    this.logger.info("janitor", "Toast notification shown", {
+                    this.logger.info("janitor", "Pruning notification sent", {
                         sessionID,
                         prunedCount: newlyPrunedIds.length,
                         estimatedTokensSaved,

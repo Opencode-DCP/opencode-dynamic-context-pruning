@@ -106,22 +106,6 @@ The global config (`~/.config/opencode/dcp.jsonc`) is automatically created on f
 
 After modifying the configuration, restart OpenCode for changes to take effect.
 
-OpenCode automatically installs plugins from npm to `~/.cache/opencode/node_modules/`. To force an update to the latest version:
-
-```bash
-cd ~/.cache/opencode
-rm -rf node_modules/@tarquinen
-sed -i.bak '/"@tarquinen\/opencode-dcp"/d' package.json
-```
-
-Then restart OpenCode, and it will automatically install the latest version.
-
-To check your current version:
-
-```bash
-cat ~/.cache/opencode/node_modules/@tarquinen/opencode-dcp/package.json | grep version
-```
-
 To check the latest available version:
 
 ```bash
@@ -130,12 +114,12 @@ npm view @tarquinen/opencode-dcp version
 
 ### Version Pinning
 
-If you want to ensure a specific version is always used, you can pin it in your config:
+If you want to ensure a specific version is always used or update your version, you can pin it in your config:
 
 ```json
 {
   "plugin": [
-    "@tarquinen/opencode-dcp@0.2.5"
+    "@tarquinen/opencode-dcp@0.2.7"
   ]
 }
 ```
