@@ -151,16 +151,24 @@ export function extractParameterKey(metadata: { tool: string, parameters?: any }
     }
     
     // ===== Directory/Search Tools =====
-    if (tool === "list" && parameters.path) {
-        return parameters.path
+    if (tool === "list") {
+        // path is optional, defaults to current directory
+        return parameters.path || '(current directory)'
     }
-    if (tool === "glob" && parameters.pattern) {
-        const pathInfo = parameters.path ? ` in ${parameters.path}` : ""
-        return `"${parameters.pattern}"${pathInfo}`
+    if (tool === "glob") {
+        // pattern is required for glob
+        if (parameters.pattern) {
+            const pathInfo = parameters.path ? ` in ${parameters.path}` : ""
+            return `"${parameters.pattern}"${pathInfo}`
+        }
+        return '(unknown pattern)'
     }
-    if (tool === "grep" && parameters.pattern) {
-        const pathInfo = parameters.path ? ` in ${parameters.path}` : ""
-        return `"${parameters.pattern}"${pathInfo}`
+    if (tool === "grep") {
+        if (parameters.pattern) {
+            const pathInfo = parameters.path ? ` in ${parameters.path}` : ""
+            return `"${parameters.pattern}"${pathInfo}`
+        }
+        return '(unknown pattern)'
     }
     
     // ===== Execution Tools =====
@@ -205,5 +213,10 @@ export function extractParameterKey(metadata: { tool: string, parameters?: any }
     
     // ===== Fallback =====
     // For unknown tools, custom tools, or tools without extractable keys
-    return JSON.stringify(parameters).substring(0, 50)
+    // Check if parameters is empty or only has empty values
+    const paramStr = JSON.stringify(parameters)
+    if (paramStr === '{}' || paramStr === '[]' || paramStr === 'null') {
+        return '' // Return empty to trigger (default) fallback in UI
+    }
+    return paramStr.substring(0, 50)
 }

@@ -66,6 +66,42 @@ function shouldSkipProvider(providerID: string): boolean {
 }
 
 /**
+ * Attempts to import OpencodeAI with retry logic to handle plugin initialization timing issues.
+ * Some providers (like openai via @openhax/codex) may not be fully initialized on first attempt.
+ */
+async function importOpencodeAI(logger?: Logger, maxRetries: number = 3, delayMs: number = 100): Promise<any> {
+    let lastError: Error | undefined;
+    
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        try {
+            const { OpencodeAI } = await import('@tarquinen/opencode-auth-provider');
+            return new OpencodeAI();
+        } catch (error: any) {
+            lastError = error;
+            
+            // Check if this is the specific initialization error we're handling
+            if (error.message?.includes('before initialization')) {
+                logger?.debug('model-selector', `Import attempt ${attempt}/${maxRetries} failed, will retry`, {
+                    error: error.message
+                });
+                
+                if (attempt < maxRetries) {
+                    // Wait before retrying, with exponential backoff
+                    await new Promise(resolve => setTimeout(resolve, delayMs * attempt));
+                    continue;
+                }
+            }
+            
+            // For other errors, don't retry
+            throw error;
+        }
+    }
+    
+    // All retries exhausted
+    throw lastError;
+}
+
+/**
  * Main model selection function with intelligent fallback logic
  * 
  * Selection hierarchy:
@@ -85,9 +121,9 @@ export async function selectModel(
 ): Promise<ModelSelectionResult> {
     logger?.info('model-selector', 'Model selection started', { currentModel, configModel });
     
-    // Lazy import - only load the 812KB auth provider package when actually needed
-    const { OpencodeAI } = await import('@tarquinen/opencode-auth-provider');
-    const opencodeAI = new OpencodeAI();
+    // Lazy import with retry logic - handles plugin initialization timing issues
+    // Some providers (like openai via @openhax/codex) may not be ready on first attempt
+    const opencodeAI = await importOpencodeAI(logger);
 
     let failedModelInfo: ModelInfo | undefined;
 
@@ -178,10 +214,10 @@ export async function selectModel(
     logger?.info('model-selector', 'Available authenticated providers', {
         providerCount: availableProviderIDs.length,
         providerIDs: availableProviderIDs,
-        providers: Object.entries(providers).map(([id, info]) => ({
+        providers: Object.entries(providers).map(([id, info]: [string, any]) => ({
             id,
             source: info.source,
-            name: info.info.name
+            name: info.info?.name
         }))
     });
 

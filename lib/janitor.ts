@@ -17,7 +17,8 @@ export class Janitor {
         private configModel?: string, // Format: "provider/model"
         private showModelErrorToasts: boolean = true, // Whether to show toast for model errors
         private pruningMode: "auto" | "smart" = "smart", // Pruning strategy
-        private pruningSummary: "off" | "minimal" | "detailed" = "detailed" // UI summary display mode
+        private pruningSummary: "off" | "minimal" | "detailed" = "detailed", // UI summary display mode
+        private workingDirectory?: string // Current working directory for relative path display
     ) { }
 
     /**
@@ -490,6 +491,23 @@ export class Janitor {
             return `${nodeModulesMatch[1]}/${nodeModulesMatch[2]}`
         }
 
+        // Strip working directory to show relative paths
+        if (this.workingDirectory) {
+            // Try to match against the absolute working directory first
+            if (path.startsWith(this.workingDirectory + '/')) {
+                return path.slice(this.workingDirectory.length + 1)
+            }
+            
+            // Also try matching against ~ version of working directory
+            const workingDirWithTilde = this.workingDirectory.startsWith(homeDir)
+                ? '~' + this.workingDirectory.slice(homeDir.length)
+                : null
+            
+            if (workingDirWithTilde && path.startsWith(workingDirWithTilde + '/')) {
+                return path.slice(workingDirWithTilde.length + 1)
+            }
+        }
+
         return path
     }
 
@@ -553,6 +571,8 @@ export class Janitor {
     /**
      * Build a summary of tools by grouping them
      * Uses shared extractParameterKey logic for consistent parameter extraction
+     * 
+     * Note: prunedIds may be in original case (from LLM) but toolMetadata uses lowercase keys
      */
     private buildToolsSummary(prunedIds: string[], toolMetadata: Map<string, { tool: string, parameters?: any }>): Map<string, string[]> {
         const toolsSummary = new Map<string, string[]>()
@@ -564,7 +584,9 @@ export class Janitor {
         }
 
         for (const prunedId of prunedIds) {
-            const metadata = toolMetadata.get(prunedId)
+            // Normalize ID to lowercase for lookup (toolMetadata uses lowercase keys)
+            const normalizedId = prunedId.toLowerCase()
+            const metadata = toolMetadata.get(normalizedId)
             if (metadata) {
                 const toolName = metadata.tool
                 if (!toolsSummary.has(toolName)) {
@@ -577,6 +599,10 @@ export class Janitor {
                     // Apply path shortening and truncation for display
                     const displayKey = truncate(this.shortenPath(paramKey), 80)
                     toolsSummary.get(toolName)!.push(displayKey)
+                } else {
+                    // For tools with no extractable parameter key, add a placeholder
+                    // This ensures the tool still shows up in the summary
+                    toolsSummary.get(toolName)!.push('(default)')
                 }
             }
         }
@@ -736,16 +762,19 @@ export class Janitor {
                     for (const param of params) {
                         message += `    ${param}\n`
                     }
-                } else {
-                    // For tools with no specific params (like batch), just show the tool name and count
-                    const count = llmPrunedIds.filter(id => {
-                        const m = toolMetadata.get(id)
-                        return m && m.tool === toolName
-                    }).length
-                    if (count > 0) {
-                        message += `  ${toolName} (${count})\n`
-                    }
                 }
+            }
+            
+            // Handle any tools that weren't found in metadata (edge case)
+            const foundToolNames = new Set(toolsSummary.keys())
+            const missingTools = llmPrunedIds.filter(id => {
+                const normalizedId = id.toLowerCase()
+                const metadata = toolMetadata.get(normalizedId)
+                return !metadata || !foundToolNames.has(metadata.tool)
+            })
+            
+            if (missingTools.length > 0) {
+                message += `  (${missingTools.length} tool${missingTools.length > 1 ? 's' : ''} with unknown metadata)\n`
             }
         }
 
