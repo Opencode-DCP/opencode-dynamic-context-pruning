@@ -52,6 +52,10 @@ Restart OpenCode. The plugin will automatically start optimizing your sessions.
 - **`pruningMode`** (string, default: `"smart"`) - Pruning strategy:
   - `"auto"`: Fast duplicate removal only (zero LLM cost)
   - `"smart"`: Deduplication + AI analysis (recommended, maximum savings)
+- **`pruning_summary`** (string, default: `"detailed"`) - UI summary display mode:
+  - `"off"`: No UI summary (silent pruning)
+  - `"minimal"`: Show tokens saved and count only (e.g., "Saved ~2.5K tokens (6 tools pruned)")
+  - `"detailed"`: Show full breakdown by tool type and pruning method
 - **`protectedTools`** (string[], default: `["task", "todowrite", "todoread"]`) - Tools that should never be pruned
 
 Example configuration:
@@ -61,6 +65,7 @@ Example configuration:
   "enabled": true,
   "debug": false,
   "pruningMode": "smart",
+  "pruning_summary": "detailed",
   "protectedTools": ["task", "todowrite", "todoread"]
 }
 ```
@@ -99,6 +104,8 @@ After modifying configuration, restart OpenCode for changes to take effect.
 
 **Example notification formats:**
 
+**Detailed mode** (default):
+
 Auto mode:
 ```
 🧹 DCP: Saved ~1.2K tokens (5 duplicate tools removed)
@@ -128,6 +135,16 @@ Smart mode:
     pattern: "deprecated"
   list (1):
     ~/project/temp
+```
+
+**Minimal mode** (`"pruning_summary": "minimal"`):
+```
+🧹 DCP: Saved ~3.4K tokens (8 tools pruned)
+```
+
+**Off mode** (`"pruning_summary": "off"`):
+```
+(No notification displayed - silent pruning)
 ```
 
 To check the latest available version:
