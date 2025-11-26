@@ -119,7 +119,7 @@ export function buildAnalysisPrompt(
 
     // Build optional context section if reason provided
     const reasonContext = reason
-        ? `\nContext: The AI has requested pruning with the following reason: "${reason}"\nUse this context to inform your decisions about what is most relevant to keep.\n`
+        ? `\nContext: The AI has requested pruning with the following reason: "${reason}"\nUse this context to inform your decisions about what is most relevant to keep.`
         : ''
 
     return `You are a conversation analyzer that identifies obsolete tool outputs in a coding session.

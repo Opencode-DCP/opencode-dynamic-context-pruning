@@ -4,7 +4,6 @@ import { tool } from "@opencode-ai/plugin"
 import { getConfig } from "./lib/config"
 import { Logger } from "./lib/logger"
 import { Janitor, type SessionStats } from "./lib/janitor"
-
 import { checkForUpdates } from "./lib/version-checker"
 
 /**
@@ -149,7 +148,7 @@ const plugin: Plugin = (async (ctx) => {
     })
 
     // Check for updates on launch (fire and forget)
-    checkForUpdates(ctx.client, logger).catch(() => { })
+    checkForUpdates(ctx.client, logger).catch(() => {})
 
     // Show migration toast if config was migrated (delayed to not overlap with version toast)
     if (migrations.length > 0) {
