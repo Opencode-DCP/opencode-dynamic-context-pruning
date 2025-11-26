@@ -70,7 +70,7 @@ export class Janitor {
      * Convenience method for idle-triggered pruning (sends notification automatically)
      */
     async runOnIdle(sessionID: string, strategies: PruningStrategy[]): Promise<void> {
-        const result = await this.runWithStrategies(sessionID, strategies, { trigger: 'idle' })
+        await this.runWithStrategies(sessionID, strategies, { trigger: 'idle' })
         // Notification is handled inside runWithStrategies
     }
 
@@ -196,7 +196,7 @@ export class Janitor {
             // ============================================================
             let llmPrunedIds: string[] = []
 
-            if (strategies.includes('llm-analysis')) {
+            if (strategies.includes('ai-analysis')) {
                 // Filter out duplicates and protected tools
                 const protectedToolCallIds: string[] = []
                 const prunableToolCallIds = unprunedToolCallIds.filter(id => {
@@ -253,7 +253,6 @@ export class Janitor {
                     const analysisPrompt = buildAnalysisPrompt(
                         prunableToolCallIds,
                         sanitizedMessages,
-                        this.protectedTools,
                         allPrunedSoFar,
                         protectedToolCallIds,
                         options.reason
@@ -342,8 +341,8 @@ export class Janitor {
             this.statsState.set(sessionID, sessionStats)
 
             // Determine notification mode based on which strategies ran
-            const hasLlmAnalysis = strategies.includes('llm-analysis')
-            
+            const hasLlmAnalysis = strategies.includes('ai-analysis')
+
             if (hasLlmAnalysis) {
                 await this.sendSmartModeNotification(
                     sessionID,
@@ -377,13 +376,13 @@ export class Janitor {
             const keptCount = candidateCount - prunedCount
             const hasBoth = deduplicatedIds.length > 0 && llmPrunedIds.length > 0
             const breakdown = hasBoth ? ` (${deduplicatedIds.length} duplicate, ${llmPrunedIds.length} llm)` : ""
-            
+
             // Build log metadata
             const logMeta: Record<string, any> = { trigger: options.trigger }
             if (options.reason) {
                 logMeta.reason = options.reason
             }
-            
+
             this.logger.info("janitor", `Pruned ${prunedCount}/${candidateCount} tools${breakdown}, ${keptCount} kept (~${formatTokenCount(tokensSaved)} tokens)`, logMeta)
 
             return {
@@ -569,6 +568,73 @@ export class Janitor {
     }
 
     /**
+     * Group deduplication details by tool type
+     * Shared helper used by notifications and tool output formatting
+     */
+    private groupDeduplicationDetails(
+        deduplicationDetails: Map<string, any>
+    ): Map<string, Array<{ count: number, key: string }>> {
+        const grouped = new Map<string, Array<{ count: number, key: string }>>()
+
+        for (const [_, details] of deduplicationDetails) {
+            const { toolName, parameterKey, duplicateCount } = details
+            if (!grouped.has(toolName)) {
+                grouped.set(toolName, [])
+            }
+            grouped.get(toolName)!.push({
+                count: duplicateCount,
+                key: this.shortenPath(parameterKey)
+            })
+        }
+
+        return grouped
+    }
+
+    /**
+     * Format grouped deduplication results as lines
+     * Shared helper for building deduplication summaries
+     */
+    private formatDeduplicationLines(
+        grouped: Map<string, Array<{ count: number, key: string }>>,
+        indent: string = '  '
+    ): string[] {
+        const lines: string[] = []
+
+        for (const [toolName, items] of grouped.entries()) {
+            for (const item of items) {
+                const removedCount = item.count - 1
+                lines.push(`${indent}${toolName}: ${item.key} (${removedCount}× duplicate)`)
+            }
+        }
+
+        return lines
+    }
+
+    /**
+     * Format tool summary (from buildToolsSummary) as lines
+     * Shared helper for building LLM-pruned summaries
+     */
+    private formatToolSummaryLines(
+        toolsSummary: Map<string, string[]>,
+        indent: string = '  '
+    ): string[] {
+        const lines: string[] = []
+
+        for (const [toolName, params] of toolsSummary.entries()) {
+            if (params.length === 1) {
+                lines.push(`${indent}${toolName}: ${params[0]}`)
+            } else if (params.length > 1) {
+                lines.push(`${indent}${toolName} (${params.length}):`)
+                for (const param of params) {
+                    lines.push(`${indent}  ${param}`)
+                }
+            }
+        }
+
+        return lines
+    }
+
+    /**
      * Send minimal summary notification (just tokens saved and count)
      */
     private async sendMinimalNotification(
@@ -625,21 +691,10 @@ export class Janitor {
         }
         message += '\n'
 
-        // Group by tool type
-        const grouped = new Map<string, Array<{ count: number, key: string }>>()
+        // Group by tool type using shared helper
+        const grouped = this.groupDeduplicationDetails(deduplicationDetails)
 
-        for (const [_, details] of deduplicationDetails) {
-            const { toolName, parameterKey, duplicateCount } = details
-            if (!grouped.has(toolName)) {
-                grouped.set(toolName, [])
-            }
-            grouped.get(toolName)!.push({
-                count: duplicateCount,
-                key: this.shortenPath(parameterKey)
-            })
-        }
-
-        // Display grouped results
+        // Display grouped results (with UI-specific formatting: total dupes header, limit to 5)
         for (const [toolName, items] of grouped.entries()) {
             const totalDupes = items.reduce((sum, item) => sum + (item.count - 1), 0)
             message += `\n${toolName} (${totalDupes} duplicate${totalDupes > 1 ? 's' : ''}):\n`
@@ -655,6 +710,33 @@ export class Janitor {
         }
 
         await this.sendIgnoredMessage(sessionID, message.trim())
+    }
+
+    /**
+     * Format pruning result for tool output (returned to AI)
+     * Uses shared helpers for consistency with UI notifications
+     */
+    formatPruningResultForTool(result: PruningResult): string {
+        const lines: string[] = []
+        lines.push(`Context pruning complete. Pruned ${result.prunedCount} tool outputs.`)
+        lines.push('')
+
+        // Section 1: Deduplicated tools
+        if (result.deduplicatedIds.length > 0 && result.deduplicationDetails.size > 0) {
+            lines.push(`Duplicates removed (${result.deduplicatedIds.length}):`)
+            const grouped = this.groupDeduplicationDetails(result.deduplicationDetails)
+            lines.push(...this.formatDeduplicationLines(grouped))
+            lines.push('')
+        }
+
+        // Section 2: LLM-pruned tools
+        if (result.llmPrunedIds.length > 0) {
+            lines.push(`Semantically pruned (${result.llmPrunedIds.length}):`)
+            const toolsSummary = this.buildToolsSummary(result.llmPrunedIds, result.toolMetadata)
+            lines.push(...this.formatToolSummaryLines(toolsSummary))
+        }
+
+        return lines.join('\n').trim()
     }
 
     /**
@@ -695,20 +777,7 @@ export class Janitor {
         // Section 1: Deduplicated tools
         if (deduplicatedIds.length > 0 && deduplicationDetails) {
             message += `\n📦 Duplicates removed (${deduplicatedIds.length}):\n`
-
-            // Group by tool type
-            const grouped = new Map<string, Array<{ count: number, key: string }>>()
-
-            for (const [_, details] of deduplicationDetails) {
-                const { toolName, parameterKey, duplicateCount } = details
-                if (!grouped.has(toolName)) {
-                    grouped.set(toolName, [])
-                }
-                grouped.get(toolName)!.push({
-                    count: duplicateCount,
-                    key: this.shortenPath(parameterKey)
-                })
-            }
+            const grouped = this.groupDeduplicationDetails(deduplicationDetails)
 
             for (const [toolName, items] of grouped.entries()) {
                 message += `  ${toolName}:\n`
@@ -722,8 +791,6 @@ export class Janitor {
         // Section 2: LLM-pruned tools
         if (llmPrunedIds.length > 0) {
             message += `\n🤖 LLM analysis (${llmPrunedIds.length}):\n`
-
-            // Use buildToolsSummary logic
             const toolsSummary = this.buildToolsSummary(llmPrunedIds, toolMetadata)
 
             for (const [toolName, params] of toolsSummary.entries()) {

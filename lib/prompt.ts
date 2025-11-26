@@ -106,7 +106,6 @@ function minimizeMessages(messages: any[], alreadyPrunedIds?: string[], protecte
 export function buildAnalysisPrompt(
     unprunedToolCallIds: string[],
     messages: any[],
-    protectedTools: string[],
     alreadyPrunedIds?: string[],
     protectedToolCallIds?: string[],
     reason?: string  // Optional reason from tool call

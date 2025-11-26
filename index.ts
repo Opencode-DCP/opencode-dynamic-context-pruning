@@ -4,7 +4,7 @@ import { tool } from "@opencode-ai/plugin"
 import { getConfig } from "./lib/config"
 import { Logger } from "./lib/logger"
 import { Janitor, type SessionStats } from "./lib/janitor"
-import { formatTokenCount } from "./lib/tokenizer"
+
 import { checkForUpdates } from "./lib/version-checker"
 
 /**
@@ -149,7 +149,7 @@ const plugin: Plugin = (async (ctx) => {
     })
 
     // Check for updates on launch (fire and forget)
-    checkForUpdates(ctx.client, logger).catch(() => {})
+    checkForUpdates(ctx.client, logger).catch(() => { })
 
     // Show migration toast if config was migrated (delayed to not overlap with version toast)
     if (migrations.length > 0) {
@@ -177,7 +177,7 @@ const plugin: Plugin = (async (ctx) => {
             if (event.type === "session.status" && event.properties.status.type === "idle") {
                 // Skip pruning for subagent sessions
                 if (await isSubagentSession(ctx.client, event.properties.sessionID)) return
-                
+
                 // Skip if no idle strategies configured
                 if (config.strategies.onIdle.length === 0) return
 
@@ -191,7 +191,7 @@ const plugin: Plugin = (async (ctx) => {
         /**
          * Chat Params Hook: Caches model info for janitor
          */
-        "chat.params": async (input, output) => {
+        "chat.params": async (input, _output) => {
             const sessionId = input.sessionID
 
             // Cache model information for this session so janitor can access it
@@ -217,11 +217,37 @@ const plugin: Plugin = (async (ctx) => {
          */
         tool: config.strategies.onTool.length > 0 ? {
             context_pruning: tool({
-                description: "Performs semantic pruning on session tool outputs that are no longer " +
-                    "relevant to the current task. Use this to declutter the conversation context and " +
-                    "filter signal from noise when you notice the context is getting cluttered with " +
-                    "outdated information (e.g., after completing a debugging session, switching to a " +
-                    "new task, or when old file reads are no longer needed).",
+                description: `Performs semantic pruning on session tool outputs that are no longer relevant to the current task. Use this to declutter the conversation context and filter signal from noise when you notice the context is getting cluttered with outdated information.
+
+## When to Use This Tool
+
+- After completing a debugging session or fixing a bug
+- When switching focus to a new task or feature
+- After exploring multiple files that didn't lead to changes
+- When you've been iterating on a difficult problem and some approaches didn't pan out
+- When old file reads, greps, or bash outputs are no longer relevant
+
+## Examples
+
+<example>
+Working through a list of bugs to fix:
+User: Please fix these 5 type errors in the codebase.
+Assistant: I'll work through each error. [Fixes first error]
+First error fixed. Let me prune the debugging context before moving to the next one.
+[Uses context_pruning with reason: "first bug fixed, moving to next task"]
+</example>
+
+<example>
+After exploring the codebase to understand it:
+Assistant: I've reviewed the relevant files. Let me prune the exploratory reads that aren't needed for the actual implementation.
+[Uses context_pruning with reason: "exploration complete, pruning unrelated file reads"]
+</example>
+
+<example>
+After trying multiple approaches that didn't work:
+Assistant: I've been trying several approaches to fix this issue. Let me prune the failed attempts to keep focus on the working solution.
+[Uses context_pruning with reason: "pruning failed iteration attempts, keeping working solution context"]
+</example>`,
                 args: {
                     reason: tool.schema.string().optional().describe(
                         "Brief reason for triggering pruning (e.g., 'task complete', 'switching focus')"
@@ -238,7 +264,7 @@ const plugin: Plugin = (async (ctx) => {
                         return "No prunable tool outputs found. Context is already optimized."
                     }
 
-                    return `Context pruning complete. Pruned ${result.prunedCount} tool outputs (~${formatTokenCount(result.tokensSaved)} tokens saved).`
+                    return janitor.formatPruningResultForTool(result)
                 },
             }),
         } : undefined,
