@@ -21,7 +21,7 @@ Add to your OpenCode config:
 ```jsonc
 // opencode.jsonc
 {
-  "plugins": ["@tarquinen/opencode-dcp@0.3.16"]
+  "plugins": ["@tarquinen/opencode-dcp@0.3.17"]
 }
 ```
 
