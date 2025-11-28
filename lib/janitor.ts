@@ -15,6 +15,7 @@ export interface SessionStats {
 export interface PruningResult {
     prunedCount: number
     tokensSaved: number
+    thinkingIds: string[]
     deduplicatedIds: string[]
     llmPrunedIds: string[]
     deduplicationDetails: Map<string, any>
@@ -154,6 +155,12 @@ export class Janitor {
                 const metadata = toolMetadata.get(id)
                 return !metadata || !this.protectedTools.includes(metadata.tool)
             }).length
+
+            // PHASE 1.5: STRIP-REASONING
+            let reasoningPrunedIds: string[] = []
+
+            if (strategies.includes('strip-reasoning')) {
+            }
 
             // PHASE 2: LLM ANALYSIS
             let llmPrunedIds: string[] = []
@@ -329,6 +336,7 @@ export class Janitor {
             return {
                 prunedCount: finalNewlyPrunedIds.length,
                 tokensSaved,
+                thinkingIds: [],
                 deduplicatedIds,
                 llmPrunedIds: expandedLlmPrunedIds,
                 deduplicationDetails,

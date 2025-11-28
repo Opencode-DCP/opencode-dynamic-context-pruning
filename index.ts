@@ -63,10 +63,22 @@ const plugin: Plugin = (async (ctx) => {
         if (init?.body && typeof init.body === 'string') {
             try {
                 const body = JSON.parse(init.body)
+
                 if (body.messages && Array.isArray(body.messages)) {
                     cacheToolParameters(body.messages)
 
-                    const toolMessages = body.messages.filter((m: any) => m.role === 'tool')
+                    // Check for tool messages in both formats:
+                    // 1. OpenAI style: role === 'tool'
+                    // 2. Anthropic style: role === 'user' with content containing tool_result
+                    const toolMessages = body.messages.filter((m: any) => {
+                        if (m.role === 'tool') return true
+                        if (m.role === 'user' && Array.isArray(m.content)) {
+                            for (const part of m.content) {
+                                if (part.type === 'tool_result') return true
+                            }
+                        }
+                        return false
+                    })
 
                     const allSessions = await ctx.client.session.list()
                     const allPrunedIds = new Set<string>()
@@ -83,6 +95,7 @@ const plugin: Plugin = (async (ctx) => {
                         let replacedCount = 0
 
                         body.messages = body.messages.map((m: any) => {
+                            // OpenAI style: role === 'tool' with tool_call_id
                             if (m.role === 'tool' && allPrunedIds.has(m.tool_call_id?.toLowerCase())) {
                                 replacedCount++
                                 return {
@@ -90,6 +103,26 @@ const plugin: Plugin = (async (ctx) => {
                                     content: '[Output removed to save context - information superseded or no longer needed]'
                                 }
                             }
+
+                            // Anthropic style: role === 'user' with content array containing tool_result
+                            if (m.role === 'user' && Array.isArray(m.content)) {
+                                let messageModified = false
+                                const newContent = m.content.map((part: any) => {
+                                    if (part.type === 'tool_result' && allPrunedIds.has(part.tool_use_id?.toLowerCase())) {
+                                        messageModified = true
+                                        replacedCount++
+                                        return {
+                                            ...part,
+                                            content: '[Output removed to save context - information superseded or no longer needed]'
+                                        }
+                                    }
+                                    return part
+                                })
+                                if (messageModified) {
+                                    return { ...m, content: newContent }
+                                }
+                            }
+
                             return m
                         })
 

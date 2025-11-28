@@ -5,7 +5,7 @@ import { parse } from 'jsonc-parser'
 import { Logger } from './logger'
 import type { PluginInput } from '@opencode-ai/plugin'
 
-export type PruningStrategy = "deduplication" | "ai-analysis"
+export type PruningStrategy = "deduplication" | "ai-analysis" | "strip-reasoning"
 
 export interface PluginConfig {
     enabled: boolean
@@ -34,8 +34,8 @@ const defaultConfig: PluginConfig = {
     strictModelSelection: false,
     pruning_summary: 'detailed',
     strategies: {
-        onIdle: ['deduplication', 'ai-analysis'],
-        onTool: ['deduplication', 'ai-analysis']
+        onIdle: ['deduplication', 'ai-analysis', "strip-reasoning"],
+        onTool: ['deduplication', 'ai-analysis', "strip-reasoning"]
     }
 }
 
