@@ -22,10 +22,10 @@ export function createPruningTool(client: any, janitor: Janitor, config: PluginC
             ),
         },
         async execute(args, ctx) {
-            // Skip pruning in subagent sessions, but guide the model to provide a proper summary
-            // TODO: implement something better here when PR 4913 is merged
+            // Skip pruning in subagent sessions, but guide the model to continue its work
+            // TODO: remove this workaround when PR 4913 is merged (primary_tools config)
             if (await isSubagentSession(client, ctx.sessionID)) {
-                return "Pruning is disabled in subagent sessions. IMPORTANT: You must now provide your final summary/findings to return to the main agent. Do not call this tool again - simply respond with your results."
+                return "Pruning is unavailable in subagent sessions. Continue with your current task - if you were in the middle of work, proceed with your next step. If you had just finished, provide your final summary/findings to return to the main agent."
             }
 
             const result = await janitor.runForTool(
