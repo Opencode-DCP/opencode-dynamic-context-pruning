@@ -86,7 +86,7 @@ export function installFetchWrapper(
                     const alreadyPruned = state.prunedIds.get(sessionId) ?? []
                     const alreadyPrunedLower = new Set(alreadyPruned.map(id => id.toLowerCase()))
                     const unpruned = toolIds.filter(id => !alreadyPrunedLower.has(id.toLowerCase()))
-                    if (unpruned.length > 0) {
+                    if (unpruned.length > 1) {
                         const { duplicateIds } = detectDuplicates(state.toolParameters, unpruned, config.protectedTools)
                         if (duplicateIds.length > 0) {
                             state.prunedIds.set(sessionId, [...new Set([...alreadyPruned, ...duplicateIds])])
