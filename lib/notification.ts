@@ -126,7 +126,6 @@ async function sendDetailedSummary(
     const missingTools = llmPrunedIds.filter(id => {
         const normalizedId = id.toLowerCase()
         const metadata = toolMetadata.get(normalizedId)
-        if (metadata?.tool === 'batch') return false
         return !metadata || !foundToolNames.has(metadata.tool)
     })
 
@@ -174,7 +173,6 @@ export function buildToolsSummary(
         const metadata = toolMetadata.get(normalizedId)
         if (metadata) {
             const toolName = metadata.tool
-            if (toolName === 'batch') continue
             if (!toolsSummary.has(toolName)) {
                 toolsSummary.set(toolName, [])
             }
