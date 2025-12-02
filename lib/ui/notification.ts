@@ -85,7 +85,7 @@ function buildMinimalMessage(data: NotificationData): string {
 
         let cycleStats = `${data.aiPrunedCount} ${toolText}`
         if (hasGcActivity) {
-            cycleStats += `, ♻️ ~${formatTokenCount(data.gcPending!.tokensCollected)}`
+            cycleStats += `, 🗑️ ~${formatTokenCount(data.gcPending!.tokensCollected)}`
         }
 
         let message = `🧹 DCP: ~${totalSaved} saved (${cycleStats})`
@@ -95,7 +95,7 @@ function buildMinimalMessage(data: NotificationData): string {
     } else {
         const tokensCollected = formatTokenCount(data.gcPending!.tokensCollected)
 
-        let message = `♻️ DCP: ~${tokensCollected} collected`
+        let message = `🗑️ DCP: ~${tokensCollected} collected`
         message += buildSessionSuffix(data.sessionStats, 0)
 
         return message
@@ -115,7 +115,7 @@ function buildDetailedMessage(data: NotificationData, workingDirectory?: string)
 
         let cycleStats = `${data.aiPrunedCount} ${toolText}`
         if (hasGcActivity) {
-            cycleStats += `, ♻️ ~${formatTokenCount(data.gcPending!.tokensCollected)}`
+            cycleStats += `, 🗑️ ~${formatTokenCount(data.gcPending!.tokensCollected)}`
         }
 
         message = `🧹 DCP: ~${totalSaved} saved (${cycleStats})`
@@ -147,7 +147,7 @@ function buildDetailedMessage(data: NotificationData, workingDirectory?: string)
     } else {
         const tokensCollected = formatTokenCount(data.gcPending!.tokensCollected)
 
-        message = `♻️ DCP: ~${tokensCollected} collected`
+        message = `🗑️ DCP: ~${tokensCollected} collected`
         message += buildSessionSuffix(data.sessionStats, 0)
     }
 
@@ -166,7 +166,7 @@ function buildSessionSuffix(sessionStats: SessionStats | null, currentAiPruned: 
     let suffix = ` │ Session: ~${formatTokenCount(sessionStats.totalTokensSaved)} (${sessionStats.totalToolsPruned} tools`
 
     if (sessionStats.totalGCTokens > 0) {
-        suffix += `, ♻️ ~${formatTokenCount(sessionStats.totalGCTokens)}`
+        suffix += `, 🗑️ ~${formatTokenCount(sessionStats.totalGCTokens)}`
     }
 
     suffix += ')'
