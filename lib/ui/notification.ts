@@ -159,6 +159,8 @@ export function formatPruningResultForTool(
 
 // ============================================================================
 // Summary building helpers
+// Groups pruned tool IDs by tool name with their key parameter (file path, command, etc.)
+// for human-readable display: e.g. "read (3): foo.ts, bar.ts, baz.ts"
 // ============================================================================
 
 export function buildToolsSummary(
