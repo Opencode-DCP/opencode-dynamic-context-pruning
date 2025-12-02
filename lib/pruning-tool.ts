@@ -1,5 +1,7 @@
 import { tool } from "@opencode-ai/plugin"
-import type { Janitor } from "./janitor"
+import type { JanitorContext } from "./janitor"
+import { runOnTool } from "./janitor"
+import { formatPruningResultForTool } from "./notification"
 import type { PluginConfig } from "./config"
 import type { ToolTracker } from "./synth-instruction"
 import { resetToolTrackerCount } from "./synth-instruction"
@@ -13,7 +15,7 @@ export const CONTEXT_PRUNING_DESCRIPTION = loadPrompt("tool")
  * Creates the prune tool definition.
  * Returns a tool definition that can be passed to the plugin's tool registry.
  */
-export function createPruningTool(client: any, janitor: Janitor, config: PluginConfig, toolTracker: ToolTracker): ReturnType<typeof tool> {
+export function createPruningTool(client: any, janitorCtx: JanitorContext, config: PluginConfig, toolTracker: ToolTracker): ReturnType<typeof tool> {
     return tool({
         description: CONTEXT_PRUNING_DESCRIPTION,
         args: {
@@ -28,7 +30,8 @@ export function createPruningTool(client: any, janitor: Janitor, config: PluginC
                 return "Pruning is unavailable in subagent sessions. Do not call this tool again. Continue with your current task - if you were in the middle of work, proceed with your next step. If you had just finished, provide your final summary/findings to return to the main agent."
             }
 
-            const result = await janitor.runForTool(
+            const result = await runOnTool(
+                janitorCtx,
                 ctx.sessionID,
                 config.strategies.onTool,
                 args.reason
@@ -48,7 +51,7 @@ export function createPruningTool(client: any, janitor: Janitor, config: PluginC
                 return "No prunable tool outputs found. Context is already optimized." + postPruneGuidance
             }
 
-            return janitor.formatPruningResultForTool(result) + postPruneGuidance
+            return formatPruningResultForTool(result, janitorCtx.config.workingDirectory) + postPruneGuidance
         },
     })
 }

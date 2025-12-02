@@ -1,7 +1,7 @@
 import type { Plugin } from "@opencode-ai/plugin"
 import { getConfig } from "./lib/config"
 import { Logger } from "./lib/logger"
-import { Janitor } from "./lib/janitor"
+import { createJanitorContext } from "./lib/janitor"
 import { checkForUpdates } from "./lib/version-checker"
 import { createPluginState } from "./lib/state"
 import { installFetchWrapper } from "./lib/fetch-wrapper"
@@ -26,16 +26,18 @@ const plugin: Plugin = (async (ctx) => {
     const logger = new Logger(config.debug)
     const state = createPluginState()
 
-    const janitor = new Janitor(
+    const janitorCtx = createJanitorContext(
         ctx.client,
         state,
         logger,
-        config.protectedTools,
-        config.model,
-        config.showModelErrorToasts,
-        config.strictModelSelection,
-        config.pruning_summary,
-        ctx.directory
+        {
+            protectedTools: config.protectedTools,
+            model: config.model,
+            showModelErrorToasts: config.showModelErrorToasts ?? true,
+            strictModelSelection: config.strictModelSelection ?? false,
+            pruningSummary: config.pruning_summary,
+            workingDirectory: ctx.directory
+        }
     )
 
     // Create tool tracker and load prompts for synthetic instruction injection
@@ -85,10 +87,10 @@ const plugin: Plugin = (async (ctx) => {
     }
 
     return {
-        event: createEventHandler(ctx.client, janitor, logger, config, toolTracker),
+        event: createEventHandler(ctx.client, janitorCtx, logger, config, toolTracker),
         "chat.params": createChatParamsHandler(ctx.client, state, logger),
         tool: config.strategies.onTool.length > 0 ? {
-            prune: createPruningTool(ctx.client, janitor, config, toolTracker),
+            prune: createPruningTool(ctx.client, janitorCtx, config, toolTracker),
         } : undefined,
     }
 }) satisfies Plugin
