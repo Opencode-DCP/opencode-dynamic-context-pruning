@@ -85,7 +85,7 @@ function buildMinimalMessage(data: NotificationData): string {
 
         let cycleStats = `${data.aiPrunedCount} ${toolText}`
         if (hasGcActivity) {
-            cycleStats += `, 🗑️ ~${formatTokenCount(data.gcPending!.tokensCollected)}`
+            cycleStats += `, ~${formatTokenCount(data.gcPending!.tokensCollected)} 🗑️`
         }
 
         let message = `🧹 DCP: ~${totalSaved} saved (${cycleStats})`
@@ -115,7 +115,7 @@ function buildDetailedMessage(data: NotificationData, workingDirectory?: string)
 
         let cycleStats = `${data.aiPrunedCount} ${toolText}`
         if (hasGcActivity) {
-            cycleStats += `, 🗑️ ~${formatTokenCount(data.gcPending!.tokensCollected)}`
+            cycleStats += `, ~${formatTokenCount(data.gcPending!.tokensCollected)} 🗑️`
         }
 
         message = `🧹 DCP: ~${totalSaved} saved (${cycleStats})`
@@ -163,10 +163,11 @@ function buildSessionSuffix(sessionStats: SessionStats | null, currentAiPruned: 
         return ''
     }
 
-    let suffix = ` │ Session: ~${formatTokenCount(sessionStats.totalTokensSaved)} (${sessionStats.totalToolsPruned} tools`
+    const totalSaved = sessionStats.totalTokensSaved + sessionStats.totalGCTokens
+    let suffix = ` │ Session: ~${formatTokenCount(totalSaved)} (${sessionStats.totalToolsPruned} tools`
 
     if (sessionStats.totalGCTokens > 0) {
-        suffix += `, 🗑️ ~${formatTokenCount(sessionStats.totalGCTokens)}`
+        suffix += `, ~${formatTokenCount(sessionStats.totalGCTokens)} 🗑️`
     }
 
     suffix += ')'
