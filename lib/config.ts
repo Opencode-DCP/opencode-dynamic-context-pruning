@@ -30,7 +30,7 @@ export interface ConfigResult {
 const defaultConfig: PluginConfig = {
     enabled: true,
     debug: false,
-    protectedTools: ['task', 'todowrite', 'todoread', 'prune'],
+    protectedTools: ['task', 'todowrite', 'todoread', 'prune', 'batch'],
     showModelErrorToasts: true,
     strictModelSelection: false,
     pruning_summary: 'detailed',

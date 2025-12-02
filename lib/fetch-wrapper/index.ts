@@ -1,12 +1,13 @@
 import type { PluginState } from "../state"
 import type { Logger } from "../logger"
 import type { FetchHandlerContext, SynthPrompts } from "./types"
-import type { ToolTracker } from "../synth-instruction"
+import type { ToolTracker } from "../api-formats/synth-instruction"
 import type { PluginConfig } from "../config"
 import { handleOpenAIChatAndAnthropic } from "./openai-chat"
 import { handleGemini } from "./gemini"
 import { handleOpenAIResponses } from "./openai-responses"
-import { detectDuplicates } from "../deduplicator"
+import { runStrategies } from "../core/strategies"
+import { accumulateGCStats } from "./gc-tracker"
 
 export type { FetchHandlerContext, FetchHandlerResult, SynthPrompts } from "./types"
 
@@ -79,7 +80,7 @@ export function installFetchWrapper(
                     }
                 }
 
-                // Run deduplication after handlers have populated toolParameters cache
+                // Run strategies after handlers have populated toolParameters cache
                 const sessionId = state.lastSeenSessionId
                 if (sessionId && state.toolParameters.size > 0) {
                     const toolIds = Array.from(state.toolParameters.keys())
@@ -87,11 +88,18 @@ export function installFetchWrapper(
                     const alreadyPrunedLower = new Set(alreadyPruned.map(id => id.toLowerCase()))
                     const unpruned = toolIds.filter(id => !alreadyPrunedLower.has(id.toLowerCase()))
                     if (unpruned.length > 1) {
-                        const { duplicateIds } = detectDuplicates(state.toolParameters, unpruned, config.protectedTools)
-                        if (duplicateIds.length > 0) {
+                        const result = runStrategies(
+                            state.toolParameters,
+                            unpruned,
+                            config.protectedTools
+                        )
+                        if (result.prunedIds.length > 0) {
                             // Normalize to lowercase to match janitor's ID normalization
-                            const normalizedIds = duplicateIds.map(id => id.toLowerCase())
+                            const normalizedIds = result.prunedIds.map(id => id.toLowerCase())
                             state.prunedIds.set(sessionId, [...new Set([...alreadyPruned, ...normalizedIds])])
+
+                            // Track GC activity for the next notification
+                            accumulateGCStats(state, sessionId, result.prunedIds, body, logger)
                         }
                     }
                 }

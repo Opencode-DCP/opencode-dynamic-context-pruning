@@ -1,9 +1,10 @@
 import type { PluginState } from "./state"
 import type { Logger } from "./logger"
-import type { Janitor } from "./janitor"
+import type { JanitorContext } from "./core/janitor"
+import { runOnIdle } from "./core/janitor"
 import type { PluginConfig, PruningStrategy } from "./config"
-import type { ToolTracker } from "./synth-instruction"
-import { resetToolTrackerCount } from "./synth-instruction"
+import type { ToolTracker } from "./api-formats/synth-instruction"
+import { resetToolTrackerCount } from "./api-formats/synth-instruction"
 
 export async function isSubagentSession(client: any, sessionID: string): Promise<boolean> {
     try {
@@ -20,7 +21,7 @@ function toolStrategiesCoveredByIdle(onIdle: PruningStrategy[], onTool: PruningS
 
 export function createEventHandler(
     client: any,
-    janitor: Janitor,
+    janitorCtx: JanitorContext,
     logger: Logger,
     config: PluginConfig,
     toolTracker?: ToolTracker
@@ -40,7 +41,7 @@ export function createEventHandler(
             }
 
             try {
-                const result = await janitor.runOnIdle(event.properties.sessionID, config.strategies.onIdle)
+                const result = await runOnIdle(janitorCtx, event.properties.sessionID, config.strategies.onIdle)
 
                 // Reset nudge counter if idle pruning succeeded and covers tool strategies
                 if (result && result.prunedCount > 0 && toolTracker && config.nudge_freq > 0) {
