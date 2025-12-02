@@ -131,7 +131,7 @@ async function runWithStrategies(
         }
 
         const currentAgent = findCurrentAgent(messages)
-        const { toolCallIds, toolOutputs, toolMetadata, batchToolChildren } = parseMessages(messages, state.toolParameters)
+        const { toolCallIds, toolOutputs, toolMetadata } = parseMessages(messages, state.toolParameters)
 
         const alreadyPrunedIds = state.prunedIds.get(sessionID) ?? []
         const unprunedToolCallIds = toolCallIds.filter(id => !alreadyPrunedIds.includes(id))
@@ -161,15 +161,13 @@ async function runWithStrategies(
             )
         }
 
-        // PHASE 2: EXPAND BATCH CHILDREN
         if (llmPrunedIds.length === 0) {
             return null
         }
 
-        const expandedPrunedIds = expandBatchIds(llmPrunedIds, batchToolChildren)
-        const finalNewlyPrunedIds = expandedPrunedIds.filter(id => !alreadyPrunedIds.includes(id))
+        const finalNewlyPrunedIds = llmPrunedIds.filter(id => !alreadyPrunedIds.includes(id))
 
-        // PHASE 3: CALCULATE STATS & NOTIFICATION
+        // PHASE 2: CALCULATE STATS & NOTIFICATION
         const tokensSaved = await calculateTokensSaved(finalNewlyPrunedIds, toolOutputs)
 
         const currentStats = state.stats.get(sessionID) ?? { totalToolsPruned: 0, totalTokensSaved: 0 }
@@ -182,15 +180,15 @@ async function runWithStrategies(
         await sendPruningSummary(
             ctx.notificationCtx,
             sessionID,
-            expandedPrunedIds,
+            llmPrunedIds,
             toolMetadata,
             tokensSaved,
             sessionStats,
             currentAgent
         )
 
-        // PHASE 4: STATE UPDATE
-        const allPrunedIds = [...new Set([...alreadyPrunedIds, ...expandedPrunedIds])]
+        // PHASE 3: STATE UPDATE
+        const allPrunedIds = [...new Set([...alreadyPrunedIds, ...llmPrunedIds])]
         state.prunedIds.set(sessionID, allPrunedIds)
 
         const sessionName = sessionInfo?.title
@@ -211,7 +209,7 @@ async function runWithStrategies(
         return {
             prunedCount: finalNewlyPrunedIds.length,
             tokensSaved,
-            llmPrunedIds: expandedPrunedIds,
+            llmPrunedIds,
             toolMetadata,
             sessionStats
         }
@@ -345,7 +343,6 @@ interface ParsedMessages {
     toolCallIds: string[]
     toolOutputs: Map<string, string>
     toolMetadata: Map<string, { tool: string, parameters?: any }>
-    batchToolChildren: Map<string, string[]>
 }
 
 function parseMessages(
@@ -355,8 +352,6 @@ function parseMessages(
     const toolCallIds: string[] = []
     const toolOutputs = new Map<string, string>()
     const toolMetadata = new Map<string, { tool: string, parameters?: any }>()
-    const batchToolChildren = new Map<string, string[]>()
-    let currentBatchId: string | null = null
 
     for (const msg of messages) {
         if (msg.parts) {
@@ -376,21 +371,12 @@ function parseMessages(
                     if (part.state?.status === "completed" && part.state.output) {
                         toolOutputs.set(normalizedId, part.state.output)
                     }
-
-                    if (part.tool === "batch") {
-                        currentBatchId = normalizedId
-                        batchToolChildren.set(normalizedId, [])
-                    } else if (currentBatchId && normalizedId.startsWith('prt_')) {
-                        batchToolChildren.get(currentBatchId)!.push(normalizedId)
-                    } else if (currentBatchId && !normalizedId.startsWith('prt_')) {
-                        currentBatchId = null
-                    }
                 }
             }
         }
     }
 
-    return { toolCallIds, toolOutputs, toolMetadata, batchToolChildren }
+    return { toolCallIds, toolOutputs, toolMetadata }
 }
 
 function findCurrentAgent(messages: any[]): string | undefined {
@@ -407,19 +393,6 @@ function findCurrentAgent(messages: any[]): string | undefined {
 // ============================================================================
 // Helpers
 // ============================================================================
-
-function expandBatchIds(ids: string[], batchToolChildren: Map<string, string[]>): string[] {
-    const expanded = new Set<string>()
-    for (const id of ids) {
-        const normalizedId = id.toLowerCase()
-        expanded.add(normalizedId)
-        const children = batchToolChildren.get(normalizedId)
-        if (children) {
-            children.forEach(childId => expanded.add(childId))
-        }
-    }
-    return Array.from(expanded)
-}
 
 function replacePrunedToolOutputs(messages: any[], prunedIds: string[]): any[] {
     if (prunedIds.length === 0) return messages
