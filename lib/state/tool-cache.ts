@@ -1,35 +1,72 @@
 import type { PluginState } from "./index"
+import type { Logger } from "../logger"
 
 /**
- * Cache tool parameters from OpenAI Chat Completions style messages.
- * Extracts tool call IDs and their parameters from assistant messages with tool_calls.
+ * Cache tool parameters from OpenAI Chat Completions and Anthropic style messages.
+ * Extracts tool call IDs and their parameters from assistant messages.
+ * 
+ * Supports:
+ * - OpenAI format: message.tool_calls[] with id, function.name, function.arguments
+ * - Anthropic format: message.content[] with type='tool_use', id, name, input
  */
 export function cacheToolParametersFromMessages(
     messages: any[],
-    state: PluginState
+    state: PluginState,
+    logger?: Logger
 ): void {
+    let openaiCached = 0
+    let anthropicCached = 0
+
     for (const message of messages) {
-        if (message.role !== 'assistant' || !Array.isArray(message.tool_calls)) {
+        if (message.role !== 'assistant') {
             continue
         }
 
-        for (const toolCall of message.tool_calls) {
-            if (!toolCall.id || !toolCall.function) {
-                continue
-            }
+        // OpenAI format: tool_calls array
+        if (Array.isArray(message.tool_calls)) {
+            for (const toolCall of message.tool_calls) {
+                if (!toolCall.id || !toolCall.function) {
+                    continue
+                }
 
-            try {
-                const params = typeof toolCall.function.arguments === 'string'
-                    ? JSON.parse(toolCall.function.arguments)
-                    : toolCall.function.arguments
-                state.toolParameters.set(toolCall.id, {
-                    tool: toolCall.function.name,
-                    parameters: params
-                })
-            } catch (error) {
-                // Silently ignore parse errors
+                try {
+                    const params = typeof toolCall.function.arguments === 'string'
+                        ? JSON.parse(toolCall.function.arguments)
+                        : toolCall.function.arguments
+                    state.toolParameters.set(toolCall.id, {
+                        tool: toolCall.function.name,
+                        parameters: params
+                    })
+                    openaiCached++
+                } catch (error) {
+                    // Silently ignore parse errors
+                }
             }
         }
+
+        // Anthropic format: content array with tool_use blocks
+        if (Array.isArray(message.content)) {
+            for (const part of message.content) {
+                if (part.type !== 'tool_use' || !part.id || !part.name) {
+                    continue
+                }
+
+                state.toolParameters.set(part.id, {
+                    tool: part.name,
+                    parameters: part.input ?? {}
+                })
+                anthropicCached++
+            }
+        }
+    }
+
+    // Log cache results if anything was cached
+    if (logger && (openaiCached > 0 || anthropicCached > 0)) {
+        logger.debug("tool-cache", "Cached tool parameters from messages", {
+            openaiFormat: openaiCached,
+            anthropicFormat: anthropicCached,
+            totalCached: state.toolParameters.size
+        })
     }
 }
 
@@ -39,8 +76,11 @@ export function cacheToolParametersFromMessages(
  */
 export function cacheToolParametersFromInput(
     input: any[],
-    state: PluginState
+    state: PluginState,
+    logger?: Logger
 ): void {
+    let cached = 0
+
     for (const item of input) {
         if (item.type !== 'function_call' || !item.call_id || !item.name) {
             continue
@@ -54,9 +94,17 @@ export function cacheToolParametersFromInput(
                 tool: item.name,
                 parameters: params
             })
+            cached++
         } catch (error) {
             // Silently ignore parse errors
         }
+    }
+
+    if (logger && cached > 0) {
+        logger.debug("tool-cache", "Cached tool parameters from input", {
+            responsesApiFormat: cached,
+            totalCached: state.toolParameters.size
+        })
     }
 }
 

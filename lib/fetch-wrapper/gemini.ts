@@ -4,7 +4,8 @@ import {
     getAllPrunedIds,
     fetchSessionMessages
 } from "./types"
-import { injectNudgeGemini, injectSynthGemini } from "../api-formats/synth-instruction"
+import { injectSynthGemini, countToolResultsGemini } from "../api-formats/synth-instruction"
+import { buildPrunableToolsList, buildEndInjection, injectPrunableListGemini } from "../api-formats/prunable-list"
 
 /**
  * Handles Google/Gemini format (body.contents array with functionResponse parts).
@@ -23,23 +24,40 @@ export async function handleGemini(
 
     // Inject synthetic instructions if onTool strategies are enabled
     if (ctx.config.strategies.onTool.length > 0) {
-        const skipIdleBefore = ctx.toolTracker.skipNextIdle
-
-        // Inject periodic nudge based on tool result count
-        if (ctx.config.nudge_freq > 0) {
-            if (injectNudgeGemini(body.contents, ctx.toolTracker, ctx.prompts.nudgeInstruction, ctx.config.nudge_freq)) {
-                // ctx.logger.info("fetch", "Injected nudge instruction (Gemini)")
-                modified = true
-            }
-        }
-
-        if (skipIdleBefore && !ctx.toolTracker.skipNextIdle) {
-            ctx.logger.debug("fetch", "skipNextIdle was reset by new tool results (Gemini)")
-        }
-
+        // Inject base synthetic instructions (appended to last user content)
         if (injectSynthGemini(body.contents, ctx.prompts.synthInstruction, ctx.prompts.nudgeInstruction)) {
-            // ctx.logger.info("fetch", "Injected synthetic instruction (Gemini)")
             modified = true
+        }
+
+        // Build and inject prunable tools list at the end
+        const sessionId = ctx.state.lastSeenSessionId
+        if (sessionId) {
+            const toolIds = Array.from(ctx.state.toolParameters.keys())
+            const alreadyPruned = ctx.state.prunedIds.get(sessionId) ?? []
+            const alreadyPrunedLower = new Set(alreadyPruned.map(id => id.toLowerCase()))
+            const unprunedIds = toolIds.filter(id => !alreadyPrunedLower.has(id.toLowerCase()))
+
+            const { list: prunableList, numericIds } = buildPrunableToolsList(
+                sessionId,
+                unprunedIds,
+                ctx.state.toolParameters,
+                ctx.config.protectedTools
+            )
+
+            if (prunableList) {
+                // Check if nudge should be included
+                const toolResultCount = countToolResultsGemini(body.contents)
+                const includeNudge = ctx.config.nudge_freq > 0 && toolResultCount > ctx.config.nudge_freq
+
+                const endInjection = buildEndInjection(prunableList, includeNudge)
+                if (injectPrunableListGemini(body.contents, endInjection)) {
+                    ctx.logger.debug("fetch", "Injected prunable tools list (Gemini)", {
+                        ids: numericIds,
+                        nudge: includeNudge
+                    })
+                    modified = true
+                }
+            }
         }
     }
 

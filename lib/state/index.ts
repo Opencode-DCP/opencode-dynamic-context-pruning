@@ -7,7 +7,6 @@ export interface PluginState {
     stats: Map<string, SessionStats>
     gcPending: Map<string, GCStats>
     toolParameters: Map<string, ToolParameterEntry>
-    model: Map<string, ModelInfo>
     googleToolCallMapping: Map<string, Map<string, string>>
     restoredSessions: Set<string>
     checkedSessions: Set<string>
@@ -20,18 +19,12 @@ export interface ToolParameterEntry {
     parameters: any
 }
 
-export interface ModelInfo {
-    providerID: string
-    modelID: string
-}
-
 export function createPluginState(): PluginState {
     return {
         prunedIds: new Map(),
         stats: new Map(),
         gcPending: new Map(),
         toolParameters: new Map(),
-        model: new Map(),
         googleToolCallMapping: new Map(),
         restoredSessions: new Set(),
         checkedSessions: new Set(),

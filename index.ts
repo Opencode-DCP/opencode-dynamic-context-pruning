@@ -90,7 +90,14 @@ const plugin: Plugin = (async (ctx) => {
         event: createEventHandler(ctx.client, janitorCtx, logger, config, toolTracker),
         "chat.params": createChatParamsHandler(ctx.client, state, logger),
         tool: config.strategies.onTool.length > 0 ? {
-            prune: createPruningTool(ctx.client, janitorCtx, config, toolTracker),
+            prune: createPruningTool({
+                client: ctx.client,
+                state,
+                logger,
+                config,
+                notificationCtx: janitorCtx.notificationCtx,
+                workingDirectory: ctx.directory
+            }, toolTracker),
         } : undefined,
     }
 }) satisfies Plugin

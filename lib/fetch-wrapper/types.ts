@@ -48,7 +48,15 @@ export async function getAllPrunedIds(
     if (currentSession) {
         await ensureSessionRestored(state, currentSession.id, logger)
         const prunedIds = state.prunedIds.get(currentSession.id) ?? []
-        prunedIds.forEach((id: string) => allPrunedIds.add(id))
+        // Normalize to lowercase for case-insensitive matching
+        prunedIds.forEach((id: string) => allPrunedIds.add(id.toLowerCase()))
+        
+        if (logger && prunedIds.length > 0) {
+            logger.debug("fetch", "Loaded pruned IDs for replacement", {
+                sessionId: currentSession.id,
+                prunedCount: prunedIds.length
+            })
+        }
     }
 
     return { allSessions, allPrunedIds }

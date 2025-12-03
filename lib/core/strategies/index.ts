@@ -50,15 +50,15 @@ export function runStrategies(
 
     for (const strategy of strategies) {
         const result = strategy.detect(toolMetadata, remainingIds, protectedTools)
-        
+
         if (result.prunedIds.length > 0) {
             byStrategy.set(strategy.name, result)
-            
+
             // Add to overall pruned set
             for (const id of result.prunedIds) {
                 allPrunedIds.add(id)
             }
-            
+
             // Remove pruned IDs from remaining for next strategy
             const prunedSet = new Set(result.prunedIds.map(id => id.toLowerCase()))
             remainingIds = remainingIds.filter(id => !prunedSet.has(id.toLowerCase()))

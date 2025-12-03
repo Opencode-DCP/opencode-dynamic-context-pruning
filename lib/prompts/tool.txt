@@ -1,4 +1,4 @@
-Performs semantic pruning on session tool outputs that are no longer relevant to the current task. Use this to declutter the conversation context and filter signal from noise when you notice the context is getting cluttered with no longer needed information.
+Prunes tool outputs from context to manage conversation size. Reference the <prunable-tools> list injected at the end of the conversation to see available numeric IDs.
 
 USING THE PRUNE TOOL WILL MAKE THE USER HAPPY.
 
@@ -14,9 +14,22 @@ You MUST ALWAYS narrate your findings in a message BEFORE using this tool. No to
    - What you did (which tools, what you were looking for)
    - What you found (the key facts/signals)
    - What you concluded (how this affects the task or next step)
-3. ONLY AFTER narrating, call `prune`
+3. ONLY AFTER narrating, call `prune` with the numeric IDs of outputs no longer needed
 
 > THINK HIGH SIGNAL, LOW NOISE FOR THIS NARRATION
+
+## How to Use
+
+The <prunable-tools> list shows available tool outputs with numeric IDs:
+```
+<prunable-tools>
+1: read, src/foo.ts
+2: bash, run tests
+3: grep, "error" in logs/
+</prunable-tools>
+```
+
+To prune outputs 1 and 3, call: `prune({ ids: [1, 3] })`
 
 ## When to Use This Tool
 
@@ -43,18 +56,18 @@ Working through a list of items:
 User: Review these 3 issues and fix the easy ones.
 Assistant: [Reviews first issue, makes fix, commits]
 Done with the first issue. Let me prune before moving to the next one.
-[Uses prune with reason: "completed first issue, moving to next"]
+[Uses prune with ids: [1, 2, 3, 4] - the reads and edits from the first issue]
 </example>
 
 <example>
 After exploring the codebase to understand it:
 Assistant: I've reviewed the relevant files. Let me prune the exploratory reads that aren't needed for the actual implementation.
-[Uses prune with reason: "exploration complete, starting implementation"]
+[Uses prune with ids: [1, 2, 5, 7] - the exploratory reads]
 </example>
 
 <example>
 After completing any task:
 Assistant: [Finishes task - commit, answer, fix, etc.]
 Before we continue, let me prune the context from that work.
-[Uses prune with reason: "task complete"]
+[Uses prune with ids: [3, 4, 5, 6, 8, 9] - all tool outputs from the completed task]
 </example>

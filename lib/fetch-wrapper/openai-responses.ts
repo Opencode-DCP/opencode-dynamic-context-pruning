@@ -6,7 +6,8 @@ import {
     getMostRecentActiveSession
 } from "./types"
 import { cacheToolParametersFromInput } from "../state/tool-cache"
-import { injectNudgeResponses, injectSynthResponses } from "../api-formats/synth-instruction"
+import { injectSynthResponses, countToolResultsResponses } from "../api-formats/synth-instruction"
+import { buildPrunableToolsList, buildEndInjection, injectPrunableListResponses } from "../api-formats/prunable-list"
 
 /**
  * Handles OpenAI Responses API format (body.input array with function_call_output items).
@@ -21,30 +22,47 @@ export async function handleOpenAIResponses(
         return { modified: false, body }
     }
 
-    // Cache tool parameters from input
-    cacheToolParametersFromInput(body.input, ctx.state)
+    // Cache tool parameters from input (OpenAI Responses API format)
+    cacheToolParametersFromInput(body.input, ctx.state, ctx.logger)
 
     let modified = false
 
     // Inject synthetic instructions if onTool strategies are enabled
     if (ctx.config.strategies.onTool.length > 0) {
-        const skipIdleBefore = ctx.toolTracker.skipNextIdle
-
-        // Inject periodic nudge based on tool result count
-        if (ctx.config.nudge_freq > 0) {
-            if (injectNudgeResponses(body.input, ctx.toolTracker, ctx.prompts.nudgeInstruction, ctx.config.nudge_freq)) {
-                // ctx.logger.info("fetch", "Injected nudge instruction (Responses API)")
-                modified = true
-            }
-        }
-
-        if (skipIdleBefore && !ctx.toolTracker.skipNextIdle) {
-            ctx.logger.debug("fetch", "skipNextIdle was reset by new tool results (Responses API)")
-        }
-
+        // Inject base synthetic instructions (appended to last user message)
         if (injectSynthResponses(body.input, ctx.prompts.synthInstruction, ctx.prompts.nudgeInstruction)) {
-            // ctx.logger.info("fetch", "Injected synthetic instruction (Responses API)")
             modified = true
+        }
+
+        // Build and inject prunable tools list at the end
+        const sessionId = ctx.state.lastSeenSessionId
+        if (sessionId) {
+            const toolIds = Array.from(ctx.state.toolParameters.keys())
+            const alreadyPruned = ctx.state.prunedIds.get(sessionId) ?? []
+            const alreadyPrunedLower = new Set(alreadyPruned.map(id => id.toLowerCase()))
+            const unprunedIds = toolIds.filter(id => !alreadyPrunedLower.has(id.toLowerCase()))
+
+            const { list: prunableList, numericIds } = buildPrunableToolsList(
+                sessionId,
+                unprunedIds,
+                ctx.state.toolParameters,
+                ctx.config.protectedTools
+            )
+
+            if (prunableList) {
+                // Check if nudge should be included
+                const toolResultCount = countToolResultsResponses(body.input)
+                const includeNudge = ctx.config.nudge_freq > 0 && toolResultCount > ctx.config.nudge_freq
+
+                const endInjection = buildEndInjection(prunableList, includeNudge)
+                if (injectPrunableListResponses(body.input, endInjection)) {
+                    ctx.logger.debug("fetch", "Injected prunable tools list (Responses API)", {
+                        ids: numericIds,
+                        nudge: includeNudge
+                    })
+                    modified = true
+                }
+            }
         }
     }
 
