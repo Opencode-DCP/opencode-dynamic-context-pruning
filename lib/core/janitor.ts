@@ -139,10 +139,8 @@ async function runWithStrategies(
         const alreadyPrunedIds = state.prunedIds.get(sessionID) ?? []
         const unprunedToolCallIds = toolCallIds.filter(id => !alreadyPrunedIds.includes(id))
 
-        // Get pending GC stats (accumulated since last notification)
         const gcPending = state.gcPending.get(sessionID) ?? null
 
-        // If nothing to analyze and no GC activity, exit early
         if (unprunedToolCallIds.length === 0 && !gcPending) {
             return null
         }
@@ -170,7 +168,6 @@ async function runWithStrategies(
 
         const finalNewlyPrunedIds = llmPrunedIds.filter(id => !alreadyPrunedIds.includes(id))
 
-        // If AI pruned nothing and no GC activity, nothing to report
         if (finalNewlyPrunedIds.length === 0 && !gcPending) {
             return null
         }
@@ -178,7 +175,6 @@ async function runWithStrategies(
         // PHASE 2: CALCULATE STATS & NOTIFICATION
         const tokensSaved = await calculateTokensSaved(finalNewlyPrunedIds, toolOutputs)
 
-        // Get current session stats, initializing with proper defaults
         const currentStats = state.stats.get(sessionID) ?? {
             totalToolsPruned: 0,
             totalTokensSaved: 0,
@@ -186,7 +182,6 @@ async function runWithStrategies(
             totalGCTools: 0
         }
 
-        // Update session stats including GC contribution
         const sessionStats: SessionStats = {
             totalToolsPruned: currentStats.totalToolsPruned + finalNewlyPrunedIds.length,
             totalTokensSaved: currentStats.totalTokensSaved + tokensSaved,
@@ -195,7 +190,6 @@ async function runWithStrategies(
         }
         state.stats.set(sessionID, sessionStats)
 
-        // Send unified notification (handles all scenarios)
         const notificationSent = await sendUnifiedNotification(
             ctx.notificationCtx,
             sessionID,
@@ -210,12 +204,10 @@ async function runWithStrategies(
             currentAgent
         )
 
-        // Clear pending GC stats after notification (whether sent or not - we've consumed them)
         if (gcPending) {
             state.gcPending.delete(sessionID)
         }
 
-        // If we only had GC activity (no AI pruning), return null but notification was sent
         if (finalNewlyPrunedIds.length === 0) {
             if (notificationSent) {
                 logger.info("janitor", `GC-only notification: ~${formatTokenCount(gcPending?.tokensCollected ?? 0)} tokens from ${gcPending?.toolsDeduped ?? 0} deduped tools`, {
