@@ -65,6 +65,7 @@ export function createChatParamsHandler(
     return async (input: any, _output: any) => {
         const sessionId = input.sessionID
         let providerID = (input.provider as any)?.info?.id || input.provider?.id
+        const modelID = input.model?.id
 
         if (!providerID && input.message?.model?.providerID) {
             providerID = input.message.model.providerID
@@ -87,6 +88,14 @@ export function createChatParamsHandler(
             if (isSubagent) {
                 state.subagentSessions.add(sessionId)
             }
+        }
+
+        // Cache model info for the session (used by janitor for model selection)
+        if (providerID && modelID) {
+            state.model.set(sessionId, {
+                providerID: providerID,
+                modelID: modelID
+            })
         }
 
         // Build position-based mapping for Gemini (which loses tool call IDs in native format)

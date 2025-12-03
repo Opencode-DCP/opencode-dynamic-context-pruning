@@ -1,6 +1,9 @@
+import { z } from "zod"
 import type { Logger } from "../logger"
 import type { PruningStrategy } from "../config"
 import type { PluginState } from "../state"
+import { buildAnalysisPrompt } from "./prompt"
+import { selectModel, extractModelFromSession } from "../model-selector"
 import { estimateTokensBatch, formatTokenCount } from "../tokenizer"
 import { saveSessionState } from "../state/persistence"
 import { ensureSessionRestored } from "../state"
@@ -142,9 +145,21 @@ async function runWithStrategies(
             return !metadata || !config.protectedTools.includes(metadata.tool)
         }).length
 
-        // For onIdle, we currently don't have AI analysis implemented
-        // This is a placeholder for future idle pruning strategies
-        const llmPrunedIds: string[] = []
+        // PHASE 1: LLM ANALYSIS
+        let llmPrunedIds: string[] = []
+
+        if (strategies.includes('ai-analysis') && unprunedToolCallIds.length > 0) {
+            llmPrunedIds = await runLlmAnalysis(
+                ctx,
+                sessionID,
+                sessionInfo,
+                messages,
+                unprunedToolCallIds,
+                alreadyPrunedIds,
+                toolMetadata,
+                options
+            )
+        }
 
         const finalNewlyPrunedIds = llmPrunedIds.filter(id => !alreadyPrunedIds.includes(id))
 
@@ -235,6 +250,147 @@ async function runWithStrategies(
         })
         return null
     }
+}
+
+// ============================================================================
+// LLM Analysis
+// ============================================================================
+
+async function runLlmAnalysis(
+    ctx: JanitorContext,
+    sessionID: string,
+    sessionInfo: any,
+    messages: any[],
+    unprunedToolCallIds: string[],
+    alreadyPrunedIds: string[],
+    toolMetadata: Map<string, { tool: string, parameters?: any }>,
+    options: PruningOptions
+): Promise<string[]> {
+    const { client, state, logger, config } = ctx
+
+    const protectedToolCallIds: string[] = []
+    const prunableToolCallIds = unprunedToolCallIds.filter(id => {
+        const metadata = toolMetadata.get(id)
+        if (metadata && config.protectedTools.includes(metadata.tool)) {
+            protectedToolCallIds.push(id)
+            return false
+        }
+        return true
+    })
+
+    if (prunableToolCallIds.length === 0) {
+        return []
+    }
+
+    const cachedModelInfo = state.model.get(sessionID)
+    const sessionModelInfo = extractModelFromSession(sessionInfo, logger)
+    const currentModelInfo = cachedModelInfo || sessionModelInfo
+
+    const modelSelection = await selectModel(currentModelInfo, logger, config.model, config.workingDirectory)
+
+    logger.info("janitor", `Model: ${modelSelection.modelInfo.providerID}/${modelSelection.modelInfo.modelID}`, {
+        source: modelSelection.source
+    })
+
+    if (modelSelection.failedModel && config.showModelErrorToasts) {
+        const skipAi = modelSelection.source === 'fallback' && config.strictModelSelection
+        try {
+            await client.tui.showToast({
+                body: {
+                    title: skipAi ? "DCP: AI analysis skipped" : "DCP: Model fallback",
+                    message: skipAi
+                        ? `${modelSelection.failedModel.providerID}/${modelSelection.failedModel.modelID} failed\nAI analysis skipped (strictModelSelection enabled)`
+                        : `${modelSelection.failedModel.providerID}/${modelSelection.failedModel.modelID} failed\nUsing ${modelSelection.modelInfo.providerID}/${modelSelection.modelInfo.modelID}`,
+                    variant: "info",
+                    duration: 5000
+                }
+            })
+        } catch (toastError: any) {
+            // Ignore toast errors
+        }
+    }
+
+    if (modelSelection.source === 'fallback' && config.strictModelSelection) {
+        logger.info("janitor", "Skipping AI analysis (fallback model, strictModelSelection enabled)")
+        return []
+    }
+
+    const { generateObject } = await import('ai')
+
+    const sanitizedMessages = replacePrunedToolOutputs(messages, alreadyPrunedIds)
+
+    const analysisPrompt = buildAnalysisPrompt(
+        prunableToolCallIds,
+        sanitizedMessages,
+        alreadyPrunedIds,
+        protectedToolCallIds,
+        options.reason
+    )
+
+    await logger.saveWrappedContext(
+        "janitor-shadow",
+        [{ role: "user", content: analysisPrompt }],
+        {
+            sessionID,
+            modelProvider: modelSelection.modelInfo.providerID,
+            modelID: modelSelection.modelInfo.modelID,
+            candidateToolCount: prunableToolCallIds.length,
+            alreadyPrunedCount: alreadyPrunedIds.length,
+            protectedToolCount: protectedToolCallIds.length,
+            trigger: options.trigger,
+            reason: options.reason
+        }
+    )
+
+    const result = await generateObject({
+        model: modelSelection.model,
+        schema: z.object({
+            pruned_tool_call_ids: z.array(z.string()),
+            reasoning: z.string(),
+        }),
+        prompt: analysisPrompt
+    })
+
+    const rawLlmPrunedIds = result.object.pruned_tool_call_ids
+    const llmPrunedIds = rawLlmPrunedIds.filter(id =>
+        prunableToolCallIds.includes(id.toLowerCase())
+    )
+
+    if (llmPrunedIds.length > 0) {
+        const reasoning = result.object.reasoning.replace(/\n+/g, ' ').replace(/\s+/g, ' ').trim()
+        logger.info("janitor", `LLM reasoning: ${reasoning.substring(0, 200)}${reasoning.length > 200 ? '...' : ''}`)
+    }
+
+    return llmPrunedIds
+}
+
+function replacePrunedToolOutputs(messages: any[], prunedIds: string[]): any[] {
+    if (prunedIds.length === 0) return messages
+
+    const prunedIdsSet = new Set(prunedIds.map(id => id.toLowerCase()))
+
+    return messages.map(msg => {
+        if (!msg.parts) return msg
+
+        return {
+            ...msg,
+            parts: msg.parts.map((part: any) => {
+                if (part.type === 'tool' &&
+                    part.callID &&
+                    prunedIdsSet.has(part.callID.toLowerCase()) &&
+                    part.state?.output) {
+                    return {
+                        ...part,
+                        state: {
+                            ...part.state,
+                            output: '[Output removed to save context - information superseded or no longer needed]'
+                        }
+                    }
+                }
+                return part
+            })
+        }
+    })
 }
 
 // ============================================================================

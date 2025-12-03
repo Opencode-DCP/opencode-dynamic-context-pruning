@@ -59,29 +59,10 @@ export function getActualId(sessionId: string, numericId: number): string | unde
     return mapping?.numericToActual.get(numericId)
 }
 
-export function getNumericId(sessionId: string, actualId: string): number | undefined {
-    const mapping = sessionMappings.get(sessionId)
-    return mapping?.actualToNumeric.get(actualId)
-}
-
-export function getAllMappings(sessionId: string): Map<number, string> {
-    const mapping = sessionMappings.get(sessionId)
-    return mapping?.numericToActual ?? new Map()
-}
-
-export function hasMapping(sessionId: string): boolean {
-    return sessionMappings.has(sessionId)
-}
-
 export function clearSessionMapping(sessionId: string): void {
     sessionMappings.delete(sessionId)
 }
 
 export function clearAllMappings(): void {
     sessionMappings.clear()
-}
-
-export function getNextId(sessionId: string): number {
-    const mapping = sessionMappings.get(sessionId)
-    return mapping?.nextId ?? 1
 }

@@ -11,7 +11,7 @@
  */
 
 import { extractParameterKey } from '../ui/display-utils'
-import { getOrCreateNumericId, getNumericId } from '../state/id-mapping'
+import { getOrCreateNumericId } from '../state/id-mapping'
 
 export interface ToolMetadata {
     tool: string
@@ -106,23 +106,6 @@ export function buildEndInjection(
 
     return parts.join('\n\n')
 }
-
-/**
- * Gets the numeric IDs for a list of actual tool call IDs.
- * Used when the prune tool needs to show what was pruned.
- */
-export function getNumericIdsForActual(
-    sessionId: string,
-    actualIds: string[]
-): number[] {
-    return actualIds
-        .map(id => getNumericId(sessionId, id))
-        .filter((id): id is number => id !== undefined)
-}
-
-// ============================================================================
-// Injection Functions
-// ============================================================================
 
 // ============================================================================
 // OpenAI Chat / Anthropic Format
