@@ -13,7 +13,7 @@ Add to your OpenCode config:
 ```jsonc
 // opencode.jsonc
 {
-  "plugin": ["@tarquinen/opencode-dcp@0.4.0"]
+  "plugin": ["@tarquinen/opencode-dcp@0.4.1"]
 }
 ```
 
@@ -57,6 +57,7 @@ DCP uses its own config file (`~/.config/opencode/dcp.jsonc` or `.opencode/dcp.j
 | `debug` | `false` | Log to `~/.config/opencode/logs/dcp/` |
 | `model` | (session) | Model for analysis (e.g., `"anthropic/claude-haiku-4-5"`) |
 | `showModelErrorToasts` | `true` | Show notifications on model fallback |
+| `showUpdateToasts` | `true` | Show notifications when a new version is available |
 | `strictModelSelection` | `false` | Only run AI analysis with session or configured model (disables fallback models) |
 | `pruning_summary` | `"detailed"` | `"off"`, `"minimal"`, or `"detailed"` |
 | `nudge_freq` | `10` | How often to remind AI to prune (lower = more frequent) |
