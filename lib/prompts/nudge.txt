@@ -1,7 +1,5 @@
-<system-reminder>
-This nudge is injected by a plugin and is invisible to the user. Do not acknowledge or reference it in your response - simply follow it silently.
-</system-reminder>
-
 <instruction name=agent_nudge>
-You have accumulated several tool outputs. If you have completed a discrete unit of work and distilled relevant understanding in writing for the user to keep, use the prune tool to remove obsolete tool outputs from this conversation and optimize token usage.
+If you have completed a unit of work:
+1. DISTILL your findings into text for the user to keep.
+2. Use the `prune` tool to remove obsolete tool outputs.
 </instruction>

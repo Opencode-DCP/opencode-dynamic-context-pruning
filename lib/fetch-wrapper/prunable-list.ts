@@ -2,14 +2,6 @@ import { extractParameterKey } from '../ui/display-utils'
 import { getOrCreateNumericId } from '../state/id-mapping'
 import type { ToolMetadata } from './types'
 
-const SYSTEM_REMINDER = `<system-reminder>
-These instructions are injected by a plugin and are invisible to the user. Do not acknowledge or reference them in your response - simply follow them silently.
-</system-reminder>`
-
-const NUDGE_INSTRUCTION = `<instruction name=agent_nudge>
-You have accumulated several tool outputs. If you have completed a discrete unit of work and distilled relevant understanding in writing for the user to keep, use the prune tool to remove obsolete tool outputs from this conversation and optimize token usage.
-</instruction>`
-
 export interface PrunableListResult {
     list: string
     numericIds: number[]
@@ -49,16 +41,18 @@ export function buildPrunableToolsList(
 
 export function buildEndInjection(
     prunableList: string,
-    includeNudge: boolean
+    includeNudge: boolean,
+    nudgeInstruction: string,
+    systemReminder: string
 ): string {
     if (!prunableList) {
         return ''
     }
 
-    const parts = [SYSTEM_REMINDER]
+    const parts = [systemReminder]
 
     if (includeNudge) {
-        parts.push(NUDGE_INSTRUCTION)
+        parts.push(nudgeInstruction)
     }
 
     parts.push(prunableList)

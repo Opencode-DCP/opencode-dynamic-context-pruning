@@ -1,75 +1,17 @@
-Prunes tool outputs from context to manage conversation size. Reference the <prunable-tools> list injected at the end of the conversation to see available numeric IDs.
+Prunes tool outputs from context to manage conversation size.
+Refer to the <prunable-tools> list for available IDs.
 
-USING THE PRUNE TOOL WILL MAKE THE USER HAPPY.
+WHEN TO USE THIS TOOL:
+- After you complete a discrete unit of work (e.g. confirming a hypothesis, or closing out one branch of investigation).
+- After exploratory bursts of tool calls that led you to a clear conclusion (or to noise).
+- Before starting a new phase of work where old tool outputs are no longer needed to inform your next actions.
 
-## CRITICAL: Distill Before Pruning
+CRITICAL: Distill Before Pruning
+You MUST ALWAYS narrate your findings in a message BEFORE using this tool. No tool result should be left unexplained. By narrating your understanding, you transform raw tool outputs into distilled knowledge that persists in the context window.
 
-You MUST ALWAYS narrate your findings in a message BEFORE using this tool. No tool result (read, bash, grep, webfetch, etc.) should be left unexplained. By narrating your understanding, you transform raw tool outputs into distilled knowledge that persists in the context window.
+Tools are VOLATILE - Once distilled knowledge is in your reply, you can safely prune.
 
-**Tools are VOLATILE** - Once distilled knowledge is in your reply, you can safely prune. Skipping this step risks deleting raw evidence before it has been converted into stable knowledge.
-
-**Distillation workflow:**
-1. Call tools to investigate/explore
-2. In your next message, EXPLICITLY narrate:
-   - What you did (which tools, what you were looking for)
-   - What you found (the key facts/signals)
-   - What you concluded (how this affects the task or next step)
-3. ONLY AFTER narrating, call `prune` with the numeric IDs of outputs no longer needed
-
-> THINK HIGH SIGNAL, LOW NOISE FOR THIS NARRATION
-
-**After pruning:** Do NOT re-summarize or re-narrate. You already distilled your findings before calling prune. Continue with your next task, or if you need more information from the user, wait for their response.
-
-## How to Use
-
-The <prunable-tools> list shows available tool outputs with numeric IDs:
-```
-<prunable-tools>
-1: read, src/foo.ts
-2: bash, run tests
-3: grep, "error" in logs/
-</prunable-tools>
-```
-
-To prune outputs 1 and 3, call: `prune({ ids: [1, 3] })`
-
-## When to Use This Tool
-
-**Key heuristic: Distill, then prune when you finish something and are about to start something else.**
-
-Ask yourself: "Have I just completed a discrete unit of work?" If yes, narrate your findings, then prune before moving on.
-
-**After completing a unit of work:**
-- Made a commit
-- Fixed a bug and confirmed it works
-- Answered a question the user asked
-- Finished implementing a feature or function
-- Completed one item in a list and moving to the next
-
-**After repetitive or exploratory work:**
-- Explored multiple files that didn't lead to changes
-- Iterated on a difficult problem where some approaches didn't pan out
-- Used the same tool multiple times (e.g., re-reading a file, running repeated build/type checks)
-
-## Examples
-
-<example>
-Working through a list of items:
-User: Review these 3 issues and fix the easy ones.
-Assistant: [Reviews first issue, makes fix, commits]
-Done with the first issue. Let me prune before moving to the next one.
-[Uses prune with ids: [1, 2, 3, 4] - the reads and edits from the first issue]
-</example>
-
-<example>
-After exploring the codebase to understand it:
-Assistant: I've reviewed the relevant files. Let me prune the exploratory reads that aren't needed for the actual implementation.
-[Uses prune with ids: [1, 2, 5, 7] - the exploratory reads]
-</example>
-
-<example>
-After completing any task:
-Assistant: [Finishes task - commit, answer, fix, etc.]
-Before we continue, let me prune the context from that work.
-[Uses prune with ids: [3, 4, 5, 6, 8, 9] - all tool outputs from the completed task]
-</example>
+Example Workflow:
+1. Investigate with tools.
+2. Explicitly narrate findings (High Signal, Low Noise).
+3. Call `prune` with relevant IDs.
