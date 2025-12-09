@@ -54,9 +54,19 @@ export function isOutdated(local: string, remote: string): boolean {
 
 export async function performUpdate(targetVersion: string, logger?: { info: (component: string, message: string, data?: any) => void }): Promise<boolean> {
     const cacheDir = join(homedir(), '.cache', 'opencode')
+    const bunCacheDir = join(homedir(), '.bun', 'install', 'cache', '@tarquinen')
     const packageSpec = `${PACKAGE_NAME}@${targetVersion}`
 
     logger?.info("version", "Starting auto-update", { targetVersion, cacheDir })
+
+    // Clear bun's install cache for this package to prevent stale versions
+    try {
+        const { rmSync } = await import('fs')
+        rmSync(bunCacheDir, { recursive: true, force: true })
+        logger?.info("version", "Cleared bun cache", { bunCacheDir })
+    } catch (err) {
+        logger?.info("version", "Could not clear bun cache", { error: (err as Error).message })
+    }
 
     return new Promise((resolve) => {
         let resolved = false
