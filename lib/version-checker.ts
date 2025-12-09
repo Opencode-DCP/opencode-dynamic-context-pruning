@@ -1,7 +1,6 @@
-import { readFileSync } from 'fs'
+import { readFileSync, writeFileSync, existsSync } from 'fs'
 import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
-import { spawn } from 'child_process'
 import { homedir } from 'os'
 
 export const PACKAGE_NAME = '@tarquinen/opencode-dcp'
@@ -12,14 +11,12 @@ const __dirname = dirname(__filename)
 
 export function getLocalVersion(): string {
     try {
-        // Walk up from the current module to find the project's package.json
-        // This works whether running from dist/lib/, lib/, or installed in node_modules
         let dir = __dirname
         for (let i = 0; i < 5; i++) {
             const pkgPath = join(dir, 'package.json')
             try {
                 const pkg = JSON.parse(readFileSync(pkgPath, 'utf-8'))
-                if (pkg.name === '@tarquinen/opencode-dcp') {
+                if (pkg.name === PACKAGE_NAME) {
                     return pkg.version
                 }
             } catch {
@@ -65,75 +62,55 @@ export function isOutdated(local: string, remote: string): boolean {
     return false
 }
 
-export async function performUpdate(targetVersion: string, logger?: { info: (component: string, message: string, data?: any) => void }): Promise<boolean> {
-    const cacheDir = join(homedir(), '.cache', 'opencode')
-    const bunCacheDir = join(homedir(), '.bun', 'install', 'cache', '@tarquinen')
-    const packageSpec = `${PACKAGE_NAME}@${targetVersion}`
+/**
+ * Updates config files to pin the new version.
+ * Checks both global and local project configs.
+ * Handles: "@tarquinen/opencode-dcp", "@tarquinen/opencode-dcp@latest", "@tarquinen/opencode-dcp@1.2.3"
+ */
+export function updateConfigVersion(newVersion: string, logger?: { info: (component: string, message: string, data?: any) => void }): boolean {
+    const configs = [
+        join(homedir(), '.config', 'opencode', 'opencode.jsonc'), // Global
+        join(process.cwd(), '.opencode', 'opencode.jsonc')        // Local project
+    ]
 
-    logger?.info("version", "Starting auto-update", { targetVersion, cacheDir })
+    let anyUpdated = false
 
-    // Clear bun's install cache for this package to prevent stale versions
-    try {
-        const { rmSync } = await import('fs')
-        rmSync(bunCacheDir, { recursive: true, force: true })
-        logger?.info("version", "Cleared bun cache", { bunCacheDir })
-    } catch (err) {
-        logger?.info("version", "Could not clear bun cache", { error: (err as Error).message })
+    for (const configPath of configs) {
+        try {
+            if (!existsSync(configPath)) continue
+
+            const content = readFileSync(configPath, 'utf-8')
+
+            // Match @tarquinen/opencode-dcp with optional version suffix (latest, 1.2.3, etc)
+            // The regex matches: " @tarquinen/opencode-dcp (optional @anything) "
+            const regex = new RegExp(`"${PACKAGE_NAME}(@[^"]*)?"`,'g')
+            const newEntry = `"${PACKAGE_NAME}@${newVersion}"`
+
+            if (!regex.test(content)) {
+                continue
+            }
+
+            // Reset regex state
+            regex.lastIndex = 0
+            const updatedContent = content.replace(regex, newEntry)
+
+            if (updatedContent !== content) {
+                writeFileSync(configPath, updatedContent, 'utf-8')
+                logger?.info("version", "Config updated", { configPath, newVersion })
+                anyUpdated = true
+            }
+        } catch (err) {
+            logger?.info("version", "Failed to update config", { configPath, error: (err as Error).message })
+        }
     }
 
-    return new Promise((resolve) => {
-        let resolved = false
-
-        // Use bun since opencode uses bun to manage its plugin dependencies
-        const proc = spawn('bun', ['add', packageSpec], {
-            cwd: cacheDir,
-            stdio: 'pipe'
-        })
-
-        let stderr = ''
-        proc.stderr?.on('data', (data) => {
-            stderr += data.toString()
-        })
-
-        proc.on('close', (code) => {
-            if (resolved) return
-            resolved = true
-            clearTimeout(timeoutId)
-            if (code === 0) {
-                logger?.info("version", "Auto-update succeeded", { targetVersion })
-                resolve(true)
-            } else {
-                logger?.info("version", "Auto-update failed", { targetVersion, code, stderr: stderr.slice(0, 500) })
-                resolve(false)
-            }
-        })
-
-        proc.on('error', (err) => {
-            if (resolved) return
-            resolved = true
-            clearTimeout(timeoutId)
-            logger?.info("version", "Auto-update error", { targetVersion, error: err.message })
-            resolve(false)
-        })
-
-        // Timeout after 60 seconds
-        const timeoutId = setTimeout(() => {
-            if (resolved) return
-            resolved = true
-            proc.kill()
-            logger?.info("version", "Auto-update timed out", { targetVersion })
-            resolve(false)
-        }, 60000)
-    })
+    return anyUpdated
 }
 
 export async function checkForUpdates(
     client: any,
-    logger?: { info: (component: string, message: string, data?: any) => void },
-    options: { showToast?: boolean; autoUpdate?: boolean } = {}
+    logger?: { info: (component: string, message: string, data?: any) => void }
 ): Promise<void> {
-    const { showToast = true, autoUpdate = false } = options
-
     try {
         const local = getLocalVersion()
         const npm = await getNpmVersion()
@@ -148,41 +125,32 @@ export async function checkForUpdates(
             return
         }
 
-        logger?.info("version", "Update available", { local, npm, autoUpdate })
+        logger?.info("version", "Update available", { local, npm })
 
-        if (autoUpdate) {
-            // Attempt auto-update
-            const success = await performUpdate(npm, logger)
+        // Update any configs found
+        const updated = updateConfigVersion(npm, logger)
 
-            if (success && showToast) {
-                await client.tui.showToast({
-                    body: {
-                        title: "DCP: Updated!",
-                        message: `v${local} → v${npm}\nRestart OpenCode to apply`,
-                        variant: "success",
-                        duration: 6000
-                    }
-                })
-            } else if (!success && showToast) {
-                await client.tui.showToast({
-                    body: {
-                        title: "DCP: Update failed",
-                        message: `v${local} → v${npm}\nManual: npm install ${PACKAGE_NAME}@${npm}`,
-                        variant: "warning",
-                        duration: 6000
-                    }
-                })
-            }
-        } else if (showToast) {
+        if (updated) {
             await client.tui.showToast({
                 body: {
                     title: "DCP: Update available",
-                    message: `v${local} → v${npm}`,
+                    message: `v${local} → v${npm}\nRestart OpenCode to apply`,
                     variant: "info",
                     duration: 6000
                 }
             })
+        } else {
+            // Config update failed or plugin not found in config, show manual instructions
+            await client.tui.showToast({
+                body: {
+                    title: "DCP: Update available",
+                    message: `v${local} → v${npm}\nUpdate opencode.jsonc:\n"${PACKAGE_NAME}@${npm}"`,
+                    variant: "info",
+                    duration: 8000
+                }
+            })
         }
     } catch {
+        // Silently fail version checks
     }
 }
