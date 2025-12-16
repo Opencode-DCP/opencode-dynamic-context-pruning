@@ -1,4 +1,4 @@
-<instruction name=recall>
+<action name=recall policy=critical>
 Pause here to conduct a structured self-assessment. Synthesize all relevant information you've accumulated about the current task, including:
 
 - Key facts, data points, and domain knowledge you've acquired
@@ -11,4 +11,6 @@ Then, evaluate your current state of advancement:
 - Which paths forward seem most viable based on current knowledge?
 
 Organize this summary to clearly separate established knowledge from open questions, and completed work from remaining challenges. Use this synthesis to explicitly state what should happen next and why. This reflection must be in a message to the user, not in a private thought.
-</instruction>
+
+DO NOT BREAK AGENTIC LOOP - KEEP GOING AFTER THIS ACTION
+</action>
