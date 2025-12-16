@@ -27,7 +27,8 @@ export async function syncToolCache(
 
                 if (part.tool === "prune") {
 		state.nudgeCounter = 0
-
+                } else if (part.tool === "recall") {
+		state.recallCounter = 0
                 } else if (!config.strategies.pruneTool.protectedTools.includes(part.tool)) {
                     state.nudgeCounter++
                     state.recallCounter++

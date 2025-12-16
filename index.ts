@@ -3,7 +3,7 @@ import { getConfig } from "./lib/config"
 import { Logger } from "./lib/logger"
 import { loadPrompt } from "./lib/prompt"
 import { createSessionState } from "./lib/state"
-import { createPruneTool } from "./lib/strategies"
+import { createPruneTool, createRecallTool } from "./lib/strategies"
 import { createChatMessageTransformHandler, createEventHandler } from "./lib/hooks"
 
 const plugin: Plugin = (async (ctx) => {
@@ -46,17 +46,27 @@ const plugin: Plugin = (async (ctx) => {
                 config,
                 workingDirectory: ctx.directory
             }),
+            ...(config.strategies.pruneTool.recall.enabled ? {
+                recall: createRecallTool({
+                    state,
+                    logger
+                })
+            } : {})
         } : undefined,
         config: async (opencodeConfig) => {
-            // Add prune to primary_tools by mutating the opencode config
+            // Add prune and recall to primary_tools by mutating the opencode config
             // This works because config is cached and passed by reference
             if (config.strategies.pruneTool.enabled) {
                 const existingPrimaryTools = opencodeConfig.experimental?.primary_tools ?? []
+                const toolsToAdd = ["prune"]
+                if (config.strategies.pruneTool.recall.enabled) {
+                    toolsToAdd.push("recall")
+                }
                 opencodeConfig.experimental = {
                     ...opencodeConfig.experimental,
-                    primary_tools: [...existingPrimaryTools, "prune"],
+                    primary_tools: [...existingPrimaryTools, ...toolsToAdd],
                 }
-                logger.info("Added 'prune' to experimental.primary_tools via config mutation")
+                logger.info(`Added ${toolsToAdd.join(", ")} to experimental.primary_tools via config mutation`)
             }
         },
         event: createEventHandler(ctx.client, config, state, logger, ctx.directory),

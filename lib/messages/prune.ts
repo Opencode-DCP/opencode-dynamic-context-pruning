@@ -6,7 +6,7 @@ import { loadPrompt } from "../prompt"
 
 const PRUNED_TOOL_OUTPUT_REPLACEMENT = '[Output removed to save context - information superseded or no longer needed]'
 const NUDGE_STRING = loadPrompt("nudge")
-const RECALL_STRING = loadPrompt("recall")
+const RECALL_REMINDER_STRING = loadPrompt("recall-reminder")
 
 const buildPrunableToolsList = (
     state: SessionState,
@@ -68,9 +68,9 @@ export const insertPruneToolContext = (
     }
 
     let recallString = ""
-    if (state.recallCounter >= config.strategies.pruneTool.recall.frequency) {
-        logger.info("Inserting prune recall message")
-        recallString = "\n" + RECALL_STRING
+    if (config.strategies.pruneTool.recall.enabled && state.recallCounter >= config.strategies.pruneTool.recall.frequency) {
+        logger.info("Inserting recall reminder")
+        recallString = "\n" + RECALL_REMINDER_STRING
         state.recallCounter = 0
     }
 
