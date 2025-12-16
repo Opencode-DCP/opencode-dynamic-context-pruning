@@ -52,7 +52,6 @@ export const insertPruneToolContext = (
 
     const lastAssistantMessage = getLastAssistantMessage(messages)
     if (!lastAssistantMessage) {
-        logger.debug("No assistant message found, skipping prune context injection")
         return
     }
 
@@ -68,18 +67,15 @@ export const insertPruneToolContext = (
     }
 
     // Inject as a new text part appended to the most recent assistant message.
-    // This preserves thinking blocks (which must be at the start) and works
-    // during tool use loops where the last message may be a user tool_result.
-    const syntheticPart = {
+    const injectedPart = {
         id: "prt_dcp_prunable_" + Date.now(),
         sessionID: lastAssistantMessage.info.sessionID,
         messageID: lastAssistantMessage.info.id,
         type: "text",
         text: prunableToolsList + nudgeString,
-        synthetic: true,
     } as any
 
-    lastAssistantMessage.parts.push(syntheticPart)
+    lastAssistantMessage.parts.push(injectedPart)
 }
 
 export const prune = (
