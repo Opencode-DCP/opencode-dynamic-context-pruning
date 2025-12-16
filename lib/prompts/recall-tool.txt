@@ -1,0 +1,26 @@
+Use this tool to pause and conduct a structured self-assessment of your current progress.
+
+## IMPORTANT: Provide your summary as the `summary` parameter to this tool
+
+When calling this tool, you MUST provide a comprehensive summary as the `summary` parameter that includes:
+
+### Task Understanding
+- Key facts, data points, and domain knowledge you've acquired
+- Assumptions you've made and any that have been validated or disproven
+- Gaps in your understanding that still need to be addressed
+- Connections between different pieces of information and how they inform the approach
+
+### Progress Evaluation
+- What specific milestones have you completed?
+- Which paths forward seem most viable based on current knowledge?
+
+### Organization
+- Clearly separate established knowledge from open questions
+- Distinguish completed work from remaining challenges
+- Explicitly state what should happen next and why
+
+## Usage Notes
+
+- Write your structured self-assessment directly in the `summary` parameter when calling this tool
+- After calling this tool, continue with your work - do not stop the agentic loop
+- Use this as a checkpoint to ensure you're on the right track and haven't missed anything

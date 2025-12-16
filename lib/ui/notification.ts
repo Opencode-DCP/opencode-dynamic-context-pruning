@@ -45,7 +45,7 @@ function buildDetailedMessage(
     if (pruneToolIds.length > 0) {
         const pruneTokenCounterStr = `~${formatTokenCount(state.stats.pruneTokenCounter)}`
         const reasonLabel = reason ? ` — ${PRUNE_REASON_LABELS[reason]}` : ''
-        message += `\n\n▣ Pruned tools (${pruneTokenCounterStr})${reasonLabel}`
+        message += `\n\n▣ Pruning (${pruneTokenCounterStr})${reasonLabel}`
 
         const itemLines = formatPrunedItemsList(pruneToolIds, toolMetadata, workingDirectory)
         message += '\n' + itemLines.join('\n')
