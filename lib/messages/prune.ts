@@ -71,6 +71,7 @@ export const insertPruneToolContext = (
     if (state.recallCounter >= config.strategies.pruneTool.recall.frequency) {
         logger.info("Inserting prune recall message")
         recallString = "\n" + RECALL_STRING
+        state.recallCounter = 0
     }
 
     const userMessage: WithParts = {
