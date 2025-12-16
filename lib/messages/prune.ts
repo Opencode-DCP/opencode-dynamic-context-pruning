@@ -1,7 +1,7 @@
 import type { SessionState, WithParts } from "../state"
 import type { Logger } from "../logger"
 import type { PluginConfig } from "../config"
-import { getLastUserMessage, extractParameterKey, buildToolIdList } from "./utils"
+import { getLastUserMessage, getLastAssistantMessage, extractParameterKey, buildToolIdList } from "./utils"
 import { loadPrompt } from "../prompt"
 
 const PRUNED_TOOL_OUTPUT_REPLACEMENT = '[Output removed to save context - information superseded or no longer needed]'
@@ -55,6 +55,8 @@ export const insertPruneToolContext = (
         return
     }
 
+    const lastAssistantMessage = getLastAssistantMessage(messages)
+
     const prunableToolsList = buildPrunableToolsList(state, config, logger, messages)
     if (!prunableToolsList) {
         return
@@ -66,18 +68,22 @@ export const insertPruneToolContext = (
         nudgeString = "\n" + NUDGE_STRING
     }
 
-    const userMessage: WithParts = {
+    const assistantInfo = lastAssistantMessage?.info as any
+    const syntheticMessage: WithParts = {
         info: {
             id: "msg_01234567890123456789012345",
             sessionID: lastUserMessage.info.sessionID,
-            role: "user",
-            time: { created: Date.now() },
-            agent: lastUserMessage.info.agent || "build",
-            model: {
-                providerID: lastUserMessage.info.model.providerID,
-                modelID: lastUserMessage.info.model.modelID
-            }
-        },
+            role: "assistant",
+            time: { created: Date.now(), completed: Date.now() },
+            parentID: lastUserMessage.info.id,
+            modelID: assistantInfo?.modelID || lastUserMessage.info.model.modelID,
+            providerID: assistantInfo?.providerID || lastUserMessage.info.model.providerID,
+            mode: assistantInfo?.mode || "build",
+            agent: assistantInfo?.agent || lastUserMessage.info.agent || "build",
+            path: assistantInfo?.path || { cwd: process.cwd(), root: process.cwd() },
+            cost: 0,
+            tokens: { input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } },
+        } as any,
         parts: [
             {
                 id: "prt_01234567890123456789012345",
@@ -85,11 +91,12 @@ export const insertPruneToolContext = (
                 messageID: "msg_01234567890123456789012345",
                 type: "text",
                 text: prunableToolsList + nudgeString,
-            }
+                synthetic: true,
+            } as any
         ]
     }
 
-    messages.push(userMessage)
+    messages.push(syntheticMessage)
 }
 
 export const prune = (

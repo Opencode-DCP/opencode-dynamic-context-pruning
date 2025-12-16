@@ -83,6 +83,18 @@ export const getLastUserMessage = (
     return null
 }
 
+export const getLastAssistantMessage = (
+    messages: WithParts[]
+): WithParts | null => {
+    for (let i = messages.length - 1; i >= 0; i--) {
+        const msg = messages[i]
+        if (msg.info.role === 'assistant') {
+            return msg
+        }
+    }
+    return null
+}
+
 export function findCurrentAgent(messages: WithParts[]): string | undefined {
     const userMsg = getLastUserMessage(messages)
     if (!userMsg) return undefined

@@ -1,7 +1,7 @@
 Prunes tool outputs from context to manage conversation size and reduce noise.
 
 ## IMPORTANT: The Prunable List
-A `<prunable-tools>` list is injected into user messages showing available tool outputs you can prune. Each line has the format `ID: tool, parameter` (e.g., `20: read, /path/to/file.ts`). You MUST only use numeric IDs that appear in this list to select which tools to prune.
+A `<prunable-tools>` list is injected into assistant messages showing available tool outputs you can prune. Each line has the format `ID: tool, parameter` (e.g., `20: read, /path/to/file.ts`). You MUST only use numeric IDs that appear in this list to select which tools to prune.
 
 ## CRITICAL: When and How to Prune
 
