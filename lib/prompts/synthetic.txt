@@ -17,6 +17,7 @@ You WILL use the `prune` tool when ANY of these are true:
 - You are about to start a new phase of work
 - You have distilled enough information in your messages to prune related tools
 - Context contains tools output that are unhelpful, noise, or made obsolete by newer outputs
+- Write or edit operations are complete (pruning removes the large input content)
 
 You MUST NOT prune when:
 - The tool output will be needed for upcoming implementation work

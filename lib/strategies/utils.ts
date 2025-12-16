@@ -50,13 +50,23 @@ export const calculateTokensSaved = (
                 if (part.type !== 'tool' || !pruneToolIds.includes(part.callID)) {
                     continue
                 }
+                // For write and edit tools, count input content as that is all we prune for these tools
+                // (input is present in both completed and error states)
+                if (part.tool === "write" || part.tool === "edit") {
+                    const inputContent = part.state.input?.content
+                    const content = typeof inputContent === 'string'
+                        ? inputContent
+                        : JSON.stringify(inputContent ?? '')
+                    contents.push(content)
+                    continue
+                }
+                // For other tools, count output or error based on status
                 if (part.state.status === "completed") {
                     const content = typeof part.state.output === 'string'
                         ? part.state.output
                         : JSON.stringify(part.state.output)
                     contents.push(content)
-                }
-                if (part.state.status === "error") {
+                } else if (part.state.status === "error") {
                     const content = typeof part.state.error === 'string'
                         ? part.state.error
                         : JSON.stringify(part.state.error)

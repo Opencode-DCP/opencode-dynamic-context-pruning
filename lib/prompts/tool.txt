@@ -1,7 +1,9 @@
-Prunes tool outputs from context to manage conversation size and reduce noise.
+Prunes tool outputs from context to manage conversation size and reduce noise. For `write` and `edit` tools, the input content is pruned instead of the output.
 
 ## IMPORTANT: The Prunable List
 A `<prunable-tools>` list is injected into user messages showing available tool outputs you can prune. Each line has the format `ID: tool, parameter` (e.g., `20: read, /path/to/file.ts`). You MUST only use numeric IDs that appear in this list to select which tools to prune.
+
+**Note:** For `write` and `edit` tools, pruning removes the input content (the code being written/edited) while preserving the output confirmation. This is useful after completing a file modification when you no longer need the raw content in context.
 
 ## CRITICAL: When and How to Prune
 
@@ -62,3 +64,9 @@ The tests passed. The feature is verified.
 Assistant: [Reads 'auth.ts' to understand the login flow]
 I've understood the auth flow. I'll need to modify this file to add the new validation, so I'm keeping this read in context rather than distilling and pruning.
 </example_keep>
+
+<example_edit_completion>
+Assistant: [Edits 'auth.ts' to add validation]
+The edit was successful. I no longer need the raw edit content in context.
+[Uses prune with ids: ["completion", "15"]]
+</example_edit_completion>

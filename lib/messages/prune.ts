@@ -6,6 +6,7 @@ import { extractParameterKey, buildToolIdList } from "./utils"
 import { getLastUserMessage } from "../shared-utils"
 import { UserMessage } from "@opencode-ai/sdk"
 
+const PRUNED_TOOL_INPUT_REPLACEMENT = '[Input removed to save context]'
 const PRUNED_TOOL_OUTPUT_REPLACEMENT = '[Output removed to save context - information superseded or no longer needed]'
 const NUDGE_STRING = loadPrompt("nudge")
 
@@ -39,7 +40,7 @@ const buildPrunableToolsList = (
         return ""
     }
 
-    return `<prunable-tools>\nThe following tools have been invoked and are available for pruning. This list does not mandate immediate action. Consider your current goals and the resources you need before discarding valuable tool outputs. Keep the context free of noise.\n${lines.join('\n')}\n</prunable-tools>`
+    return `<prunable-tools>\nThe following tools have been invoked and are available for pruning. This list does not mandate immediate action. Consider your current goals and the resources you need before discarding valuable tool inputs or outputs. Keep the context free of noise.\n${lines.join('\n')}\n</prunable-tools>`
 }
 
 export const insertPruneToolContext = (
@@ -101,7 +102,7 @@ export const prune = (
     messages: WithParts[]
 ): void => {
     pruneToolOutputs(state, logger, messages)
-    // more prune methods coming here
+    pruneToolInputs(state, logger, messages)
 }
 
 const pruneToolOutputs = (
@@ -117,8 +118,36 @@ const pruneToolOutputs = (
             if (!state.prune.toolIds.includes(part.callID)) {
                 continue
             }
+            // Skip write and edit tools - their inputs are pruned instead
+            if (part.tool === 'write' || part.tool === 'edit') {
+                continue
+            }
             if (part.state.status === 'completed') {
                 part.state.output = PRUNED_TOOL_OUTPUT_REPLACEMENT
+            }
+        }
+    }
+}
+
+const pruneToolInputs = (
+    state: SessionState,
+    logger: Logger,
+    messages: WithParts[]
+): void => {
+    for (const msg of messages) {
+        for (const part of msg.parts) {
+            if (part.type !== 'tool') {
+                continue
+            }
+            if (!state.prune.toolIds.includes(part.callID)) {
+                continue
+            }
+            // Only prune inputs for write and edit tools
+            if (part.tool !== 'write' && part.tool !== 'edit') {
+                continue
+            }
+            if (part.state.input?.content !== undefined) {
+                part.state.input.content = PRUNED_TOOL_INPUT_REPLACEMENT
             }
         }
     }
