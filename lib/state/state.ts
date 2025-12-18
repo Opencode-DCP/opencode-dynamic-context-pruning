@@ -84,7 +84,6 @@ export async function ensureSessionInitialized(
     logger.info("session ID = " + sessionId)
     logger.info("Initializing session state", { sessionId: sessionId })
 
-    // Clear previous session data
     resetSessionState(state)
     state.sessionId = sessionId
 
@@ -92,13 +91,13 @@ export async function ensureSessionInitialized(
     state.isSubAgent = isSubAgent
     logger.info("isSubAgent = " + isSubAgent)
 
-    // Load session data from storage
+    state.lastCompaction = findLastCompactionTimestamp(messages)
+
     const persisted = await loadSessionState(sessionId, logger)
     if (persisted === null) {
         return;
     }
 
-    // Populate state with loaded data
     state.prune = {
         toolIds: persisted.prune.toolIds || []
     }
