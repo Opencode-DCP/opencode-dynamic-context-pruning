@@ -8,7 +8,11 @@ import {
   createChatMessageTransformHandler,
   createEventHandler,
 } from "./lib/hooks";
-import { getPendingPrune, setPendingPrune } from "./lib/ui/confirmation";
+import {
+  getPendingPrune,
+  setPendingPrune,
+  setAutoConfirm,
+} from "./lib/ui/confirmation";
 
 const plugin: Plugin = (async (ctx) => {
   const config = getConfig(ctx);
@@ -105,6 +109,13 @@ const plugin: Plugin = (async (ctx) => {
                 },
                 {
                   type: "confirm-button",
+                  label: " Auto ",
+                  fg: "background",
+                  bg: "warning",
+                  onConfirm: "auto-prune",
+                },
+                {
+                  type: "confirm-button",
                   label: " Confirm ",
                   fg: "background",
                   bg: "accent",
@@ -136,6 +147,14 @@ const plugin: Plugin = (async (ctx) => {
           setPendingPrune(null);
         } else if (event.event === "cancel-prune" && pending) {
           pending.resolve([]);
+          setPendingPrune(null);
+        } else if (event.event === "auto-prune" && pending) {
+          // Enable auto-confirm and confirm this one
+          setAutoConfirm(true);
+          const confirmed = pending.items
+            .filter((i: { checked: boolean }) => i.checked)
+            .map((i: { id: string }) => i.id);
+          pending.resolve(confirmed);
           setPendingPrune(null);
         }
       }
@@ -179,7 +198,14 @@ const plugin: Plugin = (async (ctx) => {
         );
       }
     },
-    event: createEventHandler(ctx.client, config, state, logger, ctx.directory),
+    event: createEventHandler(
+      ctx.client,
+      config,
+      state,
+      logger,
+      ctx.directory,
+      () => setAutoConfirm(false),
+    ),
   };
 }) satisfies Plugin;
 

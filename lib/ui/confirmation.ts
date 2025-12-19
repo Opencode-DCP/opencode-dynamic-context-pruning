@@ -11,12 +11,23 @@ export interface PendingConfirmation {
 // Shared state for pending confirmations
 let pendingPrune: PendingConfirmation | null = null;
 
+// Auto-confirm mode - when true, automatically confirms all prunes
+let autoConfirmEnabled = false;
+
 export function getPendingPrune(): PendingConfirmation | null {
   return pendingPrune;
 }
 
 export function setPendingPrune(pending: PendingConfirmation | null): void {
   pendingPrune = pending;
+}
+
+export function isAutoConfirmEnabled(): boolean {
+  return autoConfirmEnabled;
+}
+
+export function setAutoConfirm(enabled: boolean): void {
+  autoConfirmEnabled = enabled;
 }
 
 export function resolvePendingPrune(confirmedIds: string[]): void {
@@ -29,6 +40,7 @@ export function resolvePendingPrune(confirmedIds: string[]): void {
 /**
  * Shows a confirmation UI for pruning and returns a Promise that resolves
  * with the list of confirmed tool IDs (or empty array if cancelled).
+ * If auto-confirm is enabled, immediately returns all IDs without showing UI.
  */
 export async function requestPruneConfirmation(
   client: any,
@@ -39,6 +51,12 @@ export async function requestPruneConfirmation(
   logger: Logger,
   workingDirectory: string,
 ): Promise<string[]> {
+  // If auto-confirm is enabled, immediately return all IDs
+  if (autoConfirmEnabled) {
+    logger.info("Auto-confirming prune", { itemCount: pruneToolIds.length });
+    return pruneToolIds;
+  }
+
   // Build checklist items from the tool metadata
   const items = pruneToolIds.map((id) => {
     const meta = toolMetadata.get(id);
