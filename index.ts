@@ -8,6 +8,7 @@ import {
   createChatMessageTransformHandler,
   createEventHandler,
 } from "./lib/hooks";
+import { getPendingPrune, setPendingPrune } from "./lib/ui/confirmation";
 
 const plugin: Plugin = (async (ctx) => {
   const config = getConfig(ctx);
@@ -34,9 +35,117 @@ const plugin: Plugin = (async (ctx) => {
     ui: [
       {
         name: "dcp-status",
-        path: "/home/spoon/.config/opencode/plugin/dcp/lib/ui/dcp-status.js",
+        template: {
+          type: "box",
+          direction: "row",
+          border: ["right"],
+          borderStyle: "heavy",
+          borderColor: "accent",
+          bg: "#1a1a2e",
+          paddingX: 1,
+          paddingY: 0,
+          gap: 1,
+          children: [
+            { type: "text", content: "📦 DCP", fg: "accent", bold: true },
+            { type: "text", content: " │ ", fg: "textMuted" },
+            { type: "text", content: "{{saved}}", fg: "accent", bold: true },
+            { type: "text", content: " saved", fg: "textMuted" },
+          ],
+        },
+      },
+      {
+        name: "dcp-confirm",
+        template: {
+          type: "box",
+          direction: "column",
+          border: ["top", "bottom", "left", "right"],
+          borderStyle: "rounded",
+          borderColor: "accent",
+          bg: "#1a1a2e",
+          paddingX: 2,
+          paddingY: 1,
+          gap: 1,
+          children: [
+            {
+              type: "box",
+              direction: "row",
+              gap: 1,
+              children: [
+                { type: "text", content: "📦", fg: "accent" },
+                {
+                  type: "text",
+                  content: "DCP — Select files to prune",
+                  fg: "accent",
+                  bold: true,
+                },
+              ],
+            },
+            {
+              type: "text",
+              content: "─────────────────────────────────",
+              fg: "textMuted",
+            },
+            {
+              type: "checklist",
+              items: "{{items}}",
+              fg: "text",
+              fgChecked: "#2ecc71",
+              onToggle: "item-toggled",
+            },
+            {
+              type: "text",
+              content: "─────────────────────────────────",
+              fg: "textMuted",
+            },
+            {
+              type: "box",
+              direction: "row",
+              gap: 2,
+              children: [
+                {
+                  type: "confirm-button",
+                  label: "  ✓ Confirm Prune  ",
+                  fg: "#1a1a2e",
+                  bg: "#2ecc71",
+                  onConfirm: "confirm-prune",
+                },
+                {
+                  type: "confirm-button",
+                  label: "  ✗ Cancel  ",
+                  fg: "text",
+                  bg: "#e94560",
+                  onConfirm: "cancel-prune",
+                },
+              ],
+            },
+          ],
+        },
       },
     ],
+    "ui.event": async (event: {
+      component: string;
+      event: string;
+      data: Record<string, any>;
+    }) => {
+      logger.info("UI Event received", event);
+
+      if (event.component === "dcp-confirm") {
+        const pending = getPendingPrune();
+        if (event.event === "item-toggled" && event.data.items && pending) {
+          // Update the pending items state
+          pending.items = event.data.items;
+        } else if (event.event === "confirm-prune" && pending) {
+          const confirmed = pending.items
+            .filter((i: { checked: boolean }) => i.checked)
+            .map((i: { id: string }) => i.id);
+          pending.resolve(confirmed);
+          setPendingPrune(null);
+        } else if (event.event === "cancel-prune" && pending) {
+          pending.resolve([]);
+          setPendingPrune(null);
+        }
+      }
+    },
     "experimental.chat.system.transform": async (
       _input: unknown,
       output: { system: string[] },

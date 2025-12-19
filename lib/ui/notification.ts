@@ -120,6 +120,30 @@ export async function sendIgnoredMessage(
         }
       : undefined;
 
+  const parts: any[] = [
+    {
+      type: "text",
+      text: text,
+      ignored: true,
+    },
+  ];
+
+  // Add plugin UI part if we have saved tokens
+  if (totalSaved && totalSaved > 0) {
+    const formatted =
+      totalSaved >= 1000
+        ? `~${(totalSaved / 1000).toFixed(1)}K`
+        : `${totalSaved}`;
+    parts.push({
+      type: "text",
+      text: "dcp-status",
+      plugin: true,
+      metadata: {
+        saved: formatted,
+      },
+    });
+  }
+
   try {
     await client.session.prompt({
       path: {
@@ -129,21 +153,7 @@ export async function sendIgnoredMessage(
         noReply: true,
         agent: agent,
         model: model,
-        parts: [
-          {
-            type: "text",
-            text: text,
-            ignored: true,
-          },
-          {
-            type: "text",
-            text: "dcp-status",
-            plugin: true,
-            metadata: {
-              saved: totalSaved ?? 0,
-            },
-          },
-        ],
+        parts: parts,
       },
     });
   } catch (error: any) {
