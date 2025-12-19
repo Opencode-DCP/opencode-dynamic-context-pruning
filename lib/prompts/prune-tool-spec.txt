@@ -12,21 +12,21 @@ You must use this tool in three specific scenarios. The rules for distillation (
 ### 1. Task Completion (Clean Up) — reason: `completion`
 **When:** You have successfully completed a specific unit of work (e.g., fixed a bug, wrote a file, answered a question).
 **Action:** Prune the tools used for that task.
-**Distillation:** NOT REQUIRED. Since the task is done, the raw data is no longer needed. Simply state that the task is complete.
+**Distillation:** Use the `distillation` parameter (as an object) to provide a final confirmation that the task is complete (e.g., `{ "status": "Tests passed, file updated" }`).
 
 ### 2. Removing Noise (Garbage Collection) — reason: `noise`
 **When:** You have read files or run commands that turned out to be irrelevant, unhelpful, or outdated (meaning later tools have provided fresher, more valid information).
 **Action:** Prune these specific tool outputs immediately.
-**Distillation:** FORBIDDEN. Do not pollute the context by summarizing useless information. Just cut it out.
+**Distillation:** NOT REQUIRED for noise.
 
 ### 3. Context Conservation (Research & Consolidation) — reason: `consolidation`
 **When:** You have gathered useful information. Prune frequently as you work (e.g., after reading a few files), rather than waiting for a "long" phase to end.
 **Action:** Convert raw data into distilled knowledge. This allows you to discard large outputs (like full file reads) while keeping only the specific parts you need (like a single function signature or constant).
-**Distillation:** MANDATORY. Before pruning, you *must* explicitly summarize the key findings from *every* tool you plan to prune.
-   - **Extract specific value:** If you read a large file but only care about one function, record that function's details and prune the whole read.
-   - Narrative format: "I found X in file Y..."
+**Distillation:** MANDATORY. Use the `distillation` parameter (MUST be an object) to explicitly summarize the key findings from *every* tool you plan to prune.
+   - **Extract specific value:** If you read a large file but only care about one function, record that function's details.
+   - Structure: `{ "file_path": { "findings": "...", "logic": "..." } }`
    - Capture all relevant details (function names, logic, constraints).
-   - Once distilled into your response history, the raw tool output can be safely pruned.
+   - Once distilled into the `distillation` object, the raw tool output can be safely pruned.
    - **Know when distillation isn't enough:** If you'll need to edit a file, grep for exact strings, or reference precise syntax, keep the raw output. Distillation works for understanding; implementation often requires the original.
    - **Prefer keeping over re-fetching:** If uncertain whether you'll need the output again, keep it. The cost of retaining context is lower than the cost of redundant tool calls.
 
@@ -47,18 +47,18 @@ This file isn't relevant to the auth system. I'll remove it to clear the context
 
 <example_consolidation>
 Assistant: [Reads 5 different config files]
-I have analyzed the configuration. Here is the distillation:
-- 'config.ts' uses port 3000.
-- 'db.ts' connects to mongo:27017.
-- The other 3 files were defaults.
-I have preserved the signals above, so I am now pruning the raw reads.
-[Uses prune with ids: ["consolidation", "10", "11", "12", "13", "14"]]
+I'll preserve the configuration details and prune the raw reads.
+[Uses prune with ids: ["consolidation", "10", "11", "12", "13", "14"], distillation: {
+  "config.ts": "uses port 3000",
+  "db.ts": "connects to mongo:27017",
+  "others": "defaults"
+}]
 </example_consolidation>
 
 <example_completion>
 Assistant: [Runs tests, they pass]
-The tests passed. The feature is verified.
-[Uses prune with ids: ["completion", "20", "21"]]
+The tests passed. I'll clean up now.
+[Uses prune with ids: ["completion", "20", "21"], distillation: "Verified feature implementation and passed all tests."]
 </example_completion>
 
 <example_keep>

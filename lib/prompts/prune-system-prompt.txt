@@ -8,14 +8,14 @@ PRUNE METHODICALLY - CONSOLIDATE YOUR ACTIONS
 Every tool call adds to your context debt. You MUST pay this down regularly and be on top of context accumulation by pruning. Consolidate your prunes for efficiency; it is rarely worth pruning a single tiny tool output unless it is pure noise. Evaluate what SHOULD be pruned before jumping the gun.
 
 WHEN TO PRUNE? THE THREE SCENARIOS TO CONSIDER
-1. TASK COMPLETION: When work is done, quietly prune the tools that aren't needed anymore
+### 1. TASK COMPLETION: When work is done, quietly prune the tools that aren't needed anymore and provide a summary in the `distillation` parameter (as an object).
 2. NOISE REMOVAL: If outputs are irrelevant, unhelpful, or superseded by newer info, prune IMMEDIATELY. No distillation - gun it down
-3. CONTEXT CONSOLIDATION: When pruning valuable context to the task at hand, you MUST ALWAYS distill key findings into your narrative BEFORE pruning. Be surgical and strategic in what you extract. THINK: high signal, low noise
+3. CONTEXT CONSOLIDATION: When pruning valuable context to the task at hand, you MUST ALWAYS provide the key findings in the `distillation` parameter of the `prune` tool (as an object). Be surgical and strategic in what you extract. THINK: high signal, low noise
 
 You WILL use the `prune` tool when ANY of these are true:
 - Task or sub-task is complete
 - You are about to start a new phase of work
-- You have distilled enough information in your messages to prune related tools
+- You have gathered enough information to prune related tools and preserve their value in the `distillation` parameter
 - Context contains tools output that are unhelpful, noise, or made obsolete by newer outputs
 - Write or edit operations are complete (pruning removes the large input content)
 

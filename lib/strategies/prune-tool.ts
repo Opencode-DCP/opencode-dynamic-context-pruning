@@ -36,6 +36,9 @@ export function createPruneTool(
             ).describe(
                 "First element is the reason ('completion', 'noise', 'consolidation'), followed by numeric IDs as strings to prune"
             ),
+            distillation: tool.schema.record(tool.schema.string(), tool.schema.any()).optional().describe(
+                "An object containing detailed summaries or extractions of the key findings from the tools being pruned. This is REQUIRED for 'consolidation'."
+            ),
         },
         async execute(args, toolCtx) {
             const { client, state, logger, config, workingDirectory } = ctx
@@ -61,6 +64,11 @@ export function createPruneTool(
             const numericToolIds: number[] = args.ids.slice(1)
                 .map(id => parseInt(id, 10))
                 .filter((n): n is number => !isNaN(n))
+
+            // Extract distillation if present in the IDs array (packed as an object or long string)
+            // or if we add a dedicated non-primitive argument.
+            // For now, let's keep the schema simple and use the logic that Objects don't show in TUI.
+            const distillation = (args as any).distillation;
             if (numericToolIds.length === 0) {
                 logger.debug("No numeric tool IDs provided for pruning, yet prune tool was called: " + JSON.stringify(args))
                 return "No numeric IDs provided. Format: [reason, id1, id2, ...] where reason is 'completion', 'noise', or 'consolidation'."
@@ -133,11 +141,17 @@ export function createPruneTool(
             saveSessionState(state, logger)
                 .catch(err => logger.error("Failed to persist state", { error: err.message }))
 
-            return formatPruningResultForTool(
+            const result = formatPruningResultForTool(
                 pruneToolIds,
                 toolMetadata,
                 workingDirectory
             )
+
+            if (distillation) {
+                logger.info("Distillation data received:", distillation)
+            }
+
+            return result
         },
     })
 }
