@@ -143,10 +143,10 @@ export function createPruneTool(
                 toolMetadata,
                 workingDirectory
             )
-
-            if (distillation) {
-                logger.info("Distillation data received:", distillation)
-            }
+            //
+            // if (distillation) {
+            //     logger.info("Distillation data received:", distillation)
+            // }
 
             return result
         },
