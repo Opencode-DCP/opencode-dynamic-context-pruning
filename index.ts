@@ -1,9 +1,9 @@
-import type { Plugin } from "@opencode-ai/plugin";
-import { getConfig } from "./lib/config";
-import { Logger } from "./lib/logger";
-import { loadPrompt } from "./lib/prompt";
-import { createSessionState } from "./lib/state";
-import { createPruneTool } from "./lib/strategies";
+import type {Plugin} from "@opencode-ai/plugin";
+import {getConfig} from "./lib/config";
+import {Logger} from "./lib/logger";
+import {loadPrompt} from "./lib/prompt";
+import {createSessionState} from "./lib/state";
+import {createPruneTool} from "./lib/strategies";
 import {
   createChatMessageTransformHandler,
   createEventHandler,
@@ -38,44 +38,20 @@ const plugin: Plugin = (async (ctx) => {
   return {
     ui: [
       {
-        name: "dcp-status",
-        template: {
-          type: "box",
-          direction: "row",
-          border: ["right"],
-          borderStyle: "heavy",
-          borderColor: "accent",
-          bg: "#1a1a2e",
-          paddingX: 1,
-          paddingY: 0,
-          gap: 1,
-          children: [
-            { type: "text", content: "📦 DCP", fg: "accent", bold: true },
-            { type: "text", content: " │ ", fg: "textMuted" },
-            { type: "text", content: "{{saved}}", fg: "accent", bold: true },
-            { type: "text", content: " saved", fg: "textMuted" },
-          ],
-        },
-      },
-      {
         name: "dcp-confirm",
         template: {
           type: "box",
           direction: "column",
-          border: ["left"],
-          borderStyle: "heavy",
-          borderColor: "accent",
           bg: "backgroundPanel",
-          paddingX: 2,
           paddingY: 0,
-          minWidth: 60,
-          alignSelf: "center",
-          gap: 1,
+          gap: 0,
           children: [
             {
               type: "box",
               direction: "row",
               gap: 1,
+              paddingX: 2,
+              paddingY: 1,
               children: [
                 {
                   type: "text",
@@ -86,40 +62,76 @@ const plugin: Plugin = (async (ctx) => {
               ],
             },
             {
-              type: "checklist",
-              items: "{{items}}",
-              fg: "textMuted",
-              fgChecked: "text",
-              bgChecked: "backgroundElement",
-              borderColorChecked: "accent",
-              onToggle: "item-toggled",
+              type: "box",
+              direction: "column",
+              paddingX: 2,
+              paddingBottom: 1,
+              children: [
+                {
+                  type: "checklist",
+                  items: "{{items}}",
+                  fg: "textMuted",
+                  fgChecked: "text",
+                  borderColorChecked: "warning",
+                  onToggle: "item-toggled",
+                },
+              ],
             },
             {
               type: "box",
               direction: "row",
-              gap: 2,
-              justifyContent: "flex-end",
+              gap: 0,
+              justifyContent: "space-between",
+              bg: "backgroundElement",
+              paddingY: 1,
+              paddingX: 2,
               children: [
                 {
-                  type: "confirm-button",
-                  label: " Cancel ",
-                  fg: "textMuted",
-                  bg: "backgroundPanel",
-                  onConfirm: "cancel-prune",
+                  type: "box",
+                  direction: "row",
+                  gap: 0,
+                  children: [
+                    {
+                      type: "text",
+                      content: "click items to select",
+                      fg: "textMuted",
+                    },
+                  ],
                 },
                 {
-                  type: "confirm-button",
-                  label: " Auto ",
-                  fg: "background",
-                  bg: "warning",
-                  onConfirm: "auto-prune",
-                },
-                {
-                  type: "confirm-button",
-                  label: " Confirm ",
-                  fg: "background",
-                  bg: "accent",
-                  onConfirm: "confirm-prune",
+                  type: "button-group",
+                  gap: 1,
+                  defaultIndex: 2,
+                  bgColor: "backgroundElement",
+                  children: [
+                    {
+                      type: "confirm-button",
+                      label: "Reject",
+                      fg: "textMuted",
+                      bg: "backgroundPanel",
+                      fgHover: "warning",
+                      borderColorHover: "warning",
+                      onConfirm: "cancel-prune",
+                    },
+                    {
+                      type: "confirm-button",
+                      label: "Auto",
+                      fg: "textMuted",
+                      bg: "backgroundPanel",
+                      fgHover: "warning",
+                      borderColorHover: "warning",
+                      onConfirm: "auto-prune",
+                    },
+                    {
+                      type: "confirm-button",
+                      label: "Confirm",
+                      fg: "textMuted",
+                      bg: "backgroundPanel",
+                      fgHover: "warning",
+                      borderColorHover: "warning",
+                      onConfirm: "confirm-prune",
+                    },
+                  ],
                 },
               ],
             },
@@ -141,8 +153,8 @@ const plugin: Plugin = (async (ctx) => {
           pending.items = event.data.items;
         } else if (event.event === "confirm-prune" && pending) {
           const confirmed = pending.items
-            .filter((i: { checked: boolean }) => i.checked)
-            .map((i: { id: string }) => i.id);
+            .filter((i: {checked: boolean}) => i.checked)
+            .map((i: {id: string}) => i.id);
           pending.resolve(confirmed);
           setPendingPrune(null);
         } else if (event.event === "cancel-prune" && pending) {
@@ -152,8 +164,8 @@ const plugin: Plugin = (async (ctx) => {
           // Enable auto-confirm and confirm this one
           setAutoConfirm(true);
           const confirmed = pending.items
-            .filter((i: { checked: boolean }) => i.checked)
-            .map((i: { id: string }) => i.id);
+            .filter((i: {checked: boolean}) => i.checked)
+            .map((i: {id: string}) => i.id);
           pending.resolve(confirmed);
           setPendingPrune(null);
         }
@@ -161,7 +173,7 @@ const plugin: Plugin = (async (ctx) => {
     },
     "experimental.chat.system.transform": async (
       _input: unknown,
-      output: { system: string[] },
+      output: {system: string[]}
     ) => {
       const syntheticPrompt = loadPrompt("prune-system-prompt");
       output.system.push(syntheticPrompt);
@@ -170,7 +182,7 @@ const plugin: Plugin = (async (ctx) => {
       ctx.client,
       state,
       logger,
-      config,
+      config
     ),
     tool: config.strategies.pruneTool.enabled
       ? {
@@ -194,7 +206,7 @@ const plugin: Plugin = (async (ctx) => {
           primary_tools: [...existingPrimaryTools, "prune"],
         };
         logger.info(
-          "Added 'prune' to experimental.primary_tools via config mutation",
+          "Added 'prune' to experimental.primary_tools via config mutation"
         );
       }
     },
@@ -204,7 +216,7 @@ const plugin: Plugin = (async (ctx) => {
       state,
       logger,
       ctx.directory,
-      () => setAutoConfirm(false),
+      () => setAutoConfirm(false)
     ),
   };
 }) satisfies Plugin;
