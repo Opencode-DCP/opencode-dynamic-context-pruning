@@ -1,60 +1,60 @@
 {
-  "$schema": "https://json.schemastore.org/package.json",
-  "name": "@tarquinen/opencode-dcp",
-  "version": "1.0.4",
-  "type": "module",
-  "description": "OpenCode plugin that optimizes token usage by pruning obsolete tool outputs from conversation context",
-  "main": "./dist/index.js",
-  "types": "./dist/index.d.ts",
-  "scripts": {
-    "clean": "rm -rf dist",
-    "build": "npm run clean && tsc && cp -r lib/prompts dist/lib/prompts",
-    "postbuild": "rm -rf dist/logs",
-    "prepublishOnly": "npm run build",
-    "dev": "opencode plugin dev",
-    "typecheck": "tsc --noEmit",
-    "test": "node --import tsx --test tests/*.test.ts"
-  },
-  "keywords": [
-    "opencode",
-    "opencode-plugin",
-    "plugin",
-    "context",
-    "pruning",
-    "optimization",
-    "tokens"
-  ],
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/Tarquinen/opencode-dynamic-context-pruning.git"
-  },
-  "bugs": {
-    "url": "https://github.com/Tarquinen/opencode-dynamic-context-pruning/issues"
-  },
-  "homepage": "https://github.com/Tarquinen/opencode-dynamic-context-pruning#readme",
-  "author": "tarquinen",
-  "license": "MIT",
-  "peerDependencies": {
-    "@opencode-ai/plugin": ">=0.13.7"
-  },
-  "dependencies": {
-    "@ai-sdk/openai-compatible": "^1.0.28",
-    "@opencode-ai/sdk": "latest",
-    "@tarquinen/opencode-auth-provider": "^0.1.7",
-    "ai": "^5.0.106",
-    "gpt-tokenizer": "^3.4.0",
-    "jsonc-parser": "^3.3.1",
-    "zod": "^4.1.13"
-  },
-  "devDependencies": {
-    "@opencode-ai/plugin": "^1.0.143",
-    "@types/node": "^24.10.1",
-    "tsx": "^4.21.0",
-    "typescript": "^5.9.3"
-  },
-  "files": [
-    "dist/",
-    "README.md",
-    "LICENSE"
-  ]
+    "$schema": "https://json.schemastore.org/package.json",
+    "name": "@tarquinen/opencode-dcp",
+    "version": "1.0.4",
+    "type": "module",
+    "description": "OpenCode plugin that optimizes token usage by pruning obsolete tool outputs from conversation context",
+    "main": "./dist/index.js",
+    "types": "./dist/index.d.ts",
+    "scripts": {
+        "clean": "rm -rf dist",
+        "build": "npm run clean && tsc && cp -r lib/prompts dist/lib/prompts",
+        "postbuild": "rm -rf dist/logs",
+        "prepublishOnly": "npm run build",
+        "dev": "opencode plugin dev",
+        "typecheck": "tsc --noEmit",
+        "test": "node --import tsx --test tests/*.test.ts"
+    },
+    "keywords": [
+        "opencode",
+        "opencode-plugin",
+        "plugin",
+        "context",
+        "pruning",
+        "optimization",
+        "tokens"
+    ],
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/Tarquinen/opencode-dynamic-context-pruning.git"
+    },
+    "bugs": {
+        "url": "https://github.com/Tarquinen/opencode-dynamic-context-pruning/issues"
+    },
+    "homepage": "https://github.com/Tarquinen/opencode-dynamic-context-pruning#readme",
+    "author": "tarquinen",
+    "license": "MIT",
+    "peerDependencies": {
+        "@opencode-ai/plugin": ">=0.13.7"
+    },
+    "dependencies": {
+        "@ai-sdk/openai-compatible": "^1.0.28",
+        "@opencode-ai/sdk": "latest",
+        "@tarquinen/opencode-auth-provider": "^0.1.7",
+        "ai": "^5.0.106",
+        "gpt-tokenizer": "^3.4.0",
+        "jsonc-parser": "^3.3.1",
+        "zod": "^4.1.13"
+    },
+    "devDependencies": {
+        "@opencode-ai/plugin": "^1.0.143",
+        "@types/node": "^24.10.1",
+        "tsx": "^4.21.0",
+        "typescript": "^5.9.3"
+    },
+    "files": [
+        "dist/",
+        "README.md",
+        "LICENSE"
+    ]
 }

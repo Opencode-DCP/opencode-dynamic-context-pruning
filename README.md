@@ -13,7 +13,7 @@ Add to your OpenCode config:
 ```jsonc
 // opencode.jsonc
 {
-  "plugin": ["@tarquinen/opencode-dcp@latest"]
+    "plugin": ["@tarquinen/opencode-dcp@latest"],
 }
 ```
 
@@ -54,53 +54,53 @@ DCP uses its own config file:
 
 ```jsonc
 {
-  // Enable or disable the plugin
-  "enabled": true,
-  // Enable debug logging to ~/.config/opencode/logs/dcp/
-  "debug": false,
-  // Summary display: "off", "minimal", or "detailed"
-  "pruningSummary": "detailed",
-  // Strategies for pruning tokens from chat history
-  "strategies": {
-    // Remove duplicate tool calls (same tool with same arguments)
-    "deduplication": {
-      "enabled": true,
-      // Additional tools to protect from pruning
-      "protectedTools": []
+    // Enable or disable the plugin
+    "enabled": true,
+    // Enable debug logging to ~/.config/opencode/logs/dcp/
+    "debug": false,
+    // Summary display: "off", "minimal", or "detailed"
+    "pruningSummary": "detailed",
+    // Strategies for pruning tokens from chat history
+    "strategies": {
+        // Remove duplicate tool calls (same tool with same arguments)
+        "deduplication": {
+            "enabled": true,
+            // Additional tools to protect from pruning
+            "protectedTools": [],
+        },
+        // Prune write tool inputs when the file has been subsequently read
+        "supersedeWrites": {
+            "enabled": true,
+        },
+        // Exposes a prune tool to your LLM to call when it determines pruning is necessary
+        "pruneTool": {
+            "enabled": true,
+            // Additional tools to protect from pruning
+            "protectedTools": [],
+            // Protect from pruning for <turn protection> message turns
+            "turnProtection": {
+                "enabled": false,
+                "turns": 4,
+            },
+            // Nudge the LLM to use the prune tool (every <frequency> tool results)
+            "nudge": {
+                "enabled": true,
+                "frequency": 10,
+            },
+        },
+        // (Legacy) Run an LLM to analyze what tool calls are no longer relevant on idle
+        "onIdle": {
+            "enabled": false,
+            // Additional tools to protect from pruning
+            "protectedTools": [],
+            // Override model for analysis (format: "provider/model")
+            // "model": "anthropic/claude-haiku-4-5",
+            // Show toast notifications when model selection fails
+            "showModelErrorToasts": true,
+            // When true, fallback models are not permitted
+            "strictModelSelection": false,
+        },
     },
-    // Prune write tool inputs when the file has been subsequently read
-    "supersedeWrites": {
-      "enabled": true
-    },
-    // Exposes a prune tool to your LLM to call when it determines pruning is necessary
-    "pruneTool": {
-      "enabled": true,
-      // Additional tools to protect from pruning
-      "protectedTools": [],
-      // Protect from pruning for <turn protection> message turns
-      "turnProtection": {
-        "enabled": false,
-        "turns": 4
-      },
-      // Nudge the LLM to use the prune tool (every <frequency> tool results)
-      "nudge": {
-        "enabled": true,
-        "frequency": 10
-      }
-    },
-    // (Legacy) Run an LLM to analyze what tool calls are no longer relevant on idle
-    "onIdle": {
-      "enabled": false,
-      // Additional tools to protect from pruning
-      "protectedTools": [],
-      // Override model for analysis (format: "provider/model")
-      // "model": "anthropic/claude-haiku-4-5",
-      // Show toast notifications when model selection fails
-      "showModelErrorToasts": true,
-      // When true, fallback models are not permitted
-      "strictModelSelection": false
-    }
-  }
 }
 ```
 
