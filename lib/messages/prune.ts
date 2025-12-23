@@ -24,7 +24,7 @@ const getNudgeString = (config: PluginConfig): string => {
 }
 
 const wrapPrunableTools = (content: string): string => `<prunable-tools>
-The following tools have been invoked and are available for pruning. This list does not mandate immediate action. Consider your current goals and the resources you need before discarding valuable tool inputs or outputs. Consolidate your prunes for efficiency; it is rarely worth pruning a single tiny tool output. Keep the context free of noise.
+I have the following tool outputs available for pruning. I will consider my current goals and the resources I need before discarding valuable inputs or outputs. I will consolidate prunes for efficiency; it is rarely worth pruning a single tiny tool output.
 ${content}
 </prunable-tools>`
 
@@ -42,7 +42,7 @@ const getCooldownMessage = (config: PluginConfig): string => {
     }
 
     return `<prunable-tools>
-Context management was just performed. Do not use the ${toolName} again. A fresh list will be available after your next tool use.
+I just performed context management. I should not use the ${toolName} again until after my next tool use, when a fresh list will be available.
 </prunable-tools>`
 }
 
