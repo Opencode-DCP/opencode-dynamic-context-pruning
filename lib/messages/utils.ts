@@ -70,6 +70,17 @@ export const extractParameterKey = (tool: string, parameters: any): string => {
     if (!parameters) return ""
 
     if (tool === "read" && parameters.filePath) {
+        const offset = parameters.offset
+        const limit = parameters.limit
+        if (offset !== undefined && limit !== undefined) {
+            return `${parameters.filePath} (lines ${offset}-${offset + limit})`
+        }
+        if (offset !== undefined) {
+            return `${parameters.filePath} (lines ${offset}+)`
+        }
+        if (limit !== undefined) {
+            return `${parameters.filePath} (lines 0-${limit})`
+        }
         return parameters.filePath
     }
     if (tool === "write" && parameters.filePath) {
