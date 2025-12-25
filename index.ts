@@ -50,13 +50,17 @@ const plugin: Plugin = (async (ctx) => {
             const discardEnabled = config.tools.discard.enabled
             const extractEnabled = config.tools.extract.enabled
 
+            // Use user-role prompts for reasoning models (second person),
+            // assistant-role prompts for non-reasoning models (first person)
+            const roleDir = state.isReasoningModel ? "user" : "assistant"
+
             let promptName: string
             if (discardEnabled && extractEnabled) {
-                promptName = "system/system-prompt-both"
+                promptName = `${roleDir}/system/system-prompt-both`
             } else if (discardEnabled) {
-                promptName = "system/system-prompt-discard"
+                promptName = `${roleDir}/system/system-prompt-discard`
             } else if (extractEnabled) {
-                promptName = "system/system-prompt-extract"
+                promptName = `${roleDir}/system/system-prompt-extract`
             } else {
                 return
             }

@@ -1,6 +1,67 @@
 import { Logger } from "../logger"
 import { isMessageCompacted } from "../shared-utils"
 import type { SessionState, WithParts } from "../state"
+import type { AssistantMessage, UserMessage } from "@opencode-ai/sdk"
+
+const SYNTHETIC_MESSAGE_ID = "msg_01234567890123456789012345"
+const SYNTHETIC_PART_ID = "prt_01234567890123456789012345"
+
+export const createSyntheticUserMessage = (baseMessage: WithParts, content: string): WithParts => {
+    const userInfo = baseMessage.info as UserMessage
+    return {
+        info: {
+            id: SYNTHETIC_MESSAGE_ID,
+            sessionID: userInfo.sessionID,
+            role: "user",
+            time: { created: Date.now() },
+            agent: userInfo.agent || "code",
+            model: {
+                providerID: userInfo.model.providerID,
+                modelID: userInfo.model.modelID,
+            },
+        },
+        parts: [
+            {
+                id: SYNTHETIC_PART_ID,
+                sessionID: userInfo.sessionID,
+                messageID: SYNTHETIC_MESSAGE_ID,
+                type: "text",
+                text: content,
+            },
+        ],
+    }
+}
+
+export const createSyntheticAssistantMessage = (
+    baseMessage: WithParts,
+    content: string,
+): WithParts => {
+    const assistantInfo = baseMessage.info as AssistantMessage
+    return {
+        info: {
+            id: SYNTHETIC_MESSAGE_ID,
+            sessionID: assistantInfo.sessionID,
+            role: "assistant",
+            parentID: assistantInfo.parentID,
+            modelID: assistantInfo.modelID,
+            providerID: assistantInfo.providerID,
+            time: { created: Date.now() },
+            tokens: { input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } },
+            cost: 0,
+            path: assistantInfo.path,
+            mode: assistantInfo.mode,
+        },
+        parts: [
+            {
+                id: SYNTHETIC_PART_ID,
+                sessionID: assistantInfo.sessionID,
+                messageID: SYNTHETIC_MESSAGE_ID,
+                type: "text",
+                text: content,
+            },
+        ],
+    }
+}
 
 /**
  * Extracts a human-readable key from tool metadata for display purposes.
@@ -9,6 +70,17 @@ export const extractParameterKey = (tool: string, parameters: any): string => {
     if (!parameters) return ""
 
     if (tool === "read" && parameters.filePath) {
+        const offset = parameters.offset
+        const limit = parameters.limit
+        if (offset !== undefined && limit !== undefined) {
+            return `${parameters.filePath} (lines ${offset}-${offset + limit})`
+        }
+        if (offset !== undefined) {
+            return `${parameters.filePath} (lines ${offset}+)`
+        }
+        if (limit !== undefined) {
+            return `${parameters.filePath} (lines 0-${limit})`
+        }
         return parameters.filePath
     }
     if (tool === "write" && parameters.filePath) {

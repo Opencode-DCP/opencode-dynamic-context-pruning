@@ -2,34 +2,45 @@ import type { SessionState, WithParts } from "../state"
 import type { Logger } from "../logger"
 import type { PluginConfig } from "../config"
 import { loadPrompt } from "../prompt"
-import { extractParameterKey, buildToolIdList } from "./utils"
+import {
+    extractParameterKey,
+    buildToolIdList,
+    createSyntheticUserMessage,
+    createSyntheticAssistantMessage,
+} from "./utils"
 import { getLastAssistantMessage, getLastUserMessage, isMessageCompacted } from "../shared-utils"
-import { AssistantMessage, UserMessage } from "@opencode-ai/sdk"
 
 const PRUNED_TOOL_INPUT_REPLACEMENT =
     "[content removed to save context, this is not what was written to the file, but a placeholder]"
 const PRUNED_TOOL_OUTPUT_REPLACEMENT =
     "[Output removed to save context - information superseded or no longer needed]"
-const getNudgeString = (config: PluginConfig): string => {
+
+const getNudgeString = (config: PluginConfig, isReasoningModel: boolean): string => {
     const discardEnabled = config.tools.discard.enabled
     const extractEnabled = config.tools.extract.enabled
+    const roleDir = isReasoningModel ? "user" : "assistant"
 
     if (discardEnabled && extractEnabled) {
-        return loadPrompt("nudge/nudge-both")
+        return loadPrompt(`${roleDir}/nudge/nudge-both`)
     } else if (discardEnabled) {
-        return loadPrompt("nudge/nudge-discard")
+        return loadPrompt(`${roleDir}/nudge/nudge-discard`)
     } else if (extractEnabled) {
-        return loadPrompt("nudge/nudge-extract")
+        return loadPrompt(`${roleDir}/nudge/nudge-extract`)
     }
     return ""
 }
 
-const wrapPrunableTools = (content: string): string => `<prunable-tools>
+const wrapPrunableToolsUser = (content: string): string => `<prunable-tools>
+The following tools have been invoked and are available for pruning. This list does not mandate immediate action. Consider your current goals and the resources you need before discarding valuable tool inputs or outputs. Consolidate your prunes for efficiency; it is rarely worth pruning a single tiny tool output. Keep the context free of noise.
+${content}
+</prunable-tools>`
+
+const wrapPrunableToolsAssistant = (content: string): string => `<prunable-tools>
 I have the following tool outputs available for pruning. I should consider my current goals and the resources I need before discarding valuable inputs or outputs. I should consolidate prunes for efficiency; it is rarely worth pruning a single tiny tool output.
 ${content}
 </prunable-tools>`
 
-const getCooldownMessage = (config: PluginConfig): string => {
+const getCooldownMessage = (config: PluginConfig, isReasoningModel: boolean): string => {
     const discardEnabled = config.tools.discard.enabled
     const extractEnabled = config.tools.extract.enabled
 
@@ -42,16 +53,12 @@ const getCooldownMessage = (config: PluginConfig): string => {
         toolName = "extract tool"
     }
 
-    return `<prunable-tools>
-I just performed context management. I will not use the ${toolName} again until after my next tool use, when a fresh list will be available.
-</prunable-tools>`
-}
+    const message = isReasoningModel
+        ? `Context management was just performed. Do not use the ${toolName} again. A fresh list will be available after your next tool use.`
+        : `I just performed context management. I will not use the ${toolName} again until after my next tool use, when a fresh list will be available.`
 
-const SYNTHETIC_MESSAGE_ID = "msg_01234567890123456789012345"
-const SYNTHETIC_PART_ID = "prt_01234567890123456789012345"
-const SYNTHETIC_USER_MESSAGE_ID = "msg_01234567890123456789012346"
-const SYNTHETIC_USER_PART_ID = "prt_01234567890123456789012346"
-const REASONING_MODEL_USER_MESSAGE_CONTENT = "[internal: context sync - no response needed]"
+    return `<prunable-tools>\n${message}\n</prunable-tools>`
+}
 
 const buildPrunableToolsList = (
     state: SessionState,
@@ -92,7 +99,8 @@ const buildPrunableToolsList = (
         return ""
     }
 
-    return wrapPrunableTools(lines.join("\n"))
+    const wrapFn = state.isReasoningModel ? wrapPrunableToolsUser : wrapPrunableToolsAssistant
+    return wrapFn(lines.join("\n"))
 }
 
 export const insertPruneToolContext = (
@@ -105,16 +113,14 @@ export const insertPruneToolContext = (
         return
     }
 
-    const lastAssistantMessage = getLastAssistantMessage(messages)
-    if (!lastAssistantMessage) {
-        return
-    }
+    // For reasoning models, inject into user role; for non-reasoning, inject into assistant role
+    const isReasoningModel = state.isReasoningModel
 
     let prunableToolsContent: string
 
     if (state.lastToolPrune) {
         logger.debug("Last tool was prune - injecting cooldown message")
-        prunableToolsContent = getCooldownMessage(config)
+        prunableToolsContent = getCooldownMessage(config, isReasoningModel)
     } else {
         const prunableToolsList = buildPrunableToolsList(state, config, logger, messages)
         if (!prunableToolsList) {
@@ -129,69 +135,24 @@ export const insertPruneToolContext = (
             state.nudgeCounter >= config.tools.settings.nudgeFrequency
         ) {
             logger.info("Inserting prune nudge message")
-            nudgeString = "\n" + getNudgeString(config)
+            nudgeString = "\n" + getNudgeString(config, isReasoningModel)
         }
 
         prunableToolsContent = prunableToolsList + nudgeString
     }
 
-    const assistantInfo = lastAssistantMessage.info as AssistantMessage
-    const assistantMessage: WithParts = {
-        info: {
-            id: SYNTHETIC_MESSAGE_ID,
-            sessionID: assistantInfo.sessionID,
-            role: "assistant",
-            parentID: assistantInfo.parentID,
-            modelID: assistantInfo.modelID,
-            providerID: assistantInfo.providerID,
-            time: { created: Date.now() },
-            tokens: { input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } },
-            cost: 0,
-            path: assistantInfo.path,
-            mode: assistantInfo.mode,
-        },
-        parts: [
-            {
-                id: SYNTHETIC_PART_ID,
-                sessionID: assistantInfo.sessionID,
-                messageID: SYNTHETIC_MESSAGE_ID,
-                type: "text",
-                text: prunableToolsContent,
-            },
-        ],
-    }
-
-    messages.push(assistantMessage)
-
-    // For reasoning models, append a synthetic user message to close the assistant turn.
-    if (state.isReasoningModel) {
-        const lastRealUserMessage = getLastUserMessage(messages)
-        const userMessageInfo = lastRealUserMessage?.info as UserMessage | undefined
-
-        const userMessage: WithParts = {
-            info: {
-                id: SYNTHETIC_USER_MESSAGE_ID,
-                sessionID: assistantInfo.sessionID,
-                role: "user",
-                time: { created: Date.now() + 1 },
-                agent: userMessageInfo?.agent ?? "code",
-                model: userMessageInfo?.model ?? {
-                    providerID: assistantInfo.providerID,
-                    modelID: assistantInfo.modelID,
-                },
-            } as UserMessage,
-            parts: [
-                {
-                    id: SYNTHETIC_USER_PART_ID,
-                    sessionID: assistantInfo.sessionID,
-                    messageID: SYNTHETIC_USER_MESSAGE_ID,
-                    type: "text",
-                    text: REASONING_MODEL_USER_MESSAGE_CONTENT,
-                },
-            ],
+    if (isReasoningModel) {
+        const lastUserMessage = getLastUserMessage(messages)
+        if (!lastUserMessage) {
+            return
         }
-        messages.push(userMessage)
-        logger.debug("Appended synthetic user message for reasoning model")
+        messages.push(createSyntheticUserMessage(lastUserMessage, prunableToolsContent))
+    } else {
+        const lastAssistantMessage = getLastAssistantMessage(messages)
+        if (!lastAssistantMessage) {
+            return
+        }
+        messages.push(createSyntheticAssistantMessage(lastAssistantMessage, prunableToolsContent))
     }
 }
 
@@ -218,7 +179,6 @@ const pruneToolOutputs = (state: SessionState, logger: Logger, messages: WithPar
             if (!state.prune.toolIds.includes(part.callID)) {
                 continue
             }
-            // Skip write and edit tools - their inputs are pruned instead
             if (part.tool === "write" || part.tool === "edit") {
                 continue
             }
@@ -238,16 +198,13 @@ const pruneToolInputs = (state: SessionState, logger: Logger, messages: WithPart
             if (!state.prune.toolIds.includes(part.callID)) {
                 continue
             }
-            // Only prune inputs for write and edit tools
             if (part.tool !== "write" && part.tool !== "edit") {
                 continue
             }
-            // Don't prune yet if tool is still pending or running
             if (part.state.status === "pending" || part.state.status === "running") {
                 continue
             }
 
-            // Write tool has content field, edit tool has oldString/newString fields
             if (part.tool === "write" && part.state.input?.content !== undefined) {
                 part.state.input.content = PRUNED_TOOL_INPUT_REPLACEMENT
             }
