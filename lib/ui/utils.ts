@@ -1,6 +1,22 @@
 import { ToolParameterEntry } from "../state"
 import { extractParameterKey } from "../messages/utils"
 
+export function formatExtracted(distillation?: string[]): string {
+    if (!distillation || distillation.length === 0) {
+        return ""
+    }
+    let result = `\n\n▣ Extracted`
+    for (const finding of distillation) {
+        result += `\n───\n${finding}`
+    }
+    return result
+}
+
+export function formatStatsHeader(totalTokensSaved: number, pruneTokenCounter: number): string {
+    const totalTokensSavedStr = `~${formatTokenCount(totalTokensSaved + pruneTokenCounter)}`
+    return [`▣ DCP | ${totalTokensSavedStr} saved total`].join("\n")
+}
+
 export function formatTokenCount(tokens: number): string {
     if (tokens >= 1000) {
         return `${(tokens / 1000).toFixed(1)}K`.replace(".0K", "K") + " tokens"

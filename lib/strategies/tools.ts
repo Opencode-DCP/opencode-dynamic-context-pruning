@@ -2,11 +2,7 @@ import { tool } from "@opencode-ai/plugin"
 import type { SessionState, ToolParameterEntry, WithParts } from "../state"
 import type { PluginConfig } from "../config"
 import { buildToolIdList } from "../messages/utils"
-import {
-    PruneReason,
-    sendUnifiedNotification,
-    sendDistillationNotification,
-} from "../ui/notification"
+import { PruneReason, sendUnifiedNotification } from "../ui/notification"
 import { formatPruningResultForTool } from "../ui/utils"
 import { ensureSessionInitialized } from "../state"
 import { saveSessionState } from "../state/persistence"
@@ -120,11 +116,8 @@ async function executePruneOperation(
         reason,
         currentParams,
         workingDirectory,
+        distillation,
     )
-
-    if (distillation && config.tools.extract.showDistillation) {
-        await sendDistillationNotification(client, logger, sessionId, distillation, currentParams)
-    }
 
     state.stats.totalPruneTokens += state.stats.pruneTokenCounter
     state.stats.pruneTokenCounter = 0
@@ -192,7 +185,7 @@ export function createExtractTool(ctx: PruneToolContext): ReturnType<typeof tool
                 ctx,
                 toolCtx,
                 args.ids,
-                "consolidation" as PruneReason,
+                "extraction" as PruneReason,
                 "Extract",
                 args.distillation,
             )

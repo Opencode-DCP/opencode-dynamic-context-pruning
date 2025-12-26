@@ -1,27 +1,32 @@
 import type { Logger } from "../logger"
 import type { SessionState } from "../state"
-import { formatPrunedItemsList, formatTokenCount } from "./utils"
+import {
+    formatExtracted,
+    formatPrunedItemsList,
+    formatStatsHeader,
+    formatTokenCount,
+} from "./utils"
 import { ToolParameterEntry } from "../state"
 import { PluginConfig } from "../config"
 
-export type PruneReason = "completion" | "noise" | "consolidation"
+export type PruneReason = "completion" | "noise" | "extraction"
 export const PRUNE_REASON_LABELS: Record<PruneReason, string> = {
     completion: "Task Complete",
     noise: "Noise Removal",
-    consolidation: "Consolidation",
+    extraction: "Extraction",
 }
 
-function formatStatsHeader(totalTokensSaved: number, pruneTokenCounter: number): string {
-    const totalTokensSavedStr = `~${formatTokenCount(totalTokensSaved + pruneTokenCounter)}`
-    return [`▣ DCP | ${totalTokensSavedStr} saved total`].join("\n")
-}
-
-function buildMinimalMessage(state: SessionState, reason: PruneReason | undefined): string {
-    const reasonSuffix = reason ? ` [${PRUNE_REASON_LABELS[reason]}]` : ""
-    return (
+function buildMinimalMessage(
+    state: SessionState,
+    reason: PruneReason | undefined,
+    distillation?: string[],
+): string {
+    const reasonSuffix = reason ? ` — ${PRUNE_REASON_LABELS[reason]}` : ""
+    let message =
         formatStatsHeader(state.stats.totalPruneTokens, state.stats.pruneTokenCounter) +
         reasonSuffix
-    )
+
+    return message + formatExtracted(distillation)
 }
 
 function buildDetailedMessage(
@@ -30,6 +35,7 @@ function buildDetailedMessage(
     pruneToolIds: string[],
     toolMetadata: Map<string, ToolParameterEntry>,
     workingDirectory?: string,
+    distillation?: string[],
 ): string {
     let message = formatStatsHeader(state.stats.totalPruneTokens, state.stats.pruneTokenCounter)
 
@@ -42,7 +48,7 @@ function buildDetailedMessage(
         message += "\n" + itemLines.join("\n")
     }
 
-    return message.trim()
+    return (message + formatExtracted(distillation)).trim()
 }
 
 export async function sendUnifiedNotification(
@@ -56,6 +62,7 @@ export async function sendUnifiedNotification(
     reason: PruneReason | undefined,
     params: any,
     workingDirectory: string,
+    distillation?: string[],
 ): Promise<boolean> {
     const hasPruned = pruneToolIds.length > 0
     if (!hasPruned) {
@@ -66,42 +73,20 @@ export async function sendUnifiedNotification(
         return false
     }
 
+    const showExtraction = config.tools.extract.showDistillation ? distillation : undefined
+
     const message =
         config.pruneNotification === "minimal"
-            ? buildMinimalMessage(state, reason)
-            : buildDetailedMessage(state, reason, pruneToolIds, toolMetadata, workingDirectory)
+            ? buildMinimalMessage(state, reason, showExtraction)
+            : buildDetailedMessage(
+                  state,
+                  reason,
+                  pruneToolIds,
+                  toolMetadata,
+                  workingDirectory,
+                  showExtraction,
+              )
 
-    await sendIgnoredMessage(client, sessionId, message, params, logger)
-    return true
-}
-
-function formatDistillationMessage(distillation: Record<string, any>): string {
-    const lines: string[] = ["▣ DCP | Extracted Distillation"]
-
-    for (const findings of Object.values(distillation)) {
-        lines.push(`\n───`)
-        if (typeof findings === "object" && findings !== null) {
-            lines.push(JSON.stringify(findings, null, 2))
-        } else {
-            lines.push(String(findings))
-        }
-    }
-
-    return lines.join("\n")
-}
-
-export async function sendDistillationNotification(
-    client: any,
-    logger: Logger,
-    sessionId: string,
-    distillation: Record<string, any>,
-    params: any,
-): Promise<boolean> {
-    if (!distillation || Object.keys(distillation).length === 0) {
-        return false
-    }
-
-    const message = formatDistillationMessage(distillation)
     await sendIgnoredMessage(client, sessionId, message, params, logger)
     return true
 }
