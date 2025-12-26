@@ -78,8 +78,8 @@ export async function sendUnifiedNotification(
 function formatDistillationMessage(distillation: Record<string, any>): string {
     const lines: string[] = ["▣ DCP | Extracted Distillation"]
 
-    for (const [id, findings] of Object.entries(distillation)) {
-        lines.push(`\n─── ID ${id} ───`)
+    for (const findings of Object.values(distillation)) {
+        lines.push(`\n───`)
         if (typeof findings === "object" && findings !== null) {
             lines.push(JSON.stringify(findings, null, 2))
         } else {
