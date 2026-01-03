@@ -9,14 +9,6 @@ export interface Deduplication {
     protectedTools: string[]
 }
 
-export interface OnIdle {
-    enabled: boolean
-    model?: string
-    showModelErrorToasts?: boolean
-    strictModelSelection?: boolean
-    protectedTools: string[]
-}
-
 export interface DiscardTool {
     enabled: boolean
 }
@@ -63,7 +55,6 @@ export interface PluginConfig {
         deduplication: Deduplication
         supersedeWrites: SupersedeWrites
         purgeErrors: PurgeErrors
-        onIdle: OnIdle
     }
 }
 
@@ -102,13 +93,6 @@ export const VALID_CONFIG_KEYS = new Set([
     "strategies.purgeErrors.enabled",
     "strategies.purgeErrors.turns",
     "strategies.purgeErrors.protectedTools",
-    // strategies.onIdle
-    "strategies.onIdle",
-    "strategies.onIdle.enabled",
-    "strategies.onIdle.model",
-    "strategies.onIdle.showModelErrorToasts",
-    "strategies.onIdle.strictModelSelection",
-    "strategies.onIdle.protectedTools",
 ])
 
 // Extract all key paths from a config object for validation
@@ -272,60 +256,6 @@ function validateConfigTypes(config: Record<string, any>): ValidationError[] {
             })
         }
 
-        // onIdle
-        if (strategies.onIdle) {
-            if (
-                strategies.onIdle.enabled !== undefined &&
-                typeof strategies.onIdle.enabled !== "boolean"
-            ) {
-                errors.push({
-                    key: "strategies.onIdle.enabled",
-                    expected: "boolean",
-                    actual: typeof strategies.onIdle.enabled,
-                })
-            }
-            if (
-                strategies.onIdle.model !== undefined &&
-                typeof strategies.onIdle.model !== "string"
-            ) {
-                errors.push({
-                    key: "strategies.onIdle.model",
-                    expected: "string",
-                    actual: typeof strategies.onIdle.model,
-                })
-            }
-            if (
-                strategies.onIdle.showModelErrorToasts !== undefined &&
-                typeof strategies.onIdle.showModelErrorToasts !== "boolean"
-            ) {
-                errors.push({
-                    key: "strategies.onIdle.showModelErrorToasts",
-                    expected: "boolean",
-                    actual: typeof strategies.onIdle.showModelErrorToasts,
-                })
-            }
-            if (
-                strategies.onIdle.strictModelSelection !== undefined &&
-                typeof strategies.onIdle.strictModelSelection !== "boolean"
-            ) {
-                errors.push({
-                    key: "strategies.onIdle.strictModelSelection",
-                    expected: "boolean",
-                    actual: typeof strategies.onIdle.strictModelSelection,
-                })
-            }
-            if (
-                strategies.onIdle.protectedTools !== undefined &&
-                !Array.isArray(strategies.onIdle.protectedTools)
-            ) {
-                errors.push({
-                    key: "strategies.onIdle.protectedTools",
-                    expected: "string[]",
-                    actual: typeof strategies.onIdle.protectedTools,
-                })
-            }
-        }
-
         // supersedeWrites
         if (strategies.supersedeWrites) {
             if (
@@ -459,12 +389,6 @@ const defaultConfig: PluginConfig = {
             turns: 4,
             protectedTools: [...DEFAULT_PROTECTED_TOOLS],
         },
-        onIdle: {
-            enabled: false,
-            protectedTools: [...DEFAULT_PROTECTED_TOOLS],
-            showModelErrorToasts: true,
-            strictModelSelection: false,
-        },
     },
 }
 
@@ -587,18 +511,6 @@ function createDefaultConfig(): void {
       "turns": 4,
       // Additional tools to protect from pruning
       "protectedTools": []
-    },
-    // (Legacy) Run an LLM to analyze what tool calls are no longer relevant on idle
-    "onIdle": {
-      "enabled": false,
-      // Additional tools to protect from pruning
-      "protectedTools": [],
-      // Override model for analysis (format: "provider/model")
-      // "model": "anthropic/claude-haiku-4-5",
-      // Show toast notifications when model selection fails
-      "showModelErrorToasts": true,
-      // When true, fallback models are not permitted
-      "strictModelSelection": false
     }
   }
 }
@@ -660,20 +572,6 @@ function mergeStrategies(
                 ]),
             ],
         },
-        onIdle: {
-            enabled: override.onIdle?.enabled ?? base.onIdle.enabled,
-            model: override.onIdle?.model ?? base.onIdle.model,
-            showModelErrorToasts:
-                override.onIdle?.showModelErrorToasts ?? base.onIdle.showModelErrorToasts,
-            strictModelSelection:
-                override.onIdle?.strictModelSelection ?? base.onIdle.strictModelSelection,
-            protectedTools: [
-                ...new Set([
-                    ...base.onIdle.protectedTools,
-                    ...(override.onIdle?.protectedTools ?? []),
-                ]),
-            ],
-        },
     }
 }
 
@@ -727,10 +625,6 @@ function deepCloneConfig(config: PluginConfig): PluginConfig {
             purgeErrors: {
                 ...config.strategies.purgeErrors,
                 protectedTools: [...config.strategies.purgeErrors.protectedTools],
-            },
-            onIdle: {
-                ...config.strategies.onIdle,
-                protectedTools: [...config.strategies.onIdle.protectedTools],
             },
         },
     }

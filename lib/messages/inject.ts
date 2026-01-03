@@ -1,7 +1,7 @@
 import type { SessionState, WithParts } from "../state"
 import type { Logger } from "../logger"
 import type { PluginConfig } from "../config"
-import { loadPrompt } from "../prompt"
+import { loadPrompt } from "../prompts"
 import { extractParameterKey, buildToolIdList, createSyntheticUserMessage } from "./utils"
 import { getLastUserMessage } from "../shared-utils"
 
