@@ -110,6 +110,20 @@ export const extractParameterKey = (tool: string, parameters: any): string => {
         return parameters.name
     }
 
+    if (tool === "lsp") {
+        const op = parameters.operation || "lsp"
+        const path = parameters.filePath || ""
+        const line = parameters.line
+        const char = parameters.character
+        if (path && line !== undefined && char !== undefined) {
+            return `${op} ${path}:${line}:${char}`
+        }
+        if (path) {
+            return `${op} ${path}`
+        }
+        return op
+    }
+
     const paramStr = JSON.stringify(parameters)
     if (paramStr === "{}" || paramStr === "[]" || paramStr === "null") {
         return ""

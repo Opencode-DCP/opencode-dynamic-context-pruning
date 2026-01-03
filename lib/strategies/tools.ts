@@ -7,7 +7,7 @@ import { formatPruningResultForTool } from "../ui/utils"
 import { ensureSessionInitialized } from "../state"
 import { saveSessionState } from "../state/persistence"
 import type { Logger } from "../logger"
-import { loadPrompt } from "../prompt"
+import { loadPrompt } from "../prompts"
 import { calculateTokensSaved, getCurrentParams } from "./utils"
 
 const DISCARD_TOOL_DESCRIPTION = loadPrompt("discard-tool-spec")

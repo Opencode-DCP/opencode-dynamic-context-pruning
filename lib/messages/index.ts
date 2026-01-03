@@ -1,1 +1,2 @@
-export { prune, insertPruneToolContext } from "./prune"
+export { prune } from "./prune"
+export { insertPruneToolContext } from "./inject"
