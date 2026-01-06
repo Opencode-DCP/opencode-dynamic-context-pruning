@@ -68,6 +68,21 @@ const plugin: Plugin = (async (ctx) => {
             logger,
             config,
         ),
+        "chat.message": async (
+            input: {
+                sessionID: string
+                agent?: string
+                model?: { providerID: string; modelID: string }
+                messageID?: string
+                variant?: string
+            },
+            _output: any,
+        ) => {
+            // Cache variant from real user messages (not synthetic)
+            // This avoids scanning all messages to find variant
+            state.variant = input.variant
+            logger.debug("Cached variant from chat.message hook", { variant: input.variant })
+        },
         tool: {
             ...(config.tools.discard.enabled && {
                 discard: createDiscardTool({

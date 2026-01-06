@@ -1,6 +1,7 @@
 import type { SessionState, WithParts } from "../state"
 import type { Logger } from "../logger"
 import type { PluginConfig } from "../config"
+import type { UserMessage } from "@opencode-ai/sdk/v2"
 import { loadPrompt } from "../prompts"
 import { extractParameterKey, buildToolIdList, createSyntheticUserMessage } from "./utils"
 import { getLastUserMessage } from "../shared-utils"
@@ -125,5 +126,6 @@ export const insertPruneToolContext = (
     if (!lastUserMessage) {
         return
     }
-    messages.push(createSyntheticUserMessage(lastUserMessage, prunableToolsContent))
+    const variant = state.variant ?? (lastUserMessage.info as UserMessage).variant
+    messages.push(createSyntheticUserMessage(lastUserMessage, prunableToolsContent, variant))
 }

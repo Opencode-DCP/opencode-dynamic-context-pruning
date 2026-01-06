@@ -56,6 +56,7 @@ export function createSessionState(): SessionState {
         lastToolPrune: false,
         lastCompaction: 0,
         currentTurn: 0,
+        variant: undefined,
     }
 }
 
@@ -75,6 +76,7 @@ export function resetSessionState(state: SessionState): void {
     state.lastToolPrune = false
     state.lastCompaction = 0
     state.currentTurn = 0
+    state.variant = undefined
 }
 
 export async function ensureSessionInitialized(

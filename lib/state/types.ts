@@ -1,4 +1,4 @@
-import { Message, Part } from "@opencode-ai/sdk"
+import { Message, Part } from "@opencode-ai/sdk/v2"
 
 export interface WithParts {
     info: Message
@@ -35,4 +35,5 @@ export interface SessionState {
     lastToolPrune: boolean
     lastCompaction: number
     currentTurn: number
+    variant: string | undefined
 }

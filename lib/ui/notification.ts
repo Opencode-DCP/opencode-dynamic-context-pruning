@@ -99,6 +99,7 @@ export async function sendIgnoredMessage(
     logger: Logger,
 ): Promise<void> {
     const agent = params.agent || undefined
+    const variant = params.variant || undefined
     const model =
         params.providerId && params.modelId
             ? {
@@ -116,6 +117,7 @@ export async function sendIgnoredMessage(
                 noReply: true,
                 agent: agent,
                 model: model,
+                variant: variant,
                 parts: [
                     {
                         type: "text",

@@ -58,7 +58,7 @@ async function executePruneOperation(
 
     await ensureSessionInitialized(ctx.client, state, sessionId, logger, messages)
 
-    const currentParams = getCurrentParams(messages, logger)
+    const currentParams = getCurrentParams(state, messages, logger)
     const toolIdList: string[] = buildToolIdList(state, messages, logger)
 
     // Validate that all numeric IDs are within bounds

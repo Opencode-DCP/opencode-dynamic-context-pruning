@@ -1,14 +1,17 @@
 import { Logger } from "../logger"
 import { isMessageCompacted } from "../shared-utils"
 import type { SessionState, WithParts } from "../state"
-import type { UserMessage } from "@opencode-ai/sdk"
+import type { UserMessage } from "@opencode-ai/sdk/v2"
 
 const SYNTHETIC_MESSAGE_ID = "msg_01234567890123456789012345"
 const SYNTHETIC_PART_ID = "prt_01234567890123456789012345"
 
-export const createSyntheticUserMessage = (baseMessage: WithParts, content: string): WithParts => {
+export const createSyntheticUserMessage = (
+    baseMessage: WithParts,
+    content: string,
+    variant?: string,
+): WithParts => {
     const userInfo = baseMessage.info as UserMessage
-    const variant = (userInfo as any).variant
     return {
         info: {
             id: SYNTHETIC_MESSAGE_ID,

@@ -1,27 +1,36 @@
 import { SessionState, WithParts } from "../state"
-import { UserMessage } from "@opencode-ai/sdk"
+import { UserMessage } from "@opencode-ai/sdk/v2"
 import { Logger } from "../logger"
 import { encode } from "gpt-tokenizer"
 import { getLastUserMessage, isMessageCompacted } from "../shared-utils"
 
 export function getCurrentParams(
+    state: SessionState,
     messages: WithParts[],
     logger: Logger,
 ): {
     providerId: string | undefined
     modelId: string | undefined
     agent: string | undefined
+    variant: string | undefined
 } {
     const userMsg = getLastUserMessage(messages)
     if (!userMsg) {
         logger.debug("No user message found when determining current params")
-        return { providerId: undefined, modelId: undefined, agent: undefined }
+        return {
+            providerId: undefined,
+            modelId: undefined,
+            agent: undefined,
+            variant: state.variant,
+        }
     }
-    const agent: string = (userMsg.info as UserMessage).agent
-    const providerId: string | undefined = (userMsg.info as UserMessage).model.providerID
-    const modelId: string | undefined = (userMsg.info as UserMessage).model.modelID
+    const userInfo = userMsg.info as UserMessage
+    const agent: string = userInfo.agent
+    const providerId: string | undefined = userInfo.model.providerID
+    const modelId: string | undefined = userInfo.model.modelID
+    const variant: string | undefined = state.variant ?? userInfo.variant
 
-    return { providerId, modelId, agent }
+    return { providerId, modelId, agent, variant }
 }
 
 /**
