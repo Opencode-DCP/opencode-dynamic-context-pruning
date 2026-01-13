@@ -3,11 +3,10 @@ import type { Logger } from "../logger"
 import type { PluginConfig } from "../config"
 import { isMessageCompacted } from "../shared-utils"
 
-const PRUNED_TOOL_INPUT_REPLACEMENT =
-    "[content removed to save context, this is not what was written to the file, but a placeholder]"
 const PRUNED_TOOL_OUTPUT_REPLACEMENT =
     "[Output removed to save context - information superseded or no longer needed]"
 const PRUNED_TOOL_ERROR_INPUT_REPLACEMENT = "[input removed due to failed tool call]"
+const PRUNED_QUESTION_INPUT_REPLACEMENT = "[questions removed - see output for user's answers]"
 
 export const prune = (
     state: SessionState,
@@ -33,7 +32,8 @@ const pruneToolOutputs = (state: SessionState, logger: Logger, messages: WithPar
             if (!state.prune.toolIds.includes(part.callID)) {
                 continue
             }
-            if (part.tool === "write" || part.tool === "edit") {
+            // Skip write/edit (protected) and question (output contains answers we want to keep)
+            if (part.tool === "write" || part.tool === "edit" || part.tool === "question") {
                 continue
             }
             if (part.state.status === "completed") {
@@ -43,10 +43,6 @@ const pruneToolOutputs = (state: SessionState, logger: Logger, messages: WithPar
     }
 }
 
-// NOTE: This function is currently unused because "write" and "edit" are protected by default.
-// Some models incorrectly use PRUNED_TOOL_INPUT_REPLACEMENT in their output when they see it in context.
-// See: https://github.com/Opencode-DCP/opencode-dynamic-context-pruning/issues/215
-// Keeping this function in case the bug is resolved in the future.
 const pruneToolInputs = (state: SessionState, logger: Logger, messages: WithParts[]): void => {
     for (const msg of messages) {
         if (isMessageCompacted(state, msg)) {
@@ -60,23 +56,12 @@ const pruneToolInputs = (state: SessionState, logger: Logger, messages: WithPart
             if (!state.prune.toolIds.includes(part.callID)) {
                 continue
             }
-            if (part.tool !== "write" && part.tool !== "edit") {
-                continue
-            }
             if (part.state.status !== "completed") {
                 continue
             }
 
-            if (part.tool === "write" && part.state.input?.content !== undefined) {
-                part.state.input.content = PRUNED_TOOL_INPUT_REPLACEMENT
-            }
-            if (part.tool === "edit") {
-                if (part.state.input?.oldString !== undefined) {
-                    part.state.input.oldString = PRUNED_TOOL_INPUT_REPLACEMENT
-                }
-                if (part.state.input?.newString !== undefined) {
-                    part.state.input.newString = PRUNED_TOOL_INPUT_REPLACEMENT
-                }
+            if (part.tool === "question" && part.state.input?.questions !== undefined) {
+                part.state.input.questions = PRUNED_QUESTION_INPUT_REPLACEMENT
             }
         }
     }

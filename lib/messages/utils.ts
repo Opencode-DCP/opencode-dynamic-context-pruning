@@ -177,6 +177,26 @@ export const extractParameterKey = (tool: string, parameters: any): string => {
         return op
     }
 
+    if (tool === "question") {
+        const questions = parameters.questions
+        if (Array.isArray(questions) && questions.length > 0) {
+            const headers = questions
+                .map((q: any) => q.header || "")
+                .filter(Boolean)
+                .slice(0, 3)
+
+            const count = questions.length
+            const plural = count > 1 ? "s" : ""
+
+            if (headers.length > 0) {
+                const suffix = count > 3 ? ` (+${count - 3} more)` : ""
+                return `${count} question${plural}: ${headers.join(", ")}${suffix}`
+            }
+            return `${count} question${plural}`
+        }
+        return "question"
+    }
+
     const paramStr = JSON.stringify(parameters)
     if (paramStr === "{}" || paramStr === "[]" || paramStr === "null") {
         return ""
