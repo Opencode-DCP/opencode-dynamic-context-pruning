@@ -7,6 +7,11 @@ const SYNTHETIC_MESSAGE_ID = "msg_01234567890123456789012345"
 const SYNTHETIC_PART_ID = "prt_01234567890123456789012345"
 const SYNTHETIC_CALL_ID = "call_01234567890123456789012345"
 
+const isGeminiModel = (modelID: string): boolean => {
+    const lowerModelID = modelID.toLowerCase()
+    return lowerModelID.includes("gemini")
+}
+
 export const createSyntheticAssistantMessageWithToolPart = (
     baseMessage: WithParts,
     content: string,
@@ -14,25 +19,46 @@ export const createSyntheticAssistantMessageWithToolPart = (
 ): WithParts => {
     const userInfo = baseMessage.info as UserMessage
     const now = Date.now()
-    return {
-        info: {
-            id: SYNTHETIC_MESSAGE_ID,
-            sessionID: userInfo.sessionID,
-            role: "assistant",
-            agent: userInfo.agent || "code",
-            parentID: userInfo.id,
-            modelID: userInfo.model.modelID,
-            providerID: userInfo.model.providerID,
-            mode: "default",
-            path: {
-                cwd: "/",
-                root: "/",
-            },
-            time: { created: now, completed: now },
-            cost: 0,
-            tokens: { input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } },
-            ...(variant !== undefined && { variant }),
+
+    const baseInfo = {
+        id: SYNTHETIC_MESSAGE_ID,
+        sessionID: userInfo.sessionID,
+        role: "assistant" as const,
+        agent: userInfo.agent || "code",
+        parentID: userInfo.id,
+        modelID: userInfo.model.modelID,
+        providerID: userInfo.model.providerID,
+        mode: "default",
+        path: {
+            cwd: "/",
+            root: "/",
         },
+        time: { created: now, completed: now },
+        cost: 0,
+        tokens: { input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } },
+        ...(variant !== undefined && { variant }),
+    }
+
+    // For Gemini models, inject as text to avoid thought signature requirements
+    // Gemini 3+ has strict validation requiring thoughtSignature on functionCall parts
+    if (isGeminiModel(userInfo.model.modelID)) {
+        return {
+            info: baseInfo,
+            parts: [
+                {
+                    id: SYNTHETIC_PART_ID,
+                    sessionID: userInfo.sessionID,
+                    messageID: SYNTHETIC_MESSAGE_ID,
+                    type: "text",
+                    text: content,
+                },
+            ],
+        }
+    }
+
+    // For other models, use tool part for cleaner context
+    return {
+        info: baseInfo,
         parts: [
             {
                 id: SYNTHETIC_PART_ID,
@@ -206,24 +232,4 @@ export const isIgnoredUserMessage = (message: WithParts): boolean => {
     }
 
     return true
-}
-
-export const hasReasoningInCurrentAssistantTurn = (messages: WithParts[]): boolean => {
-    for (let i = messages.length - 1; i >= 0; i--) {
-        const message = messages[i]
-        if (message.info?.role === "user") {
-            if (isIgnoredUserMessage(message)) {
-                continue
-            }
-            return false
-        }
-        if (message.info?.role === "assistant" && message.parts) {
-            for (const part of message.parts) {
-                if (part.type === "reasoning") {
-                    return true
-                }
-            }
-        }
-    }
-    return false
 }
