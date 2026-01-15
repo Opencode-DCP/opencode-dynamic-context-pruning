@@ -8,7 +8,6 @@ import {
     buildToolIdList,
     createSyntheticAssistantMessageWithToolPart,
     isIgnoredUserMessage,
-    hasReasoningInCurrentAssistantTurn,
 } from "./utils"
 import { getFilePathFromParameters, isProtectedFilePath } from "../protected-file-patterns"
 import { getLastUserMessage } from "../shared-utils"
@@ -139,31 +138,16 @@ export const insertPruneToolContext = (
         return
     }
 
+    // Never inject immediately following a user message - wait until assistant has started its turn
+    // This avoids interfering with model reasoning/thinking phases
+    // TODO: This can be skipped if there is a good way to check if the model has reasoning,
+    // can't find a good way to do this yet
+    const lastMessage = messages[messages.length - 1]
+    if (lastMessage?.info?.role === "user" && !isIgnoredUserMessage(lastMessage)) {
+        return
+    }
+
     const userInfo = lastUserMessage.info as UserMessage
-    const providerID = userInfo.model.providerID
-    const modelID = userInfo.model.modelID
-    const isGitHubCopilot =
-        providerID === "github-copilot" || providerID === "github-copilot-enterprise"
-
-    // TODO: This can probably be improved further to only trigger for the appropriate thinking settings
-    // This setting is also potentially only necessary for claude subscription, API seems to not need this
-    // validation. See more here: https://platform.claude.com/docs/en/build-with-claude/extended-thinking
-    const isAnthropic = modelID.includes("claude")
-
-    if (isGitHubCopilot) {
-        const lastMessage = messages[messages.length - 1]
-        if (lastMessage?.info?.role === "user" && !isIgnoredUserMessage(lastMessage)) {
-            return
-        }
-    }
-
-    // Anthropic extended thinking models require a thinking block at the start of its turn
-    if (isAnthropic) {
-        if (!hasReasoningInCurrentAssistantTurn(messages)) {
-            return
-        }
-    }
-
     const variant = state.variant ?? userInfo.variant
     messages.push(
         createSyntheticAssistantMessageWithToolPart(lastUserMessage, prunableToolsContent, variant),
