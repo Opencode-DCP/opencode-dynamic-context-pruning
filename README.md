@@ -157,7 +157,89 @@ Restart OpenCode after making config changes.
 
 ## Limitations
 
-**Subagents** — DCP is disabled for subagents. Subagents are not designed to be token efficient; what matters is that the final message returned to the main agent is a concise summary of findings. DCP's pruning could interfere with this summarization behavior.
+**Subagents** — By default, DCP is disabled for subagents. Subagents are not designed to be token efficient; what matters is that the final message returned to the main agent is a concise summary of findings. DCP's pruning could interfere with this summarization behavior.
+
+However, you can enable DCP for specific sub-agents using the experimental configuration (see below).
+
+## Experimental Features
+
+### Sub-Agent DCP Support
+
+> **Warning:** This feature is experimental and may change or be removed in future versions.
+
+You can enable DCP for specific sub-agents by configuring pattern matching on their system prompts. This is useful for long-running sub-agents that would benefit from context pruning.
+
+```jsonc
+{
+    "experimental": {
+        "subAgents": {
+            // Enable DCP for sub-agents matching the configured patterns
+            "enabled": true,
+            "agents": [
+                {
+                    // Unique identifier for this configuration
+                    "name": "explorer",
+                    // Patterns to match in the sub-agent's system prompt (substring matching)
+                    "systemPromptPatterns": [
+                        "You are an exploration agent",
+                        "explore the codebase"
+                    ],
+                    "config": {
+                        // Tools that can be pruned for this sub-agent
+                        "prunableTools": ["Read", "Glob", "Grep"],
+                        // Optional: Override strategies for this sub-agent
+                        "strategies": {
+                            "deduplication": { "enabled": true },
+                            "supersedeWrites": { "enabled": false },
+                            "purgeErrors": { "enabled": true, "turns": 2 }
+                        },
+                        // Optional: Override tool settings for this sub-agent
+                        "tools": {
+                            "discard": { "enabled": true },
+                            "extract": { "enabled": false }
+                        }
+                    }
+                },
+                {
+                    "name": "researcher",
+                    "systemPromptPatterns": ["research agent", "web search"],
+                    "config": {
+                        "prunableTools": ["WebFetch", "WebSearch", "Read"],
+                        "tools": {
+                            "discard": { "enabled": true },
+                            "extract": { "enabled": true }
+                        }
+                    }
+                }
+            ]
+        }
+    }
+}
+```
+
+#### How It Works
+
+1. When a sub-agent session is detected, DCP extracts the system prompt
+2. The system prompt is matched against the configured `systemPromptPatterns`
+3. If a match is found, DCP is enabled for that sub-agent with the specified configuration
+4. Only the tools listed in `prunableTools` can be pruned; all other tools are protected
+
+#### Configuration Options
+
+| Option | Description |
+|--------|-------------|
+| `name` | Unique identifier for this sub-agent configuration |
+| `systemPromptPatterns` | Array of strings to match in the system prompt (substring matching) |
+| `config.prunableTools` | Tools that can be pruned for this sub-agent type |
+| `config.strategies` | Optional strategy overrides (deduplication, supersedeWrites, purgeErrors) |
+| `config.tools` | Optional tool overrides (discard, extract) |
+
+#### Best Practices
+
+- Only enable DCP for sub-agents that have long-running sessions with many tool calls
+- Keep the `prunableTools` list minimal—only include tools whose outputs become stale
+- Test thoroughly, as sub-agent behavior may change with pruning enabled
+- Consider disabling the `extract` tool for sub-agents to keep things simple
 
 ## License
 

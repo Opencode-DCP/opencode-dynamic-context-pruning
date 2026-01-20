@@ -1,13 +1,16 @@
-import type { SessionState, ToolParameterEntry, WithParts } from "./types"
+import type { SessionState, ToolParameterEntry, WithParts, SubAgentState } from "./types"
 import type { Logger } from "../logger"
+import type { PluginConfig } from "../config"
+import { getSubAgentConfig } from "../config"
 import { loadSessionState } from "./persistence"
-import { isSubAgentSession } from "./utils"
+import { getSubAgentSessionInfo } from "./utils"
 import { getLastUserMessage, isMessageCompacted } from "../shared-utils"
 
 export const checkSession = async (
     client: any,
     state: SessionState,
     logger: Logger,
+    config: PluginConfig,
     messages: WithParts[],
 ): Promise<void> => {
     const lastUserMessage = getLastUserMessage(messages)
@@ -20,7 +23,7 @@ export const checkSession = async (
     if (state.sessionId === null || state.sessionId !== lastSessionId) {
         logger.info(`Session changed: ${state.sessionId} -> ${lastSessionId}`)
         try {
-            await ensureSessionInitialized(client, state, lastSessionId, logger, messages)
+            await ensureSessionInitialized(client, state, lastSessionId, logger, config, messages)
         } catch (err: any) {
             logger.error("Failed to initialize session state", { error: err.message })
         }
@@ -39,10 +42,19 @@ export const checkSession = async (
     state.currentTurn = countTurns(state, messages)
 }
 
+function createDefaultSubAgentState(): SubAgentState {
+    return {
+        dcpEnabled: false,
+        matchedConfig: null,
+        systemPrompt: null,
+    }
+}
+
 export function createSessionState(): SessionState {
     return {
         sessionId: null,
         isSubAgent: false,
+        subAgentState: createDefaultSubAgentState(),
         prune: {
             toolIds: [],
         },
@@ -62,6 +74,7 @@ export function createSessionState(): SessionState {
 export function resetSessionState(state: SessionState): void {
     state.sessionId = null
     state.isSubAgent = false
+    state.subAgentState = createDefaultSubAgentState()
     state.prune = {
         toolIds: [],
     }
@@ -82,6 +95,7 @@ export async function ensureSessionInitialized(
     state: SessionState,
     sessionId: string,
     logger: Logger,
+    config: PluginConfig,
     messages: WithParts[],
 ): Promise<void> {
     if (state.sessionId === sessionId) {
@@ -94,9 +108,23 @@ export async function ensureSessionInitialized(
     resetSessionState(state)
     state.sessionId = sessionId
 
-    const isSubAgent = await isSubAgentSession(client, sessionId)
-    state.isSubAgent = isSubAgent
-    logger.info("isSubAgent = " + isSubAgent)
+    const sessionInfo = await getSubAgentSessionInfo(client, sessionId)
+    state.isSubAgent = sessionInfo.isSubAgent
+    logger.info("isSubAgent = " + sessionInfo.isSubAgent)
+
+    // Initialize sub-agent state if this is a sub-agent
+    if (sessionInfo.isSubAgent && sessionInfo.systemPrompt) {
+        const subAgentConfig = getSubAgentConfig(config, sessionInfo.systemPrompt)
+        state.subAgentState = {
+            dcpEnabled: subAgentConfig.enabled,
+            matchedConfig: subAgentConfig.agentConfig,
+            systemPrompt: sessionInfo.systemPrompt,
+        }
+        logger.info("Sub-agent DCP config", {
+            dcpEnabled: subAgentConfig.enabled,
+            matchedAgent: subAgentConfig.agentConfig?.name || null,
+        })
+    }
 
     state.lastCompaction = findLastCompactionTimestamp(messages)
     state.currentTurn = countTurns(state, messages)

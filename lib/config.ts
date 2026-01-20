@@ -45,6 +45,44 @@ export interface TurnProtection {
     turns: number
 }
 
+// Experimental: Sub-agent DCP configuration
+export interface SubAgentConfig {
+    // Tools that can be pruned for this sub-agent type
+    prunableTools: string[]
+    // Override strategies for this sub-agent type
+    strategies?: {
+        deduplication?: { enabled?: boolean }
+        supersedeWrites?: { enabled?: boolean }
+        purgeErrors?: { enabled?: boolean; turns?: number }
+    }
+    // Override tools for this sub-agent type
+    tools?: {
+        discard?: { enabled?: boolean }
+        extract?: { enabled?: boolean }
+    }
+}
+
+export interface SubAgentEntry {
+    // Unique identifier for this sub-agent configuration
+    name: string
+    // Patterns to match in the system prompt to identify this sub-agent type
+    // Uses simple substring matching
+    systemPromptPatterns: string[]
+    // Configuration for this sub-agent type
+    config: SubAgentConfig
+}
+
+export interface ExperimentalSubAgents {
+    // Enable DCP for sub-agents (experimental)
+    enabled: boolean
+    // Sub-agent configurations
+    agents: SubAgentEntry[]
+}
+
+export interface Experimental {
+    subAgents: ExperimentalSubAgents
+}
+
 export interface PluginConfig {
     enabled: boolean
     debug: boolean
@@ -58,6 +96,7 @@ export interface PluginConfig {
         supersedeWrites: SupersedeWrites
         purgeErrors: PurgeErrors
     }
+    experimental: Experimental
 }
 
 const DEFAULT_PROTECTED_TOOLS = [
@@ -109,6 +148,11 @@ export const VALID_CONFIG_KEYS = new Set([
     "strategies.purgeErrors.enabled",
     "strategies.purgeErrors.turns",
     "strategies.purgeErrors.protectedTools",
+    // experimental
+    "experimental",
+    "experimental.subAgents",
+    "experimental.subAgents.enabled",
+    "experimental.subAgents.agents",
 ])
 
 // Extract all key paths from a config object for validation
@@ -347,6 +391,33 @@ function validateConfigTypes(config: Record<string, any>): ValidationError[] {
         }
     }
 
+    // Experimental validators
+    const experimental = config.experimental
+    if (experimental) {
+        if (experimental.subAgents) {
+            if (
+                experimental.subAgents.enabled !== undefined &&
+                typeof experimental.subAgents.enabled !== "boolean"
+            ) {
+                errors.push({
+                    key: "experimental.subAgents.enabled",
+                    expected: "boolean",
+                    actual: typeof experimental.subAgents.enabled,
+                })
+            }
+            if (
+                experimental.subAgents.agents !== undefined &&
+                !Array.isArray(experimental.subAgents.agents)
+            ) {
+                errors.push({
+                    key: "experimental.subAgents.agents",
+                    expected: "array",
+                    actual: typeof experimental.subAgents.agents,
+                })
+            }
+        }
+    }
+
     return errors
 }
 
@@ -432,6 +503,12 @@ const defaultConfig: PluginConfig = {
             enabled: true,
             turns: 4,
             protectedTools: [...DEFAULT_PROTECTED_TOOLS],
+        },
+    },
+    experimental: {
+        subAgents: {
+            enabled: false,
+            agents: [],
         },
     },
 }
@@ -660,6 +737,20 @@ function mergeCommands(
     return override as boolean
 }
 
+function mergeExperimental(
+    base: PluginConfig["experimental"],
+    override?: Partial<PluginConfig["experimental"]>,
+): PluginConfig["experimental"] {
+    if (!override) return base
+
+    return {
+        subAgents: {
+            enabled: override.subAgents?.enabled ?? base.subAgents.enabled,
+            agents: override.subAgents?.agents ?? base.subAgents.agents,
+        },
+    }
+}
+
 function deepCloneConfig(config: PluginConfig): PluginConfig {
     return {
         ...config,
@@ -685,6 +776,22 @@ function deepCloneConfig(config: PluginConfig): PluginConfig {
             purgeErrors: {
                 ...config.strategies.purgeErrors,
                 protectedTools: [...config.strategies.purgeErrors.protectedTools],
+            },
+        },
+        experimental: {
+            subAgents: {
+                enabled: config.experimental.subAgents.enabled,
+                agents: config.experimental.subAgents.agents.map((agent) => ({
+                    name: agent.name,
+                    systemPromptPatterns: [...agent.systemPromptPatterns],
+                    config: {
+                        prunableTools: [...agent.config.prunableTools],
+                        strategies: agent.config.strategies
+                            ? { ...agent.config.strategies }
+                            : undefined,
+                        tools: agent.config.tools ? { ...agent.config.tools } : undefined,
+                    },
+                })),
             },
         },
     }
@@ -730,6 +837,7 @@ export function getConfig(ctx: PluginInput): PluginConfig {
                 ],
                 tools: mergeTools(config.tools, result.data.tools as any),
                 strategies: mergeStrategies(config.strategies, result.data.strategies as any),
+                experimental: mergeExperimental(config.experimental, result.data.experimental as any),
             }
         }
     } else {
@@ -773,6 +881,7 @@ export function getConfig(ctx: PluginInput): PluginConfig {
                 ],
                 tools: mergeTools(config.tools, result.data.tools as any),
                 strategies: mergeStrategies(config.strategies, result.data.strategies as any),
+                experimental: mergeExperimental(config.experimental, result.data.experimental as any),
             }
         }
     }
@@ -813,9 +922,31 @@ export function getConfig(ctx: PluginInput): PluginConfig {
                 ],
                 tools: mergeTools(config.tools, result.data.tools as any),
                 strategies: mergeStrategies(config.strategies, result.data.strategies as any),
+                experimental: mergeExperimental(config.experimental, result.data.experimental as any),
             }
         }
     }
 
     return config
+}
+
+// Helper function to get effective config for a sub-agent based on system prompt
+export function getSubAgentConfig(
+    config: PluginConfig,
+    systemPrompt: string,
+): { enabled: boolean; agentConfig: SubAgentEntry | null } {
+    if (!config.experimental.subAgents.enabled) {
+        return { enabled: false, agentConfig: null }
+    }
+
+    for (const agent of config.experimental.subAgents.agents) {
+        const matchesPattern = agent.systemPromptPatterns.some((pattern) =>
+            systemPrompt.includes(pattern),
+        )
+        if (matchesPattern) {
+            return { enabled: true, agentConfig: agent }
+        }
+    }
+
+    return { enabled: false, agentConfig: null }
 }

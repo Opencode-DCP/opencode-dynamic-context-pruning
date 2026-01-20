@@ -207,6 +207,129 @@
                     }
                 }
             }
+        },
+        "experimental": {
+            "type": "object",
+            "description": "Experimental features (may change or be removed in future versions)",
+            "additionalProperties": false,
+            "properties": {
+                "subAgents": {
+                    "type": "object",
+                    "description": "Enable DCP for specific sub-agents (experimental)",
+                    "additionalProperties": false,
+                    "properties": {
+                        "enabled": {
+                            "type": "boolean",
+                            "default": false,
+                            "description": "Enable DCP for sub-agents matching the configured patterns"
+                        },
+                        "agents": {
+                            "type": "array",
+                            "description": "List of sub-agent configurations",
+                            "items": {
+                                "type": "object",
+                                "additionalProperties": false,
+                                "required": ["name", "systemPromptPatterns", "config"],
+                                "properties": {
+                                    "name": {
+                                        "type": "string",
+                                        "description": "Unique identifier for this sub-agent configuration"
+                                    },
+                                    "systemPromptPatterns": {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "string"
+                                        },
+                                        "description": "Patterns to match in the system prompt to identify this sub-agent type (substring matching)"
+                                    },
+                                    "config": {
+                                        "type": "object",
+                                        "additionalProperties": false,
+                                        "required": ["prunableTools"],
+                                        "properties": {
+                                            "prunableTools": {
+                                                "type": "array",
+                                                "items": {
+                                                    "type": "string"
+                                                },
+                                                "description": "Tools that can be pruned for this sub-agent type"
+                                            },
+                                            "strategies": {
+                                                "type": "object",
+                                                "description": "Override strategies for this sub-agent",
+                                                "additionalProperties": false,
+                                                "properties": {
+                                                    "deduplication": {
+                                                        "type": "object",
+                                                        "additionalProperties": false,
+                                                        "properties": {
+                                                            "enabled": {
+                                                                "type": "boolean",
+                                                                "description": "Enable deduplication for this sub-agent"
+                                                            }
+                                                        }
+                                                    },
+                                                    "supersedeWrites": {
+                                                        "type": "object",
+                                                        "additionalProperties": false,
+                                                        "properties": {
+                                                            "enabled": {
+                                                                "type": "boolean",
+                                                                "description": "Enable supersede writes for this sub-agent"
+                                                            }
+                                                        }
+                                                    },
+                                                    "purgeErrors": {
+                                                        "type": "object",
+                                                        "additionalProperties": false,
+                                                        "properties": {
+                                                            "enabled": {
+                                                                "type": "boolean",
+                                                                "description": "Enable purge errors for this sub-agent"
+                                                            },
+                                                            "turns": {
+                                                                "type": "number",
+                                                                "description": "Number of turns before errors are purged"
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            },
+                                            "tools": {
+                                                "type": "object",
+                                                "description": "Override tool settings for this sub-agent",
+                                                "additionalProperties": false,
+                                                "properties": {
+                                                    "discard": {
+                                                        "type": "object",
+                                                        "additionalProperties": false,
+                                                        "properties": {
+                                                            "enabled": {
+                                                                "type": "boolean",
+                                                                "description": "Enable discard tool for this sub-agent"
+                                                            }
+                                                        }
+                                                    },
+                                                    "extract": {
+                                                        "type": "object",
+                                                        "additionalProperties": false,
+                                                        "properties": {
+                                                            "enabled": {
+                                                                "type": "boolean",
+                                                                "description": "Enable extract tool for this sub-agent"
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
 }

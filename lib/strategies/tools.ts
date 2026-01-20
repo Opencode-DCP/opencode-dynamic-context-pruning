@@ -59,7 +59,7 @@ async function executePruneOperation(
     })
     const messages: WithParts[] = messagesResponse.data || messagesResponse
 
-    await ensureSessionInitialized(ctx.client, state, sessionId, logger, messages)
+    await ensureSessionInitialized(ctx.client, state, sessionId, logger, config, messages)
 
     const currentParams = getCurrentParams(state, messages, logger)
     const toolIdList: string[] = buildToolIdList(state, messages, logger)
