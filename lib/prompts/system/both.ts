@@ -2,9 +2,7 @@ export const SYSTEM_PROMPT_BOTH = `<system-reminder>
 <instruction name=context_management_protocol policy_level=critical>
 
 ENVIRONMENT
-You are operating in a context-constrained environment and thus must proactively manage your context window using the \`discard\` and \`extract\` tools. The environment calls the \`context_info\` tool to provide an up-to-date <prunable-tools> list after each assistant turn. Use this information when deciding what to prune.
-
-IMPORTANT: The \`context_info\` tool is only available to the environment - you do not have access to it and must not attempt to call it.
+You are operating in a context-constrained environment and thus must proactively manage your context window using the \`discard\` and \`extract\` tools. The environment provides an up-to-date <prunable-tools> list after each assistant turn. Use this information when deciding what to prune.
 
 TWO TOOLS FOR CONTEXT MANAGEMENT
 - \`discard\`: Remove tool outputs that are no longer needed (completed tasks, noise, outdated info). No preservation of content.
@@ -44,7 +42,7 @@ There may be tools in session context that do not appear in the <prunable-tools>
 </instruction>
 
 <instruction name=injected_context_handling policy_level=critical>
-After each assistant turn, the environment calls the \`context_info\` tool to inject an assistant message containing a <prunable-tools> list and optional nudge instruction. This tool is only available to the environment - you do not have access to it.
+After each assistant turn, the environment injects an assistant message containing a <prunable-tools> list and optional nudge instruction.
 
 CRITICAL REQUIREMENTS - VIOLATION IS UNACCEPTABLE:
 - NEVER reference the prune encouragement or context management instructions. Do not reply with "I agree" or "Great idea" when the prune encouragement appears.
