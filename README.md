@@ -71,15 +71,8 @@ DCP uses its own config file:
     "debug": false,
     // Notification display: "off", "minimal", or "detailed"
     "pruneNotification": "detailed",
-    // Enable or disable slash commands
-    "commands": {
-        "context": {
-            "enabled": true,
-        },
-        "stats": {
-            "enabled": true,
-        },
-    },
+    // Enable or disable slash commands (/dcp)
+    "commands": true,
     // Protect from pruning for <turns> message turns
     "turnProtection": {
         "enabled": false,
@@ -137,10 +130,11 @@ DCP uses its own config file:
 
 ### Commands
 
-DCP provides two slash commands for visibility into context usage:
+DCP provides a `/dcp` slash command:
 
-- `/dcp-context` — Shows a breakdown of your current session's token usage by category (system, user, assistant, tools, etc.) and how much has been saved through pruning.
-- `/dcp-stats` — Shows cumulative pruning statistics across all sessions.
+- `/dcp` — Shows available DCP commands
+- `/dcp context` — Shows a breakdown of your current session's token usage by category (system, user, assistant, tools, etc.) and how much has been saved through pruning.
+- `/dcp stats` — Shows cumulative pruning statistics across all sessions.
 
 ### Turn Protection
 

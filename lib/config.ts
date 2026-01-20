@@ -45,20 +45,11 @@ export interface TurnProtection {
     turns: number
 }
 
-export interface CommandConfig {
-    enabled: boolean
-}
-
-export interface Commands {
-    context: CommandConfig
-    stats: CommandConfig
-}
-
 export interface PluginConfig {
     enabled: boolean
     debug: boolean
     pruneNotification: "off" | "minimal" | "detailed"
-    commands: Commands
+    commands: boolean
     turnProtection: TurnProtection
     protectedFilePatterns: string[]
     tools: Tools
@@ -95,10 +86,6 @@ export const VALID_CONFIG_KEYS = new Set([
     "turnProtection.turns",
     "protectedFilePatterns",
     "commands",
-    "commands.context",
-    "commands.context.enabled",
-    "commands.stats",
-    "commands.stats.enabled",
     "tools",
     "tools.settings",
     "tools.settings.nudgeEnabled",
@@ -211,26 +198,14 @@ function validateConfigTypes(config: Record<string, any>): ValidationError[] {
         }
     }
 
-    // Commands validators
+    // Commands validator
     const commands = config.commands
-    if (commands) {
-        if (
-            commands.context?.enabled !== undefined &&
-            typeof commands.context.enabled !== "boolean"
-        ) {
-            errors.push({
-                key: "commands.context.enabled",
-                expected: "boolean",
-                actual: typeof commands.context.enabled,
-            })
-        }
-        if (commands.stats?.enabled !== undefined && typeof commands.stats.enabled !== "boolean") {
-            errors.push({
-                key: "commands.stats.enabled",
-                expected: "boolean",
-                actual: typeof commands.stats.enabled,
-            })
-        }
+    if (commands !== undefined && typeof commands !== "boolean") {
+        errors.push({
+            key: "commands",
+            expected: "boolean",
+            actual: typeof commands,
+        })
     }
 
     // Tools validators
@@ -425,14 +400,7 @@ const defaultConfig: PluginConfig = {
     enabled: true,
     debug: false,
     pruneNotification: "detailed",
-    commands: {
-        context: {
-            enabled: true,
-        },
-        stats: {
-            enabled: true,
-        },
-    },
+    commands: true,
     turnProtection: {
         enabled: false,
         turns: 4,
@@ -543,15 +511,8 @@ function createDefaultConfig(): void {
   "debug": false,
   // Notification display: "off", "minimal", or "detailed"
   "pruneNotification": "detailed",
-  // Enable or disable slash commands
-  "commands": {
-    "context": {
-      "enabled": true
-    },
-    "stats": {
-      "enabled": true
-    }
-  },
+  // Enable or disable slash commands (/dcp)
+  "commands": true,
   // Protect from pruning for <turns> message turns
   "turnProtection": {
     "enabled": false,
@@ -695,25 +656,14 @@ function mergeCommands(
     base: PluginConfig["commands"],
     override?: Partial<PluginConfig["commands"]>,
 ): PluginConfig["commands"] {
-    if (!override) return base
-
-    return {
-        context: {
-            enabled: override.context?.enabled ?? base.context.enabled,
-        },
-        stats: {
-            enabled: override.stats?.enabled ?? base.stats.enabled,
-        },
-    }
+    if (override === undefined) return base
+    return override as boolean
 }
 
 function deepCloneConfig(config: PluginConfig): PluginConfig {
     return {
         ...config,
-        commands: {
-            context: { ...config.commands.context },
-            stats: { ...config.commands.stats },
-        },
+        commands: config.commands,
         turnProtection: { ...config.turnProtection },
         protectedFilePatterns: [...config.protectedFilePatterns],
         tools: {

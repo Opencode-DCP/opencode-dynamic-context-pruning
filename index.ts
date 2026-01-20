@@ -68,16 +68,13 @@ const plugin: Plugin = (async (ctx) => {
             }),
         },
         config: async (opencodeConfig) => {
-            opencodeConfig.command ??= {}
-            opencodeConfig.command["dcp-stats"] = {
-                template: "",
-                description: "Show DCP pruning statistics",
+            if (config.commands) {
+                opencodeConfig.command ??= {}
+                opencodeConfig.command["dcp"] = {
+                    template: "",
+                    description: "Show available DCP commands",
+                }
             }
-            opencodeConfig.command["dcp-context"] = {
-                template: "",
-                description: "Show token usage breakdown for current session",
-            }
-            logger.info("Registered /dcp-stats and /dcp-context commands")
 
             const toolsToAdd: string[] = []
             if (config.tools.discard.enabled) toolsToAdd.push("discard")

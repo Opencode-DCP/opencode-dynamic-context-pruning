@@ -27,35 +27,9 @@
             "description": "Level of notification shown when pruning occurs"
         },
         "commands": {
-            "type": "object",
-            "description": "Enable or disable slash commands",
-            "additionalProperties": false,
-            "properties": {
-                "context": {
-                    "type": "object",
-                    "description": "Configuration for /dcp-context command",
-                    "additionalProperties": false,
-                    "properties": {
-                        "enabled": {
-                            "type": "boolean",
-                            "default": true,
-                            "description": "Enable the /dcp-context command"
-                        }
-                    }
-                },
-                "stats": {
-                    "type": "object",
-                    "description": "Configuration for /dcp-stats command",
-                    "additionalProperties": false,
-                    "properties": {
-                        "enabled": {
-                            "type": "boolean",
-                            "default": true,
-                            "description": "Enable the /dcp-stats command"
-                        }
-                    }
-                }
-            }
+            "type": "boolean",
+            "default": true,
+            "description": "Enable DCP slash commands (/dcp)"
         },
         "turnProtection": {
             "type": "object",

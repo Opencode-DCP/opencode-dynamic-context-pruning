@@ -8,6 +8,7 @@ import { checkSession } from "./state"
 import { loadPrompt } from "./prompts"
 import { handleStatsCommand } from "./commands/stats"
 import { handleContextCommand } from "./commands/context"
+import { handleHelpCommand } from "./commands/help"
 
 const INTERNAL_AGENT_SIGNATURES = [
     "You are a title generator",
@@ -89,39 +90,50 @@ export function createCommandExecuteHandler(
         input: { command: string; sessionID: string; arguments: string },
         _output: { parts: any[] },
     ) => {
-        if (input.command === "dcp-stats") {
-            if (!config.commands.stats.enabled) {
-                return
-            }
-            const messagesResponse = await client.session.messages({
-                path: { id: input.sessionID },
-            })
-            const messages = (messagesResponse.data || messagesResponse) as WithParts[]
-            await handleStatsCommand({
-                client,
-                state,
-                logger,
-                sessionId: input.sessionID,
-                messages,
-            })
-            throw new Error("__DCP_STATS_HANDLED__")
+        if (!config.commands) {
+            return
         }
-        if (input.command === "dcp-context") {
-            if (!config.commands.context.enabled) {
-                return
-            }
+
+        if (input.command === "dcp") {
+            const args = (input.arguments || "").trim().split(/\s+/).filter(Boolean)
+            const subcommand = args[0]?.toLowerCase() || ""
+            const _subArgs = args.slice(1)
+
             const messagesResponse = await client.session.messages({
                 path: { id: input.sessionID },
             })
             const messages = (messagesResponse.data || messagesResponse) as WithParts[]
-            await handleContextCommand({
+
+            if (subcommand === "context") {
+                await handleContextCommand({
+                    client,
+                    state,
+                    logger,
+                    sessionId: input.sessionID,
+                    messages,
+                })
+                throw new Error("__DCP_CONTEXT_HANDLED__")
+            }
+
+            if (subcommand === "stats") {
+                await handleStatsCommand({
+                    client,
+                    state,
+                    logger,
+                    sessionId: input.sessionID,
+                    messages,
+                })
+                throw new Error("__DCP_STATS_HANDLED__")
+            }
+
+            await handleHelpCommand({
                 client,
                 state,
                 logger,
                 sessionId: input.sessionID,
                 messages,
             })
-            throw new Error("__DCP_CONTEXT_HANDLED__")
+            throw new Error("__DCP_HELP_HANDLED__")
         }
     }
 }
