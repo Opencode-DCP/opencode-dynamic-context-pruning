@@ -59,6 +59,7 @@ interface TokenBreakdown {
     user: number
     assistant: number
     tools: number
+    toolCount: number
     prunedTokens: number
     prunedCount: number
     total: number
@@ -70,6 +71,7 @@ function analyzeTokens(state: SessionState, messages: WithParts[]): TokenBreakdo
         user: 0,
         assistant: 0,
         tools: 0,
+        toolCount: 0,
         prunedTokens: state.stats.totalPruneTokens,
         prunedCount: state.prune.toolIds.length,
         total: 0,
@@ -125,6 +127,7 @@ function analyzeTokens(state: SessionState, messages: WithParts[]): TokenBreakdo
                 }
             } else if (part.type === "tool") {
                 const toolPart = part as ToolPart
+                breakdown.toolCount++
 
                 if (toolPart.state?.input) {
                     const inputStr =
@@ -180,12 +183,17 @@ function formatContextMessage(breakdown: TokenBreakdown): string {
     const lines: string[] = []
     const barWidth = 30
 
+    const toolsInContext = breakdown.toolCount - breakdown.prunedCount
+    const toolsLabel = `Tools (${toolsInContext})`
+
     const categories = [
         { label: "System", value: breakdown.system, char: "█" },
         { label: "User", value: breakdown.user, char: "▓" },
         { label: "Assistant", value: breakdown.assistant, char: "▒" },
-        { label: "Tools", value: breakdown.tools, char: "░" },
+        { label: toolsLabel, value: breakdown.tools, char: "░" },
     ] as const
+
+    const maxLabelLen = Math.max(...categories.map((c) => c.label.length))
 
     lines.push("╭───────────────────────────────────────────────────────────╮")
     lines.push("│                  DCP Context Analysis                     │")
@@ -199,7 +207,7 @@ function formatContextMessage(breakdown: TokenBreakdown): string {
         const bar = createBar(cat.value, breakdown.total, barWidth, cat.char)
         const percentage =
             breakdown.total > 0 ? ((cat.value / breakdown.total) * 100).toFixed(1) : "0.0"
-        const labelWithPct = `${cat.label.padEnd(9)} ${percentage.padStart(5)}% `
+        const labelWithPct = `${cat.label.padEnd(maxLabelLen)} ${percentage.padStart(5)}% `
         const valueStr = formatTokenCount(cat.value).padStart(13)
         lines.push(`${labelWithPct}│${bar.padEnd(barWidth)}│${valueStr}`)
     }
