@@ -27,9 +27,28 @@
             "description": "Level of notification shown when pruning occurs"
         },
         "commands": {
-            "type": "boolean",
-            "default": true,
-            "description": "Enable DCP slash commands (/dcp)"
+            "type": "object",
+            "description": "Configuration for DCP slash commands (/dcp)",
+            "additionalProperties": false,
+            "properties": {
+                "enabled": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Enable DCP slash commands (/dcp)"
+                },
+                "protectedTools": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "default": [],
+                    "description": "Additional tool names to protect from pruning via commands (e.g., /dcp sweep)"
+                }
+            },
+            "default": {
+                "enabled": true,
+                "protectedTools": []
+            }
         },
         "turnProtection": {
             "type": "object",

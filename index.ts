@@ -47,6 +47,13 @@ const plugin: Plugin = (async (ctx) => {
             state.variant = input.variant
             logger.debug("Cached variant from chat.message hook", { variant: input.variant })
         },
+        "command.execute.before": createCommandExecuteHandler(
+            ctx.client,
+            state,
+            logger,
+            config,
+            ctx.directory,
+        ),
         tool: {
             ...(config.tools.discard.enabled && {
                 discard: createDiscardTool({
@@ -68,7 +75,7 @@ const plugin: Plugin = (async (ctx) => {
             }),
         },
         config: async (opencodeConfig) => {
-            if (config.commands) {
+            if (config.commands.enabled) {
                 opencodeConfig.command ??= {}
                 opencodeConfig.command["dcp"] = {
                     template: "",
@@ -91,7 +98,6 @@ const plugin: Plugin = (async (ctx) => {
                 )
             }
         },
-        "command.execute.before": createCommandExecuteHandler(ctx.client, state, logger, config),
     }
 }) satisfies Plugin
 

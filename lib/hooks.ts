@@ -9,6 +9,7 @@ import { loadPrompt } from "./prompts"
 import { handleStatsCommand } from "./commands/stats"
 import { handleContextCommand } from "./commands/context"
 import { handleHelpCommand } from "./commands/help"
+import { handleSweepCommand } from "./commands/sweep"
 
 const INTERNAL_AGENT_SIGNATURES = [
     "You are a title generator",
@@ -85,12 +86,13 @@ export function createCommandExecuteHandler(
     state: SessionState,
     logger: Logger,
     config: PluginConfig,
+    workingDirectory: string,
 ) {
     return async (
         input: { command: string; sessionID: string; arguments: string },
         _output: { parts: any[] },
     ) => {
-        if (!config.commands) {
+        if (!config.commands.enabled) {
             return
         }
 
@@ -124,6 +126,20 @@ export function createCommandExecuteHandler(
                     messages,
                 })
                 throw new Error("__DCP_STATS_HANDLED__")
+            }
+
+            if (subcommand === "sweep") {
+                await handleSweepCommand({
+                    client,
+                    state,
+                    config,
+                    logger,
+                    sessionId: input.sessionID,
+                    messages,
+                    args: _subArgs,
+                    workingDirectory,
+                })
+                throw new Error("__DCP_SWEEP_HANDLED__")
             }
 
             await handleHelpCommand({

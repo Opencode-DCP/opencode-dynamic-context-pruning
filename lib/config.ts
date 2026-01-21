@@ -30,6 +30,11 @@ export interface Tools {
     extract: ExtractTool
 }
 
+export interface Commands {
+    enabled: boolean
+    protectedTools: string[]
+}
+
 export interface SupersedeWrites {
     enabled: boolean
 }
@@ -49,7 +54,7 @@ export interface PluginConfig {
     enabled: boolean
     debug: boolean
     pruneNotification: "off" | "minimal" | "detailed"
-    commands: boolean
+    commands: Commands
     turnProtection: TurnProtection
     protectedFilePatterns: string[]
     tools: Tools
@@ -86,6 +91,8 @@ export const VALID_CONFIG_KEYS = new Set([
     "turnProtection.turns",
     "protectedFilePatterns",
     "commands",
+    "commands.enabled",
+    "commands.protectedTools",
     "tools",
     "tools.settings",
     "tools.settings.nudgeEnabled",
@@ -200,12 +207,29 @@ function validateConfigTypes(config: Record<string, any>): ValidationError[] {
 
     // Commands validator
     const commands = config.commands
-    if (commands !== undefined && typeof commands !== "boolean") {
-        errors.push({
-            key: "commands",
-            expected: "boolean",
-            actual: typeof commands,
-        })
+    if (commands !== undefined) {
+        if (typeof commands === "object") {
+            if (commands.enabled !== undefined && typeof commands.enabled !== "boolean") {
+                errors.push({
+                    key: "commands.enabled",
+                    expected: "boolean",
+                    actual: typeof commands.enabled,
+                })
+            }
+            if (commands.protectedTools !== undefined && !Array.isArray(commands.protectedTools)) {
+                errors.push({
+                    key: "commands.protectedTools",
+                    expected: "string[]",
+                    actual: typeof commands.protectedTools,
+                })
+            }
+        } else {
+            errors.push({
+                key: "commands",
+                expected: "{ enabled: boolean, protectedTools: string[] }",
+                actual: typeof commands,
+            })
+        }
     }
 
     // Tools validators
@@ -400,7 +424,10 @@ const defaultConfig: PluginConfig = {
     enabled: true,
     debug: false,
     pruneNotification: "detailed",
-    commands: true,
+    commands: {
+        enabled: true,
+        protectedTools: [...DEFAULT_PROTECTED_TOOLS],
+    },
     turnProtection: {
         enabled: false,
         turns: 4,
@@ -511,8 +538,12 @@ function createDefaultConfig(): void {
   "debug": false,
   // Notification display: "off", "minimal", or "detailed"
   "pruneNotification": "detailed",
-  // Enable or disable slash commands (/dcp)
-  "commands": true,
+  // Slash commands (/dcp) configuration
+  "commands": {
+    "enabled": true,
+    // Additional tools to protect from pruning via commands
+    "protectedTools": []
+  },
   // Protect from pruning for <turns> message turns
   "turnProtection": {
     "enabled": false,
@@ -657,13 +688,20 @@ function mergeCommands(
     override?: Partial<PluginConfig["commands"]>,
 ): PluginConfig["commands"] {
     if (override === undefined) return base
-    return override as boolean
+
+    return {
+        enabled: override.enabled ?? base.enabled,
+        protectedTools: [...new Set([...base.protectedTools, ...(override.protectedTools ?? [])])],
+    }
 }
 
 function deepCloneConfig(config: PluginConfig): PluginConfig {
     return {
         ...config,
-        commands: config.commands,
+        commands: {
+            enabled: config.commands.enabled,
+            protectedTools: [...config.commands.protectedTools],
+        },
         turnProtection: { ...config.turnProtection },
         protectedFilePatterns: [...config.protectedFilePatterns],
         tools: {

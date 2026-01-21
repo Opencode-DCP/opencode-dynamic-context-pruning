@@ -71,8 +71,12 @@ DCP uses its own config file:
     "debug": false,
     // Notification display: "off", "minimal", or "detailed"
     "pruneNotification": "detailed",
-    // Enable or disable slash commands (/dcp)
-    "commands": true,
+    // Slash commands configuration
+    "commands": {
+        "enabled": true,
+        // Additional tools to protect from pruning via commands (e.g., /dcp sweep)
+        "protectedTools": [],
+    },
     // Protect from pruning for <turns> message turns
     "turnProtection": {
         "enabled": false,
@@ -135,6 +139,7 @@ DCP provides a `/dcp` slash command:
 - `/dcp` — Shows available DCP commands
 - `/dcp context` — Shows a breakdown of your current session's token usage by category (system, user, assistant, tools, etc.) and how much has been saved through pruning.
 - `/dcp stats` — Shows cumulative pruning statistics across all sessions.
+- `/dcp sweep` — Prunes all tools since the last user message. Accepts an optional count: `/dcp sweep 10` prunes the last 10 tools. Respects `commands.protectedTools`.
 
 ### Turn Protection
 
