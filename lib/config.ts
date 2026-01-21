@@ -531,69 +531,7 @@ function createDefaultConfig(): void {
     }
 
     const configContent = `{
-  "$schema": "https://raw.githubusercontent.com/Opencode-DCP/opencode-dynamic-context-pruning/master/dcp.schema.json",
-  // Enable or disable the plugin
-  "enabled": true,
-  // Enable debug logging to ~/.config/opencode/logs/dcp/
-  "debug": false,
-  // Notification display: "off", "minimal", or "detailed"
-  "pruneNotification": "detailed",
-  // Slash commands (/dcp) configuration
-  "commands": {
-    "enabled": true,
-    // Additional tools to protect from pruning via commands
-    "protectedTools": []
-  },
-  // Protect from pruning for <turns> message turns
-  "turnProtection": {
-    "enabled": false,
-    "turns": 4
-  },
-  // Protect file operations from pruning via glob patterns
-  // Patterns match tool parameters.filePath (e.g. read/write/edit)
-  "protectedFilePatterns": [],
-  // LLM-driven context pruning tools
-  "tools": {
-    // Shared settings for all prune tools
-    "settings": {
-      // Nudge the LLM to use prune tools (every <nudgeFrequency> tool results)
-      "nudgeEnabled": true,
-      "nudgeFrequency": 10,
-      // Additional tools to protect from pruning
-      "protectedTools": []
-    },
-    // Removes tool content from context without preservation (for completed tasks or noise)
-    "discard": {
-      "enabled": true
-    },
-    // Distills key findings into preserved knowledge before removing raw content
-    "extract": {
-      "enabled": true,
-      // Show distillation content as an ignored message notification
-      "showDistillation": false
-    }
-  },
-  // Automatic pruning strategies
-  "strategies": {
-    // Remove duplicate tool calls (same tool with same arguments)
-    "deduplication": {
-      "enabled": true,
-      // Additional tools to protect from pruning
-      "protectedTools": []
-    },
-    // Prune write tool inputs when the file has been subsequently read
-    "supersedeWrites": {
-      "enabled": false
-    },
-    // Prune tool inputs for errored tools after X turns
-    "purgeErrors": {
-      "enabled": true,
-      // Number of turns before errored tool inputs are pruned
-      "turns": 4,
-      // Additional tools to protect from pruning
-      "protectedTools": []
-    }
-  }
+  "$schema": "https://raw.githubusercontent.com/Opencode-DCP/opencode-dynamic-context-pruning/master/dcp.schema.json"
 }
 `
     writeFileSync(GLOBAL_CONFIG_PATH_JSONC, configContent, "utf-8")
