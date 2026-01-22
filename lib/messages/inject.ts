@@ -7,6 +7,7 @@ import {
     extractParameterKey,
     buildToolIdList,
     createSyntheticAssistantMessage,
+    createSyntheticUserMessage,
     isIgnoredUserMessage,
 } from "./utils"
 import { getFilePathFromParameters, isProtectedFilePath } from "../protected-file-patterns"
@@ -138,16 +139,18 @@ export const insertPruneToolContext = (
         return
     }
 
-    // Never inject immediately following a user message - wait until assistant has started its turn
-    // This avoids interfering with model reasoning/thinking phases
-    // TODO: This can be skipped if there is a good way to check if the model has reasoning,
-    // can't find a good way to do this yet
-    const lastMessage = messages[messages.length - 1]
-    if (lastMessage?.info?.role === "user" && !isIgnoredUserMessage(lastMessage)) {
-        return
-    }
-
     const userInfo = lastUserMessage.info as UserMessage
     const variant = state.variant ?? userInfo.variant
-    messages.push(createSyntheticAssistantMessage(lastUserMessage, prunableToolsContent, variant))
+
+    const lastMessage = messages[messages.length - 1]
+    const isLastMessageUser =
+        lastMessage?.info?.role === "user" && !isIgnoredUserMessage(lastMessage)
+
+    if (isLastMessageUser) {
+        messages.push(createSyntheticUserMessage(lastUserMessage, prunableToolsContent, variant))
+    } else {
+        messages.push(
+            createSyntheticAssistantMessage(lastUserMessage, prunableToolsContent, variant),
+        )
+    }
 }

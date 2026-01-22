@@ -1,6 +1,7 @@
 import type { Logger } from "../logger"
 import type { SessionState } from "../state"
 import {
+    countDistillationTokens,
     formatExtracted,
     formatPrunedItemsList,
     formatStatsHeader,
@@ -19,14 +20,19 @@ export const PRUNE_REASON_LABELS: Record<PruneReason, string> = {
 function buildMinimalMessage(
     state: SessionState,
     reason: PruneReason | undefined,
-    distillation?: string[],
+    distillation: string[] | undefined,
+    showDistillation: boolean,
 ): string {
-    const reasonSuffix = reason ? ` — ${PRUNE_REASON_LABELS[reason]}` : ""
+    const extractedTokens = countDistillationTokens(distillation)
+    const extractedSuffix =
+        extractedTokens > 0 ? ` (extracted ${formatTokenCount(extractedTokens)})` : ""
+    const reasonSuffix = reason && extractedTokens === 0 ? ` — ${PRUNE_REASON_LABELS[reason]}` : ""
     let message =
         formatStatsHeader(state.stats.totalPruneTokens, state.stats.pruneTokenCounter) +
-        reasonSuffix
+        reasonSuffix +
+        extractedSuffix
 
-    return message + formatExtracted(distillation)
+    return message + formatExtracted(showDistillation ? distillation : undefined)
 }
 
 function buildDetailedMessage(
@@ -34,21 +40,26 @@ function buildDetailedMessage(
     reason: PruneReason | undefined,
     pruneToolIds: string[],
     toolMetadata: Map<string, ToolParameterEntry>,
-    workingDirectory?: string,
-    distillation?: string[],
+    workingDirectory: string,
+    distillation: string[] | undefined,
+    showDistillation: boolean,
 ): string {
     let message = formatStatsHeader(state.stats.totalPruneTokens, state.stats.pruneTokenCounter)
 
     if (pruneToolIds.length > 0) {
         const pruneTokenCounterStr = `~${formatTokenCount(state.stats.pruneTokenCounter)}`
-        const reasonLabel = reason ? ` — ${PRUNE_REASON_LABELS[reason]}` : ""
-        message += `\n\n▣ Pruning (${pruneTokenCounterStr})${reasonLabel}`
+        const extractedTokens = countDistillationTokens(distillation)
+        const extractedSuffix =
+            extractedTokens > 0 ? `, extracted ${formatTokenCount(extractedTokens)}` : ""
+        const reasonLabel =
+            reason && extractedTokens === 0 ? ` — ${PRUNE_REASON_LABELS[reason]}` : ""
+        message += `\n\n▣ Pruning (${pruneTokenCounterStr}${extractedSuffix})${reasonLabel}`
 
         const itemLines = formatPrunedItemsList(pruneToolIds, toolMetadata, workingDirectory)
         message += "\n" + itemLines.join("\n")
     }
 
-    return (message + formatExtracted(distillation)).trim()
+    return (message + formatExtracted(showDistillation ? distillation : undefined)).trim()
 }
 
 export async function sendUnifiedNotification(
@@ -73,18 +84,19 @@ export async function sendUnifiedNotification(
         return false
     }
 
-    const showExtraction = config.tools.extract.showDistillation ? distillation : undefined
+    const showDistillation = config.tools.extract.showDistillation
 
     const message =
         config.pruneNotification === "minimal"
-            ? buildMinimalMessage(state, reason, showExtraction)
+            ? buildMinimalMessage(state, reason, distillation, showDistillation)
             : buildDetailedMessage(
                   state,
                   reason,
                   pruneToolIds,
                   toolMetadata,
                   workingDirectory,
-                  showExtraction,
+                  distillation,
+                  showDistillation,
               )
 
     await sendIgnoredMessage(client, sessionId, message, params, logger)

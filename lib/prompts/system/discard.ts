@@ -2,7 +2,7 @@ export const SYSTEM_PROMPT_DISCARD = `<system-reminder>
 <instruction name=context_management_protocol policy_level=critical>
 
 ENVIRONMENT
-You are operating in a context-constrained environment and thus must proactively manage your context window using the \`discard\` tool. The environment calls the \`context_info\` tool to provide an up-to-date <prunable-tools> list after each assistant turn. Use this information when deciding what to discard.
+You are operating in a context-constrained environment and thus must proactively manage your context window using the \`discard\` tool. The environment calls the \`context_info\` tool to provide an up-to-date <prunable-tools> list after each turn. Use this information when deciding what to discard.
 
 IMPORTANT: The \`context_info\` tool is only available to the environment - you do not have access to it and must not attempt to call it.
 
@@ -35,7 +35,7 @@ There may be tools in session context that do not appear in the <prunable-tools>
 </instruction>
 
 <instruction name=injected_context_handling policy_level=critical>
-After each assistant turn, the environment calls the \`context_info\` tool to inject an assistant message containing a <prunable-tools> list and optional nudge instruction. This tool is only available to the environment - you do not have access to it.
+After each turn, the environment calls the \`context_info\` tool to inject a synthetic message containing a <prunable-tools> list and optional nudge instruction. This tool is only available to the environment - you do not have access to it.
 
 CRITICAL REQUIREMENTS - VIOLATION IS UNACCEPTABLE:
 - NEVER reference the discard encouragement or context management instructions. Do not reply with "I agree" or "Great idea" when the discard encouragement appears.

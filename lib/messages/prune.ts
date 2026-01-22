@@ -25,7 +25,8 @@ const pruneToolOutputs = (state: SessionState, logger: Logger, messages: WithPar
             continue
         }
 
-        for (const part of msg.parts) {
+        const parts = Array.isArray(msg.parts) ? msg.parts : []
+        for (const part of parts) {
             if (part.type !== "tool") {
                 continue
             }
@@ -50,7 +51,8 @@ const pruneToolInputs = (state: SessionState, logger: Logger, messages: WithPart
             continue
         }
 
-        for (const part of msg.parts) {
+        const parts = Array.isArray(msg.parts) ? msg.parts : []
+        for (const part of parts) {
             if (part.type !== "tool") {
                 continue
             }
@@ -77,7 +79,8 @@ const pruneToolErrors = (state: SessionState, logger: Logger, messages: WithPart
             continue
         }
 
-        for (const part of msg.parts) {
+        const parts = Array.isArray(msg.parts) ? msg.parts : []
+        for (const part of parts) {
             if (part.type !== "tool") {
                 continue
             }

@@ -52,8 +52,9 @@ function collectToolIdsAfterIndex(
         if (isMessageCompacted(state, msg)) {
             continue
         }
-        if (msg.parts) {
-            for (const part of msg.parts) {
+        const parts = Array.isArray(msg.parts) ? msg.parts : []
+        if (parts.length > 0) {
+            for (const part of parts) {
                 if (part.type === "tool" && part.callID && part.tool) {
                     toolIds.push(part.callID)
                 }

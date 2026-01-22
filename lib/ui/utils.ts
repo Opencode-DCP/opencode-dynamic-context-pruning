@@ -1,5 +1,11 @@
 import { ToolParameterEntry } from "../state"
 import { extractParameterKey } from "../messages/utils"
+import { countTokens } from "../strategies/utils"
+
+export function countDistillationTokens(distillation?: string[]): number {
+    if (!distillation || distillation.length === 0) return 0
+    return countTokens(distillation.join("\n"))
+}
 
 export function formatExtracted(distillation?: string[]): string {
     if (!distillation || distillation.length === 0) {

@@ -12,6 +12,36 @@ const isGeminiModel = (modelID: string): boolean => {
     return lowerModelID.includes("gemini")
 }
 
+export const createSyntheticUserMessage = (
+    baseMessage: WithParts,
+    content: string,
+    variant?: string,
+): WithParts => {
+    const userInfo = baseMessage.info as UserMessage
+    const now = Date.now()
+
+    return {
+        info: {
+            id: SYNTHETIC_MESSAGE_ID,
+            sessionID: userInfo.sessionID,
+            role: "user" as const,
+            agent: userInfo.agent || "code",
+            model: userInfo.model,
+            time: { created: now },
+            ...(variant !== undefined && { variant }),
+        },
+        parts: [
+            {
+                id: SYNTHETIC_PART_ID,
+                sessionID: userInfo.sessionID,
+                messageID: SYNTHETIC_MESSAGE_ID,
+                type: "text",
+                text: content,
+            },
+        ],
+    }
+}
+
 export const createSyntheticAssistantMessage = (
     baseMessage: WithParts,
     content: string,
@@ -197,8 +227,9 @@ export function buildToolIdList(
         if (isMessageCompacted(state, msg)) {
             continue
         }
-        if (msg.parts) {
-            for (const part of msg.parts) {
+        const parts = Array.isArray(msg.parts) ? msg.parts : []
+        if (parts.length > 0) {
+            for (const part of parts) {
                 if (part.type === "tool" && part.callID && part.tool) {
                     toolIds.push(part.callID)
                 }
@@ -209,11 +240,12 @@ export function buildToolIdList(
 }
 
 export const isIgnoredUserMessage = (message: WithParts): boolean => {
-    if (!message.parts || message.parts.length === 0) {
+    const parts = Array.isArray(message.parts) ? message.parts : []
+    if (parts.length === 0) {
         return true
     }
 
-    for (const part of message.parts) {
+    for (const part of parts) {
         if (!(part as any).ignored) {
             return false
         }

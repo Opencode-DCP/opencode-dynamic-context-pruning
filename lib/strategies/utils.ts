@@ -57,7 +57,8 @@ export const calculateTokensSaved = (
             if (isMessageCompacted(state, msg)) {
                 continue
             }
-            for (const part of msg.parts) {
+            const parts = Array.isArray(msg.parts) ? msg.parts : []
+            for (const part of parts) {
                 if (part.type !== "tool" || !pruneToolIds.includes(part.callID)) {
                     continue
                 }

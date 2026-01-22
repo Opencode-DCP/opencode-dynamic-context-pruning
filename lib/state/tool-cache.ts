@@ -25,7 +25,8 @@ export async function syncToolCache(
                 continue
             }
 
-            for (const part of msg.parts) {
+            const parts = Array.isArray(msg.parts) ? msg.parts : []
+            for (const part of parts) {
                 if (part.type === "step-start") {
                     turnCounter++
                     continue

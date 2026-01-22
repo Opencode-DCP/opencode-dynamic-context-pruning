@@ -117,7 +117,8 @@ function analyzeTokens(state: SessionState, messages: WithParts[]): TokenBreakdo
         if (isMessageCompacted(state, msg)) continue
         if (msg.info.role === "user" && isIgnoredUserMessage(msg)) continue
 
-        for (const part of msg.parts) {
+        const parts = Array.isArray(msg.parts) ? msg.parts : []
+        for (const part of parts) {
             if (part.type === "text" && msg.info.role === "user") {
                 const textPart = part as TextPart
                 const text = textPart.text || ""

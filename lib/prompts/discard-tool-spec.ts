@@ -12,7 +12,7 @@ Use \`discard\` for removing tool content that is no longer needed
 
 ## When NOT to Use This Tool
 
-- **If the output contains useful information:** Use \`extract\` instead to preserve key findings.
+- **If the output contains useful information:** Keep it in context rather than discarding.
 - **If you'll need the output later:** Don't discard files you plan to edit or context you'll need for implementation.
 
 ## Best Practices
