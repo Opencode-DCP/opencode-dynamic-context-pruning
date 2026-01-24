@@ -3,9 +3,24 @@ import { isMessageCompacted } from "../shared-utils"
 import type { SessionState, WithParts } from "../state"
 import type { UserMessage } from "@opencode-ai/sdk/v2"
 
+export const SQUASH_SUMMARY_PREFIX = "[Squashed conversation block]\n\n"
 const SYNTHETIC_MESSAGE_ID = "msg_01234567890123456789012345"
 const SYNTHETIC_PART_ID = "prt_01234567890123456789012345"
 const SYNTHETIC_CALL_ID = "call_01234567890123456789012345"
+
+// Counter for generating unique IDs within the same millisecond
+let idCounter = 0
+let lastTimestamp = 0
+
+const generateUniqueId = (prefix: string): string => {
+    const now = Date.now()
+    if (now !== lastTimestamp) {
+        lastTimestamp = now
+        idCounter = 0
+    }
+    idCounter++
+    return `${prefix}_${now}_${idCounter}`
+}
 
 const isGeminiModel = (modelID: string): boolean => {
     const lowerModelID = modelID.toLowerCase()
@@ -20,21 +35,24 @@ export const createSyntheticUserMessage = (
     const userInfo = baseMessage.info as UserMessage
     const now = Date.now()
 
+    const messageId = generateUniqueId("msg")
+    const partId = generateUniqueId("prt")
+
     return {
         info: {
-            id: SYNTHETIC_MESSAGE_ID,
+            id: messageId,
             sessionID: userInfo.sessionID,
             role: "user" as const,
-            agent: userInfo.agent || "code",
+            agent: userInfo.agent,
             model: userInfo.model,
             time: { created: now },
             ...(variant !== undefined && { variant }),
         },
         parts: [
             {
-                id: SYNTHETIC_PART_ID,
+                id: partId,
                 sessionID: userInfo.sessionID,
-                messageID: SYNTHETIC_MESSAGE_ID,
+                messageID: messageId,
                 type: "text",
                 text: content,
             },
@@ -252,4 +270,8 @@ export const isIgnoredUserMessage = (message: WithParts): boolean => {
     }
 
     return true
+}
+
+export const findMessageIndex = (messages: WithParts[], messageId: string): number => {
+    return messages.findIndex((msg) => msg.info.id === messageId)
 }

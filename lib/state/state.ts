@@ -45,6 +45,8 @@ export function createSessionState(): SessionState {
         isSubAgent: false,
         prune: {
             toolIds: [],
+            messageIds: [],
+            squashSummaries: [],
         },
         stats: {
             pruneTokenCounter: 0,
@@ -64,6 +66,8 @@ export function resetSessionState(state: SessionState): void {
     state.isSubAgent = false
     state.prune = {
         toolIds: [],
+        messageIds: [],
+        squashSummaries: [],
     }
     state.stats = {
         pruneTokenCounter: 0,
@@ -108,6 +112,8 @@ export async function ensureSessionInitialized(
 
     state.prune = {
         toolIds: persisted.prune.toolIds || [],
+        messageIds: persisted.prune.messageIds || [],
+        squashSummaries: persisted.prune.squashSummaries || [],
     }
     state.stats = {
         pruneTokenCounter: persisted.stats?.pruneTokenCounter || 0,

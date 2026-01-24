@@ -31,6 +31,8 @@ DCP uses multiple tools and strategies to reduce context size:
 
 **Extract** — Exposes an `extract` tool that the AI can call to distill valuable context into concise summaries before removing the tool content.
 
+**Squash** — Exposes a `squash` tool that the AI can call to collapse a large section of conversation (messages and tools) into a single summary.
+
 ### Strategies
 
 **Deduplication** — Identifies repeated tool calls (e.g., reading the same file multiple times) and keeps only the most recent output. Runs automatically on every request with zero LLM cost.
@@ -105,6 +107,12 @@ DCP uses its own config file:
             // Show distillation content as an ignored message notification
             "showDistillation": false,
         },
+        // Collapses a range of conversation content into a single summary
+        "squash": {
+            "enabled": true,
+            // Show summary content as an ignored message notification
+            "showSummary": true,
+        },
     },
     // Automatic pruning strategies
     "strategies": {
@@ -148,7 +156,7 @@ When enabled, turn protection prevents tool outputs from being pruned for a conf
 ### Protected Tools
 
 By default, these tools are always protected from pruning across all strategies:
-`task`, `todowrite`, `todoread`, `discard`, `extract`, `batch`, `write`, `edit`
+`task`, `todowrite`, `todoread`, `discard`, `extract`, `squash`, `batch`, `write`, `edit`
 
 The `protectedTools` arrays in each section add to this default list.
 

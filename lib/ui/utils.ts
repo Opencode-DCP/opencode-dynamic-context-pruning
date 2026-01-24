@@ -35,6 +35,29 @@ export function truncate(str: string, maxLen: number = 60): string {
     return str.slice(0, maxLen - 3) + "..."
 }
 
+export function formatProgressBar(
+    total: number,
+    start: number,
+    end: number,
+    width: number = 20,
+): string {
+    if (total <= 0) return `│${" ".repeat(width)}│`
+
+    const startIdx = Math.floor((start / total) * width)
+    const endIdx = Math.min(width - 1, Math.floor((end / total) * width))
+
+    let bar = ""
+    for (let i = 0; i < width; i++) {
+        if (i >= startIdx && i <= endIdx) {
+            bar += "░"
+        } else {
+            bar += "█"
+        }
+    }
+
+    return `│${bar}│`
+}
+
 export function shortenPath(input: string, workingDirectory?: string): string {
     const inPathMatch = input.match(/^(.+) in (.+)$/)
     if (inPathMatch) {

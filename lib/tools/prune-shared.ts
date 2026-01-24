@@ -1,29 +1,17 @@
-import { tool } from "@opencode-ai/plugin"
 import type { SessionState, ToolParameterEntry, WithParts } from "../state"
 import type { PluginConfig } from "../config"
+import type { Logger } from "../logger"
+import type { PruneToolContext } from "./types"
 import { buildToolIdList } from "../messages/utils"
 import { PruneReason, sendUnifiedNotification } from "../ui/notification"
 import { formatPruningResultForTool } from "../ui/utils"
 import { ensureSessionInitialized } from "../state"
 import { saveSessionState } from "../state/persistence"
-import type { Logger } from "../logger"
-import { loadPrompt } from "../prompts"
-import { calculateTokensSaved, getCurrentParams } from "./utils"
+import { calculateTokensSaved, getCurrentParams } from "../strategies/utils"
 import { getFilePathFromParameters, isProtectedFilePath } from "../protected-file-patterns"
 
-const DISCARD_TOOL_DESCRIPTION = loadPrompt("discard-tool-spec")
-const EXTRACT_TOOL_DESCRIPTION = loadPrompt("extract-tool-spec")
-
-export interface PruneToolContext {
-    client: any
-    state: SessionState
-    logger: Logger
-    config: PluginConfig
-    workingDirectory: string
-}
-
 // Shared logic for executing prune operations.
-async function executePruneOperation(
+export async function executePruneOperation(
     ctx: PruneToolContext,
     toolCtx: { sessionID: string },
     ids: string[],
@@ -150,71 +138,4 @@ async function executePruneOperation(
     )
 
     return formatPruningResultForTool(pruneToolIds, toolMetadata, workingDirectory)
-}
-
-export function createDiscardTool(ctx: PruneToolContext): ReturnType<typeof tool> {
-    return tool({
-        description: DISCARD_TOOL_DESCRIPTION,
-        args: {
-            ids: tool.schema
-                .array(tool.schema.string())
-                .describe(
-                    "First element is the reason ('completion' or 'noise'), followed by numeric IDs as strings to discard",
-                ),
-        },
-        async execute(args, toolCtx) {
-            // Parse reason from first element, numeric IDs from the rest
-            const reason = args.ids?.[0]
-            const validReasons = ["completion", "noise"] as const
-            if (typeof reason !== "string" || !validReasons.includes(reason as any)) {
-                ctx.logger.debug("Invalid discard reason provided: " + reason)
-                throw new Error(
-                    "No valid reason found. Use 'completion' or 'noise' as the first element.",
-                )
-            }
-
-            const numericIds = args.ids.slice(1)
-
-            return executePruneOperation(ctx, toolCtx, numericIds, reason as PruneReason, "Discard")
-        },
-    })
-}
-
-export function createExtractTool(ctx: PruneToolContext): ReturnType<typeof tool> {
-    return tool({
-        description: EXTRACT_TOOL_DESCRIPTION,
-        args: {
-            ids: tool.schema
-                .array(tool.schema.string())
-                .describe("Numeric IDs as strings to extract from the <prunable-tools> list"),
-            distillation: tool.schema
-                .array(tool.schema.string())
-                .describe(
-                    "REQUIRED. Array of strings, one per ID (positional: distillation[0] is for ids[0], etc.)",
-                ),
-        },
-        async execute(args, toolCtx) {
-            if (!args.distillation || args.distillation.length === 0) {
-                ctx.logger.debug(
-                    "Extract tool called without distillation: " + JSON.stringify(args),
-                )
-                throw new Error(
-                    "Missing distillation. You must provide a distillation string for each ID.",
-                )
-            }
-
-            // Log the distillation for debugging/analysis
-            ctx.logger.info("Distillation data received:")
-            ctx.logger.info(JSON.stringify(args.distillation, null, 2))
-
-            return executePruneOperation(
-                ctx,
-                toolCtx,
-                args.ids,
-                "extraction" as PruneReason,
-                "Extract",
-                args.distillation,
-            )
-        },
-    })
 }

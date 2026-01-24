@@ -11,43 +11,69 @@ import {
     isIgnoredUserMessage,
 } from "./utils"
 import { getFilePathFromParameters, isProtectedFilePath } from "../protected-file-patterns"
-import { getLastUserMessage } from "../shared-utils"
+import { getLastUserMessage, isMessageCompacted } from "../shared-utils"
 
 const getNudgeString = (config: PluginConfig): string => {
     const discardEnabled = config.tools.discard.enabled
     const extractEnabled = config.tools.extract.enabled
+    const squashEnabled = config.tools.squash.enabled
 
-    if (discardEnabled && extractEnabled) {
-        return loadPrompt(`nudge/nudge-both`)
+    if (discardEnabled && extractEnabled && squashEnabled) {
+        return loadPrompt(`nudge/nudge-all`)
+    } else if (discardEnabled && extractEnabled) {
+        return loadPrompt(`nudge/nudge-discard-extract`)
+    } else if (discardEnabled && squashEnabled) {
+        return loadPrompt(`nudge/nudge-discard-squash`)
+    } else if (extractEnabled && squashEnabled) {
+        return loadPrompt(`nudge/nudge-extract-squash`)
     } else if (discardEnabled) {
         return loadPrompt(`nudge/nudge-discard`)
     } else if (extractEnabled) {
         return loadPrompt(`nudge/nudge-extract`)
+    } else if (squashEnabled) {
+        return loadPrompt(`nudge/nudge-squash`)
     }
     return ""
 }
 
 const wrapPrunableTools = (content: string): string => `<prunable-tools>
-The following tools have been invoked and are available for pruning. This list does not mandate immediate action. Consider your current goals and the resources you need before discarding valuable tool inputs or outputs. Consolidate your prunes for efficiency; it is rarely worth pruning a single tiny tool output. Keep the context free of noise.
+The following tools have been invoked and are available for pruning. This list does not mandate immediate action. Consider your current goals and the resources you need before pruning valuable tool inputs or outputs. Consolidate your prunes for efficiency; it is rarely worth pruning a single tiny tool output. Keep the context free of noise.
 ${content}
 </prunable-tools>`
 
 const getCooldownMessage = (config: PluginConfig): string => {
     const discardEnabled = config.tools.discard.enabled
     const extractEnabled = config.tools.extract.enabled
+    const squashEnabled = config.tools.squash.enabled
+
+    const enabledTools: string[] = []
+    if (discardEnabled) enabledTools.push("discard")
+    if (extractEnabled) enabledTools.push("extract")
+    if (squashEnabled) enabledTools.push("squash")
 
     let toolName: string
-    if (discardEnabled && extractEnabled) {
-        toolName = "discard or extract tools"
-    } else if (discardEnabled) {
-        toolName = "discard tool"
+    if (enabledTools.length === 0) {
+        toolName = "pruning tools"
+    } else if (enabledTools.length === 1) {
+        toolName = `${enabledTools[0]} tool`
     } else {
-        toolName = "extract tool"
+        const last = enabledTools.pop()
+        toolName = `${enabledTools.join(", ")} or ${last} tools`
     }
 
-    return `<prunable-tools>
+    return `<context-info>
 Context management was just performed. Do not use the ${toolName} again. A fresh list will be available after your next tool use.
-</prunable-tools>`
+</context-info>`
+}
+
+const buildSquashContext = (state: SessionState, messages: WithParts[]): string => {
+    const messageCount = messages.filter((msg) => !isMessageCompacted(state, msg)).length
+
+    return `<squash-context>
+Squash available. Conversation: ${messageCount} messages.
+Squash collapses completed task sequences or exploration phases into summaries.
+Uses text boundaries [startString, endString, topic, summary].
+</squash-context>`
 }
 
 const buildPrunableToolsList = (
@@ -105,34 +131,52 @@ export const insertPruneToolContext = (
     logger: Logger,
     messages: WithParts[],
 ): void => {
-    if (!config.tools.discard.enabled && !config.tools.extract.enabled) {
+    const discardEnabled = config.tools.discard.enabled
+    const extractEnabled = config.tools.extract.enabled
+    const squashEnabled = config.tools.squash.enabled
+
+    if (!discardEnabled && !extractEnabled && !squashEnabled) {
         return
     }
 
-    let prunableToolsContent: string
+    const discardOrExtractEnabled = discardEnabled || extractEnabled
+    const contentParts: string[] = []
 
     if (state.lastToolPrune) {
         logger.debug("Last tool was prune - injecting cooldown message")
-        prunableToolsContent = getCooldownMessage(config)
+        contentParts.push(getCooldownMessage(config))
     } else {
-        const prunableToolsList = buildPrunableToolsList(state, config, logger, messages)
-        if (!prunableToolsList) {
-            return
+        // Inject <prunable-tools> only when discard or extract is enabled
+        if (discardOrExtractEnabled) {
+            const prunableToolsList = buildPrunableToolsList(state, config, logger, messages)
+            if (prunableToolsList) {
+                // logger.debug("prunable-tools: \n" + prunableToolsList)
+                contentParts.push(prunableToolsList)
+            }
         }
 
-        logger.debug("prunable-tools: \n" + prunableToolsList)
+        // Inject <squash-context> always when squash is enabled (every turn)
+        if (squashEnabled) {
+            const squashContext = buildSquashContext(state, messages)
+            // logger.debug("squash-context: \n" + squashContext)
+            contentParts.push(squashContext)
+        }
 
-        let nudgeString = ""
+        // Add nudge if threshold reached
         if (
             config.tools.settings.nudgeEnabled &&
             state.nudgeCounter >= config.tools.settings.nudgeFrequency
         ) {
             logger.info("Inserting prune nudge message")
-            nudgeString = "\n" + getNudgeString(config)
+            contentParts.push(getNudgeString(config))
         }
-
-        prunableToolsContent = prunableToolsList + nudgeString
     }
+
+    if (contentParts.length === 0) {
+        return
+    }
+
+    const combinedContent = contentParts.join("\n")
 
     const lastUserMessage = getLastUserMessage(messages)
     if (!lastUserMessage) {
@@ -147,10 +191,8 @@ export const insertPruneToolContext = (
         lastMessage?.info?.role === "user" && !isIgnoredUserMessage(lastMessage)
 
     if (isLastMessageUser) {
-        messages.push(createSyntheticUserMessage(lastUserMessage, prunableToolsContent, variant))
+        messages.push(createSyntheticUserMessage(lastUserMessage, combinedContent, variant))
     } else {
-        messages.push(
-            createSyntheticAssistantMessage(lastUserMessage, prunableToolsContent, variant),
-        )
+        messages.push(createSyntheticAssistantMessage(lastUserMessage, combinedContent, variant))
     }
 }

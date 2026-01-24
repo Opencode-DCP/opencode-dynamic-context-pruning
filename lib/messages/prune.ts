@@ -1,7 +1,9 @@
 import type { SessionState, WithParts } from "../state"
 import type { Logger } from "../logger"
 import type { PluginConfig } from "../config"
-import { isMessageCompacted } from "../shared-utils"
+import { isMessageCompacted, getLastUserMessage } from "../shared-utils"
+import { createSyntheticUserMessage, SQUASH_SUMMARY_PREFIX } from "./utils"
+import type { UserMessage } from "@opencode-ai/sdk/v2"
 
 const PRUNED_TOOL_OUTPUT_REPLACEMENT =
     "[Output removed to save context - information superseded or no longer needed]"
@@ -14,6 +16,7 @@ export const prune = (
     config: PluginConfig,
     messages: WithParts[],
 ): void => {
+    filterSquashedRanges(state, logger, messages)
     pruneToolOutputs(state, logger, messages)
     pruneToolInputs(state, logger, messages)
     pruneToolErrors(state, logger, messages)
@@ -102,4 +105,53 @@ const pruneToolErrors = (state: SessionState, logger: Logger, messages: WithPart
             }
         }
     }
+}
+
+const filterSquashedRanges = (state: SessionState, logger: Logger, messages: WithParts[]): void => {
+    if (!state.prune.messageIds?.length) {
+        return
+    }
+
+    const result: WithParts[] = []
+
+    for (const msg of messages) {
+        const msgId = msg.info.id
+
+        // Check if there's a summary to inject at this anchor point
+        const summary = state.prune.squashSummaries?.find((s) => s.anchorMessageId === msgId)
+        if (summary) {
+            // Find user message for variant and as base for synthetic message
+            const msgIndex = messages.indexOf(msg)
+            const userMessage = getLastUserMessage(messages, msgIndex)
+
+            if (userMessage) {
+                const userInfo = userMessage.info as UserMessage
+                const summaryContent = SQUASH_SUMMARY_PREFIX + summary.summary
+                result.push(
+                    createSyntheticUserMessage(userMessage, summaryContent, userInfo.variant),
+                )
+
+                logger.info("Injected squash summary", {
+                    anchorMessageId: msgId,
+                    summaryLength: summary.summary.length,
+                })
+            } else {
+                logger.warn("No user message found for squash summary", {
+                    anchorMessageId: msgId,
+                })
+            }
+        }
+
+        // Skip messages that are in the prune list
+        if (state.prune.messageIds.includes(msgId)) {
+            continue
+        }
+
+        // Normal message, include it
+        result.push(msg)
+    }
+
+    // Replace messages array contents
+    messages.length = 0
+    messages.push(...result)
 }
