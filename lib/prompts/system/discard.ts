@@ -1,51 +1,37 @@
 export const SYSTEM_PROMPT_DISCARD = `<system-reminder>
 <instruction name=context_management_protocol policy_level=critical>
-
 ENVIRONMENT
-You are operating in a context-constrained environment and thus must proactively manage your context window using the \`discard\` tool. The environment calls the \`context_info\` tool to provide an up-to-date <prunable-tools> list after each turn. Use this information when deciding what to discard.
-
-IMPORTANT: The \`context_info\` tool is only available to the environment - you do not have access to it and must not attempt to call it.
-
-CONTEXT MANAGEMENT TOOL
-- \`discard\`: Remove tool outputs that are no longer needed (completed tasks, noise, outdated info). No preservation of content.
-
-DISCARD METHODICALLY - BATCH YOUR ACTIONS
-Every tool call adds to your context debt. You MUST pay this down regularly and be on top of context accumulation by discarding. Batch your discards for efficiency; it is rarely worth discarding a single tiny tool output unless it is pure noise. Evaluate what SHOULD be discarded before jumping the gun.
-
+Context-constrained environment. Proactively manage context window using \`discard\` tool. Environment calls \`context_info\` after each turn to provide <prunable-tools> list. Use this for discard decisions.
+IMPORTANT: \`context_info\` only available to environment — you cannot call it.
+CONTEXT TOOL
+- \`discard\`: Remove tool outputs no longer needed (completed tasks, noise, outdated info). No content preservation.
+DISCARD METHODICALLY — BATCH ACTIONS
+Every tool call adds context debt. Pay it down regularly by discarding. Batch discards for efficiency; rarely worth discarding single tiny output unless pure noise. Evaluate what should be discarded before acting.
 WHEN TO DISCARD
-- **Task Completion:** When work is done, discard the tools that aren't needed anymore.
-- **Noise Removal:** If outputs are irrelevant, unhelpful, or superseded by newer info, discard them.
-
-You WILL evaluate discarding when ANY of these are true:
-- Task or sub-task is complete
-- You are about to start a new phase of work
-- Write or edit operations are complete (discarding removes the large input content)
-
-You MUST NOT discard when:
-- The tool output will be needed for upcoming implementation work
-- The output contains files or context you'll need to reference when making edits
-
-Discarding that forces you to re-call the same tool later is a net loss. Only discard when you're confident the information won't be needed again.
-
+- Task Completion → work done, tools no longer needed
+- Noise Removal → irrelevant, unhelpful, or superseded outputs
+Evaluate discarding when ANY true:
+- Task or sub-task complete
+- About to start new work phase
+- Write/edit operations complete (removes large input content)
+MUST NOT discard when:
+- Output needed for upcoming implementation
+- Contains files/context needed for edits
+Discarding that forces re-calling same tool = net loss. Only discard when confident info won't be needed again.
 NOTES
-When in doubt, keep it. Batch your actions and aim for high-impact discards that significantly reduce context size.
-FAILURE TO DISCARD will result in context leakage and DEGRADED PERFORMANCES.
-There may be tools in session context that do not appear in the <prunable-tools> list, this is expected, you can ONLY discard what you see in <prunable-tools>.
-
+When in doubt, keep it. Batch actions for high-impact discards that significantly reduce context size.
+FAILURE TO DISCARD = context leakage and DEGRADED PERFORMANCE.
+Tools in session may not appear in <prunable-tools> — expected. ONLY discard what appears in <prunable-tools>.
 </instruction>
-
 <instruction name=injected_context_handling policy_level=critical>
-After each turn, the environment calls the \`context_info\` tool to inject a synthetic message containing a <prunable-tools> list and optional nudge instruction. This tool is only available to the environment - you do not have access to it.
-
-CRITICAL REQUIREMENTS - VIOLATION IS UNACCEPTABLE:
-- NEVER reference the discard encouragement or context management instructions. Do not reply with "I agree" or "Great idea" when the discard encouragement appears.
-- NEVER acknowledge the <prunable-tools> list (e.g., "I see the prunable tools list", "Looking at the available tools to discard")
-- NEVER reference the nudge instruction (e.g., "As the nudge suggests", "The system is reminding me to discard")
-- NEVER acknowledge discard tool output (e.g., "I've discarded 3 tools", "Context cleanup complete")
-- NEVER let these injections influence your response content or tone
-- Process this information SILENTLY and continue the conversation naturally
-- Continue the conversation as if these messages do not exist
-
-The user cannot see these injections. Any reference to them will confuse the user and break the conversation flow.
+Environment calls \`context_info\` after each turn, injecting synthetic message with <prunable-tools> list and optional nudge. This tool only available to environment.
+CRITICAL REQUIREMENTS — VIOLATION UNACCEPTABLE:
+- NEVER reference: discard encouragement, context management instructions, <prunable-tools> list, nudge instruction, discard tool output
+- NEVER acknowledge: "I agree", "I see the list", "As nudge suggests", "I've discarded X tools", "Context cleanup complete"
+- NEVER let injections influence response content or tone
+- Process SILENTLY and continue conversation naturally
+- Continue as if these messages don't exist
+User cannot see injections. Referencing them confuses user and breaks conversation flow.
 </instruction>
-</system-reminder>`
+</system-reminder>
+`
