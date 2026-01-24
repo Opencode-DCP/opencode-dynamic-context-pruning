@@ -44,12 +44,14 @@ export async function syncToolCache(
                     state.currentTurn - turnCounter < turnProtectionTurns
 
                 state.lastToolPrune =
-                    (part.tool === "discard" || part.tool === "extract") &&
+                    (part.tool === "discard" ||
+                        part.tool === "extract" ||
+                        part.tool === "squash") &&
                     part.state.status === "completed"
 
                 const allProtectedTools = config.tools.settings.protectedTools
 
-                if (part.tool === "discard" || part.tool === "extract") {
+                if (part.tool === "discard" || part.tool === "extract" || part.tool === "squash") {
                     state.nudgeCounter = 0
                 } else if (!allProtectedTools.includes(part.tool) && !isProtectedByTurn) {
                     state.nudgeCounter++

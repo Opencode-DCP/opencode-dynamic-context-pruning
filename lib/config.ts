@@ -18,6 +18,11 @@ export interface ExtractTool {
     showDistillation: boolean
 }
 
+export interface SquashTool {
+    enabled: boolean
+    showSummary: boolean
+}
+
 export interface ToolSettings {
     nudgeEnabled: boolean
     nudgeFrequency: number
@@ -28,6 +33,7 @@ export interface Tools {
     settings: ToolSettings
     discard: DiscardTool
     extract: ExtractTool
+    squash: SquashTool
 }
 
 export interface Commands {
@@ -71,6 +77,7 @@ const DEFAULT_PROTECTED_TOOLS = [
     "todoread",
     "discard",
     "extract",
+    "squash",
     "batch",
     "write",
     "edit",
@@ -103,6 +110,9 @@ export const VALID_CONFIG_KEYS = new Set([
     "tools.extract",
     "tools.extract.enabled",
     "tools.extract.showDistillation",
+    "tools.squash",
+    "tools.squash.enabled",
+    "tools.squash.showSummary",
     "strategies",
     // strategies.deduplication
     "strategies.deduplication",
@@ -295,6 +305,25 @@ function validateConfigTypes(config: Record<string, any>): ValidationError[] {
                 })
             }
         }
+        if (tools.squash) {
+            if (tools.squash.enabled !== undefined && typeof tools.squash.enabled !== "boolean") {
+                errors.push({
+                    key: "tools.squash.enabled",
+                    expected: "boolean",
+                    actual: typeof tools.squash.enabled,
+                })
+            }
+            if (
+                tools.squash.showSummary !== undefined &&
+                typeof tools.squash.showSummary !== "boolean"
+            ) {
+                errors.push({
+                    key: "tools.squash.showSummary",
+                    expected: "boolean",
+                    actual: typeof tools.squash.showSummary,
+                })
+            }
+        }
     }
 
     // Strategies validators
@@ -445,6 +474,10 @@ const defaultConfig: PluginConfig = {
         extract: {
             enabled: true,
             showDistillation: false,
+        },
+        squash: {
+            enabled: true,
+            showSummary: true,
         },
     },
     strategies: {
@@ -618,6 +651,10 @@ function mergeTools(
             enabled: override.extract?.enabled ?? base.extract.enabled,
             showDistillation: override.extract?.showDistillation ?? base.extract.showDistillation,
         },
+        squash: {
+            enabled: override.squash?.enabled ?? base.squash.enabled,
+            showSummary: override.squash?.showSummary ?? base.squash.showSummary,
+        },
     }
 }
 
@@ -649,6 +686,7 @@ function deepCloneConfig(config: PluginConfig): PluginConfig {
             },
             discard: { ...config.tools.discard },
             extract: { ...config.tools.extract },
+            squash: { ...config.tools.squash },
         },
         strategies: {
             deduplication: {

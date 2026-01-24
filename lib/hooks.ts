@@ -35,14 +35,23 @@ export function createSystemPromptHandler(
 
         const discardEnabled = config.tools.discard.enabled
         const extractEnabled = config.tools.extract.enabled
+        const squashEnabled = config.tools.squash.enabled
 
         let promptName: string
-        if (discardEnabled && extractEnabled) {
-            promptName = "system/system-prompt-both"
+        if (discardEnabled && extractEnabled && squashEnabled) {
+            promptName = "system/system-prompt-all"
+        } else if (discardEnabled && extractEnabled) {
+            promptName = "system/system-prompt-discard-extract"
+        } else if (discardEnabled && squashEnabled) {
+            promptName = "system/system-prompt-discard-squash"
+        } else if (extractEnabled && squashEnabled) {
+            promptName = "system/system-prompt-extract-squash"
         } else if (discardEnabled) {
             promptName = "system/system-prompt-discard"
         } else if (extractEnabled) {
             promptName = "system/system-prompt-extract"
+        } else if (squashEnabled) {
+            promptName = "system/system-prompt-squash"
         } else {
             return
         }

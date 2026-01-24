@@ -20,8 +20,15 @@ export interface SessionStats {
     totalPruneTokens: number
 }
 
+export interface SquashSummary {
+    anchorMessageId: string
+    summary: string
+}
+
 export interface Prune {
     toolIds: string[]
+    messageIds: string[]
+    squashSummaries: SquashSummary[]
 }
 
 export interface SessionState {

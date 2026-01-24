@@ -2,7 +2,7 @@ import type { Plugin } from "@opencode-ai/plugin"
 import { getConfig } from "./lib/config"
 import { Logger } from "./lib/logger"
 import { createSessionState } from "./lib/state"
-import { createDiscardTool, createExtractTool } from "./lib/strategies"
+import { createDiscardTool, createExtractTool, createSquashTool } from "./lib/strategies"
 import {
     createChatMessageTransformHandler,
     createCommandExecuteHandler,
@@ -73,6 +73,15 @@ const plugin: Plugin = (async (ctx) => {
                     workingDirectory: ctx.directory,
                 }),
             }),
+            ...(config.tools.squash.enabled && {
+                squash: createSquashTool({
+                    client: ctx.client,
+                    state,
+                    logger,
+                    config,
+                    workingDirectory: ctx.directory,
+                }),
+            }),
         },
         config: async (opencodeConfig) => {
             if (config.commands.enabled) {
@@ -86,6 +95,7 @@ const plugin: Plugin = (async (ctx) => {
             const toolsToAdd: string[] = []
             if (config.tools.discard.enabled) toolsToAdd.push("discard")
             if (config.tools.extract.enabled) toolsToAdd.push("extract")
+            if (config.tools.squash.enabled) toolsToAdd.push("squash")
 
             if (toolsToAdd.length > 0) {
                 const existingPrimaryTools = opencodeConfig.experimental?.primary_tools ?? []
