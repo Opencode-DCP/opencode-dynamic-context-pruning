@@ -1,4 +1,123 @@
-import { WithParts } from "../state"
+import type { WithParts, SquashSummary } from "../state"
+import type { Logger } from "../logger"
+
+/**
+ * Searches messages for a string and returns the message ID where it's found.
+ * Searches in text parts, tool outputs, tool inputs, and other textual content.
+ * Also searches through existing squash summaries to enable chained squashing.
+ * Throws an error if the string is not found or found more than once.
+ */
+export function findStringInMessages(
+    messages: WithParts[],
+    searchString: string,
+    logger: Logger,
+    squashSummaries: SquashSummary[] = [],
+): { messageId: string; messageIndex: number } {
+    const matches: { messageId: string; messageIndex: number }[] = []
+
+    // First, search through existing squash summaries
+    // This allows referencing text from previous squash operations
+    for (const summary of squashSummaries) {
+        if (summary.summary.includes(searchString)) {
+            const anchorIndex = messages.findIndex((m) => m.info.id === summary.anchorMessageId)
+            if (anchorIndex !== -1) {
+                matches.push({
+                    messageId: summary.anchorMessageId,
+                    messageIndex: anchorIndex,
+                })
+            }
+        }
+    }
+
+    // Then search through raw messages
+    for (let i = 0; i < messages.length; i++) {
+        const msg = messages[i]
+        const parts = Array.isArray(msg.parts) ? msg.parts : []
+
+        for (const part of parts) {
+            let content = ""
+
+            if (part.type === "text" && typeof part.text === "string") {
+                content = part.text
+            } else if (part.type === "tool" && part.state?.status === "completed") {
+                if (typeof part.state.output === "string") {
+                    content = part.state.output
+                }
+                if (part.state.input) {
+                    const inputStr =
+                        typeof part.state.input === "string"
+                            ? part.state.input
+                            : JSON.stringify(part.state.input)
+                    content += " " + inputStr
+                }
+            }
+
+            if (content.includes(searchString)) {
+                matches.push({ messageId: msg.info.id, messageIndex: i })
+            }
+        }
+    }
+
+    if (matches.length === 0) {
+        throw new Error(
+            `String not found in conversation. Make sure the string exists in the conversation.`,
+        )
+    }
+
+    if (matches.length > 1) {
+        throw new Error(
+            `String found in ${matches.length} messages. Please use a more unique string to identify the range boundary.`,
+        )
+    }
+
+    return matches[0]
+}
+
+/**
+ * Collects all tool callIDs from messages between start and end indices (inclusive).
+ */
+export function collectToolIdsInRange(
+    messages: WithParts[],
+    startIndex: number,
+    endIndex: number,
+): string[] {
+    const toolIds: string[] = []
+
+    for (let i = startIndex; i <= endIndex; i++) {
+        const msg = messages[i]
+        const parts = Array.isArray(msg.parts) ? msg.parts : []
+
+        for (const part of parts) {
+            if (part.type === "tool" && part.callID) {
+                if (!toolIds.includes(part.callID)) {
+                    toolIds.push(part.callID)
+                }
+            }
+        }
+    }
+
+    return toolIds
+}
+
+/**
+ * Collects all message IDs from messages between start and end indices (inclusive).
+ */
+export function collectMessageIdsInRange(
+    messages: WithParts[],
+    startIndex: number,
+    endIndex: number,
+): string[] {
+    const messageIds: string[] = []
+
+    for (let i = startIndex; i <= endIndex; i++) {
+        const msgId = messages[i].info.id
+        if (!messageIds.includes(msgId)) {
+            messageIds.push(msgId)
+        }
+    }
+
+    return messageIds
+}
 
 /**
  * Collects all textual content (text parts, tool inputs, and tool outputs)
