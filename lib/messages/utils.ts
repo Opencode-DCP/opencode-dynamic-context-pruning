@@ -1,26 +1,12 @@
+import { ulid } from "ulid"
 import { Logger } from "../logger"
 import { isMessageCompacted } from "../shared-utils"
 import type { SessionState, WithParts } from "../state"
 import type { UserMessage } from "@opencode-ai/sdk/v2"
 
 export const SQUASH_SUMMARY_PREFIX = "[Squashed conversation block]\n\n"
-const SYNTHETIC_MESSAGE_ID = "msg_01234567890123456789012345"
-const SYNTHETIC_PART_ID = "prt_01234567890123456789012345"
-const SYNTHETIC_CALL_ID = "call_01234567890123456789012345"
 
-// Counter for generating unique IDs within the same millisecond
-let idCounter = 0
-let lastTimestamp = 0
-
-const generateUniqueId = (prefix: string): string => {
-    const now = Date.now()
-    if (now !== lastTimestamp) {
-        lastTimestamp = now
-        idCounter = 0
-    }
-    idCounter++
-    return `${prefix}_${now}_${idCounter}`
-}
+const generateUniqueId = (prefix: string): string => `${prefix}_${ulid()}`
 
 const isGeminiModel = (modelID: string): boolean => {
     const lowerModelID = modelID.toLowerCase()
@@ -68,8 +54,12 @@ export const createSyntheticAssistantMessage = (
     const userInfo = baseMessage.info as UserMessage
     const now = Date.now()
 
+    const messageId = generateUniqueId("msg")
+    const partId = generateUniqueId("prt")
+    const callId = generateUniqueId("call")
+
     const baseInfo = {
-        id: SYNTHETIC_MESSAGE_ID,
+        id: messageId,
         sessionID: userInfo.sessionID,
         role: "assistant" as const,
         agent: userInfo.agent || "code",
@@ -96,11 +86,11 @@ export const createSyntheticAssistantMessage = (
         info: baseInfo,
         parts: [
             {
-                id: SYNTHETIC_PART_ID,
+                id: partId,
                 sessionID: userInfo.sessionID,
-                messageID: SYNTHETIC_MESSAGE_ID,
+                messageID: messageId,
                 type: "tool",
-                callID: SYNTHETIC_CALL_ID,
+                callID: callId,
                 tool: "context_info",
                 state: {
                     status: "completed",
