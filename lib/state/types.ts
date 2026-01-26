@@ -28,13 +28,13 @@ export interface SquashSummary {
 export interface Prune {
     toolIds: string[]
     messageIds: string[]
-    squashSummaries: SquashSummary[]
 }
 
 export interface SessionState {
     sessionId: string | null
     isSubAgent: boolean
     prune: Prune
+    squashSummaries: SquashSummary[]
     stats: SessionStats
     toolParameters: Map<string, ToolParameterEntry>
     nudgeCounter: number

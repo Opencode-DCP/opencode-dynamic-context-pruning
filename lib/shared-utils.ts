@@ -2,7 +2,13 @@ import { SessionState, WithParts } from "./state"
 import { isIgnoredUserMessage } from "./messages/utils"
 
 export const isMessageCompacted = (state: SessionState, msg: WithParts): boolean => {
-    return msg.info.time.created < state.lastCompaction
+    if (msg.info.time.created < state.lastCompaction) {
+        return true
+    }
+    if (state.prune.messageIds.includes(msg.info.id)) {
+        return true
+    }
+    return false
 }
 
 export const getLastUserMessage = (

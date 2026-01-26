@@ -1,8 +1,13 @@
 import type { SessionState, ToolParameterEntry, WithParts } from "./types"
 import type { Logger } from "../logger"
 import { loadSessionState } from "./persistence"
-import { isSubAgentSession } from "./utils"
-import { getLastUserMessage, isMessageCompacted } from "../shared-utils"
+import {
+    isSubAgentSession,
+    findLastCompactionTimestamp,
+    countTurns,
+    resetOnCompaction,
+} from "./utils"
+import { getLastUserMessage } from "../shared-utils"
 
 export const checkSession = async (
     client: any,
@@ -29,9 +34,8 @@ export const checkSession = async (
     const lastCompactionTimestamp = findLastCompactionTimestamp(messages)
     if (lastCompactionTimestamp > state.lastCompaction) {
         state.lastCompaction = lastCompactionTimestamp
-        state.toolParameters.clear()
-        state.prune.toolIds = []
-        logger.info("Detected compaction from messages - cleared tool cache", {
+        resetOnCompaction(state)
+        logger.info("Detected compaction - reset stale state", {
             timestamp: lastCompactionTimestamp,
         })
     }
@@ -46,8 +50,8 @@ export function createSessionState(): SessionState {
         prune: {
             toolIds: [],
             messageIds: [],
-            squashSummaries: [],
         },
+        squashSummaries: [],
         stats: {
             pruneTokenCounter: 0,
             totalPruneTokens: 0,
@@ -67,8 +71,8 @@ export function resetSessionState(state: SessionState): void {
     state.prune = {
         toolIds: [],
         messageIds: [],
-        squashSummaries: [],
     }
+    state.squashSummaries = []
     state.stats = {
         pruneTokenCounter: 0,
         totalPruneTokens: 0,
@@ -113,36 +117,10 @@ export async function ensureSessionInitialized(
     state.prune = {
         toolIds: persisted.prune.toolIds || [],
         messageIds: persisted.prune.messageIds || [],
-        squashSummaries: persisted.prune.squashSummaries || [],
     }
+    state.squashSummaries = persisted.squashSummaries || []
     state.stats = {
         pruneTokenCounter: persisted.stats?.pruneTokenCounter || 0,
         totalPruneTokens: persisted.stats?.totalPruneTokens || 0,
     }
-}
-
-function findLastCompactionTimestamp(messages: WithParts[]): number {
-    for (let i = messages.length - 1; i >= 0; i--) {
-        const msg = messages[i]
-        if (msg.info.role === "assistant" && msg.info.summary === true) {
-            return msg.info.time.created
-        }
-    }
-    return 0
-}
-
-export function countTurns(state: SessionState, messages: WithParts[]): number {
-    let turnCount = 0
-    for (const msg of messages) {
-        if (isMessageCompacted(state, msg)) {
-            continue
-        }
-        const parts = Array.isArray(msg.parts) ? msg.parts : []
-        for (const part of parts) {
-            if (part.type === "step-start") {
-                turnCount++
-            }
-        }
-    }
-    return turnCount
 }

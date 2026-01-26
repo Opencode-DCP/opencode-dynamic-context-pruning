@@ -118,7 +118,7 @@ const filterSquashedRanges = (state: SessionState, logger: Logger, messages: Wit
         const msgId = msg.info.id
 
         // Check if there's a summary to inject at this anchor point
-        const summary = state.prune.squashSummaries?.find((s) => s.anchorMessageId === msgId)
+        const summary = state.squashSummaries?.find((s) => s.anchorMessageId === msgId)
         if (summary) {
             // Find user message for variant and as base for synthetic message
             const msgIndex = messages.indexOf(msg)
