@@ -3,6 +3,7 @@ import type { PluginConfig } from "../config"
 import type { Logger } from "../logger"
 import type { PruneToolContext } from "./types"
 import { buildToolIdList } from "../messages/utils"
+import { syncToolCache } from "../state/tool-cache"
 import { PruneReason, sendUnifiedNotification } from "../ui/notification"
 import { formatPruningResultForTool } from "../ui/utils"
 import { ensureSessionInitialized } from "../state"
@@ -48,32 +49,37 @@ export async function executePruneOperation(
     const messages: WithParts[] = messagesResponse.data || messagesResponse
 
     await ensureSessionInitialized(ctx.client, state, sessionId, logger, messages)
+    await syncToolCache(state, config, logger, messages)
 
     const currentParams = getCurrentParams(state, messages, logger)
     const toolIdList: string[] = buildToolIdList(state, messages, logger)
 
-    // Validate that all numeric IDs are within bounds
-    if (numericToolIds.some((id) => id < 0 || id >= toolIdList.length)) {
-        logger.debug("Invalid tool IDs provided: " + numericToolIds.join(", "))
-        throw new Error(
-            "Invalid IDs provided. Only use numeric IDs from the <prunable-tools> list.",
-        )
-    }
+    const validNumericIds: number[] = []
+    const skippedIds: string[] = []
 
-    // Validate that all IDs exist in cache and aren't protected
-    // (rejects hallucinated IDs and turn-protected tools not shown in <prunable-tools>)
+    // Validate and filter IDs
     for (const index of numericToolIds) {
+        // Validate that all numeric IDs are within bounds
+        if (index < 0 || index >= toolIdList.length) {
+            logger.debug(`Rejecting prune request - index out of bounds: ${index}`)
+            skippedIds.push(index.toString())
+            continue
+        }
+
         const id = toolIdList[index]
         const metadata = state.toolParameters.get(id)
+
+        // Validate that all IDs exist in cache and aren't protected
+        // (rejects hallucinated IDs and turn-protected tools not shown in <prunable-tools>)
         if (!metadata) {
             logger.debug(
                 "Rejecting prune request - ID not in cache (turn-protected or hallucinated)",
                 { index, id },
             )
-            throw new Error(
-                "Invalid IDs provided. Only use numeric IDs from the <prunable-tools> list.",
-            )
+            skippedIds.push(index.toString())
+            continue
         }
+
         const allProtectedTools = config.tools.settings.protectedTools
         if (allProtectedTools.includes(metadata.tool)) {
             logger.debug("Rejecting prune request - protected tool", {
@@ -81,9 +87,8 @@ export async function executePruneOperation(
                 id,
                 tool: metadata.tool,
             })
-            throw new Error(
-                "Invalid IDs provided. Only use numeric IDs from the <prunable-tools> list.",
-            )
+            skippedIds.push(index.toString())
+            continue
         }
 
         const filePath = getFilePathFromParameters(metadata.parameters)
@@ -94,13 +99,22 @@ export async function executePruneOperation(
                 tool: metadata.tool,
                 filePath,
             })
-            throw new Error(
-                "Invalid IDs provided. Only use numeric IDs from the <prunable-tools> list.",
-            )
+            skippedIds.push(index.toString())
+            continue
         }
+
+        validNumericIds.push(index)
     }
 
-    const pruneToolIds: string[] = numericToolIds.map((index) => toolIdList[index])
+    if (validNumericIds.length === 0) {
+        const errorMsg =
+            skippedIds.length > 0
+                ? `Invalid IDs provided: [${skippedIds.join(", ")}]. Only use numeric IDs from the <prunable-tools> list.`
+                : `No valid IDs provided to ${toolName.toLowerCase()}.`
+        throw new Error(errorMsg)
+    }
+
+    const pruneToolIds: string[] = validNumericIds.map((index) => toolIdList[index])
     state.prune.toolIds.push(...pruneToolIds)
 
     const toolMetadata = new Map<string, ToolParameterEntry>()
@@ -137,5 +151,9 @@ export async function executePruneOperation(
         logger.error("Failed to persist state", { error: err.message }),
     )
 
-    return formatPruningResultForTool(pruneToolIds, toolMetadata, workingDirectory)
+    let result = formatPruningResultForTool(pruneToolIds, toolMetadata, workingDirectory)
+    if (skippedIds.length > 0) {
+        result += `\n\nNote: ${skippedIds.length} IDs were skipped (invalid, protected, or missing metadata): ${skippedIds.join(", ")}`
+    }
+    return result
 }
