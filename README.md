@@ -1,6 +1,7 @@
 # Dynamic Context Pruning Plugin
 
 [![npm version](https://img.shields.io/npm/v/@tarquinen/opencode-dcp.svg)](https://www.npmjs.com/package/@tarquinen/opencode-dcp)
+[![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/dansmolsky)
 
 Automatically reduces token usage in OpenCode by removing obsolete tools from conversation history.
 
