@@ -42,8 +42,9 @@ export function countTokens(text: string): number {
     }
 }
 
-function estimateTokensBatch(texts: string[]): number[] {
-    return texts.map(countTokens)
+export function estimateTokensBatch(texts: string[]): number {
+    if (texts.length === 0) return 0
+    return countTokens(texts.join(" "))
 }
 
 export const calculateTokensSaved = (
@@ -86,8 +87,7 @@ export const calculateTokensSaved = (
                 }
             }
         }
-        const tokenCounts: number[] = estimateTokensBatch(contents)
-        return tokenCounts.reduce((sum, count) => sum + count, 0)
+        return estimateTokensBatch(contents)
     } catch (error: any) {
         return 0
     }

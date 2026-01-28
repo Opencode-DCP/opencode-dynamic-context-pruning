@@ -112,6 +112,7 @@
                                 "todoread",
                                 "discard",
                                 "extract",
+                                "squash",
                                 "batch",
                                 "write",
                                 "edit"
@@ -148,6 +149,23 @@
                             "description": "Show distillation output in the UI"
                         }
                     }
+                },
+                "squash": {
+                    "type": "object",
+                    "description": "Configuration for the squash tool",
+                    "additionalProperties": false,
+                    "properties": {
+                        "enabled": {
+                            "type": "boolean",
+                            "default": true,
+                            "description": "Enable the squash tool"
+                        },
+                        "showSummary": {
+                            "type": "boolean",
+                            "default": true,
+                            "description": "Show summary output in the UI"
+                        }
+                    }
                 }
             }
         },
@@ -177,6 +195,7 @@
                                 "todoread",
                                 "discard",
                                 "extract",
+                                "squash",
                                 "batch",
                                 "write",
                                 "edit"
@@ -223,6 +242,7 @@
                                 "todoread",
                                 "discard",
                                 "extract",
+                                "squash",
                                 "batch",
                                 "write",
                                 "edit"

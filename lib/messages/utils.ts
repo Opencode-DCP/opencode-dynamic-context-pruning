@@ -1,11 +1,12 @@
+import { ulid } from "ulid"
 import { Logger } from "../logger"
 import { isMessageCompacted } from "../shared-utils"
 import type { SessionState, WithParts } from "../state"
 import type { UserMessage } from "@opencode-ai/sdk/v2"
 
-const SYNTHETIC_MESSAGE_ID = "msg_01234567890123456789012345"
-const SYNTHETIC_PART_ID = "prt_01234567890123456789012345"
-const SYNTHETIC_CALL_ID = "call_01234567890123456789012345"
+export const SQUASH_SUMMARY_PREFIX = "[Squashed conversation block]\n\n"
+
+const generateUniqueId = (prefix: string): string => `${prefix}_${ulid()}`
 
 const isGeminiModel = (modelID: string): boolean => {
     const lowerModelID = modelID.toLowerCase()
@@ -20,21 +21,24 @@ export const createSyntheticUserMessage = (
     const userInfo = baseMessage.info as UserMessage
     const now = Date.now()
 
+    const messageId = generateUniqueId("msg")
+    const partId = generateUniqueId("prt")
+
     return {
         info: {
-            id: SYNTHETIC_MESSAGE_ID,
+            id: messageId,
             sessionID: userInfo.sessionID,
             role: "user" as const,
-            agent: userInfo.agent || "code",
+            agent: userInfo.agent,
             model: userInfo.model,
             time: { created: now },
             ...(variant !== undefined && { variant }),
         },
         parts: [
             {
-                id: SYNTHETIC_PART_ID,
+                id: partId,
                 sessionID: userInfo.sessionID,
-                messageID: SYNTHETIC_MESSAGE_ID,
+                messageID: messageId,
                 type: "text",
                 text: content,
             },
@@ -42,59 +46,34 @@ export const createSyntheticUserMessage = (
     }
 }
 
-export const createSyntheticAssistantMessage = (
-    baseMessage: WithParts,
-    content: string,
-    variant?: string,
-): WithParts => {
-    const userInfo = baseMessage.info as UserMessage
+export const createSyntheticToolPart = (assistantMessage: WithParts, content: string): any => {
     const now = Date.now()
+    const partId = generateUniqueId("prt")
+    const callId = generateUniqueId("call")
 
-    const baseInfo = {
-        id: SYNTHETIC_MESSAGE_ID,
-        sessionID: userInfo.sessionID,
-        role: "assistant" as const,
-        agent: userInfo.agent || "code",
-        parentID: userInfo.id,
-        modelID: userInfo.model.modelID,
-        providerID: userInfo.model.providerID,
-        mode: "default",
-        path: {
-            cwd: "/",
-            root: "/",
-        },
-        time: { created: now, completed: now },
-        cost: 0,
-        tokens: { input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } },
-        ...(variant !== undefined && { variant }),
-    }
+    const modelID = (assistantMessage.info as any).modelID || ""
 
     // For Gemini models, add thoughtSignature bypass to avoid validation errors
-    const toolPartMetadata = isGeminiModel(userInfo.model.modelID)
+    const toolPartMetadata = isGeminiModel(modelID)
         ? { google: { thoughtSignature: "skip_thought_signature_validator" } }
         : undefined
 
     return {
-        info: baseInfo,
-        parts: [
-            {
-                id: SYNTHETIC_PART_ID,
-                sessionID: userInfo.sessionID,
-                messageID: SYNTHETIC_MESSAGE_ID,
-                type: "tool",
-                callID: SYNTHETIC_CALL_ID,
-                tool: "context_info",
-                state: {
-                    status: "completed",
-                    input: {},
-                    output: content,
-                    title: "Context Info",
-                    metadata: {},
-                    time: { start: now, end: now },
-                },
-                ...(toolPartMetadata && { metadata: toolPartMetadata }),
-            },
-        ],
+        id: partId,
+        sessionID: assistantMessage.info.sessionID,
+        messageID: assistantMessage.info.id,
+        type: "tool",
+        callID: callId,
+        tool: "context_info",
+        state: {
+            status: "completed",
+            input: {},
+            output: content,
+            title: "Context Info",
+            metadata: {},
+            time: { start: now, end: now },
+        },
+        ...(toolPartMetadata && { metadata: toolPartMetadata }),
     }
 }
 
@@ -252,4 +231,8 @@ export const isIgnoredUserMessage = (message: WithParts): boolean => {
     }
 
     return true
+}
+
+export const findMessageIndex = (messages: WithParts[], messageId: string): number => {
+    return messages.findIndex((msg) => msg.info.id === messageId)
 }

@@ -6,6 +6,7 @@ import {
     formatPrunedItemsList,
     formatStatsHeader,
     formatTokenCount,
+    formatProgressBar,
 } from "./utils"
 import { ToolParameterEntry } from "../state"
 import { PluginConfig } from "../config"
@@ -156,6 +157,56 @@ export async function sendUnifiedNotification(
             return true
         } catch (error) {
             logger.warn("Failed to show toast, falling back to message", { error })
+        }
+    }
+
+    await sendIgnoredMessage(client, sessionId, message, params, logger)
+    return true
+}
+
+export async function sendSquashNotification(
+    client: any,
+    logger: Logger,
+    config: PluginConfig,
+    state: SessionState,
+    sessionId: string,
+    toolIds: string[],
+    messageIds: string[],
+    topic: string,
+    summary: string,
+    startResult: any,
+    endResult: any,
+    totalMessages: number,
+    params: any,
+): Promise<boolean> {
+    if (config.pruneNotification === "off") {
+        return false
+    }
+
+    let message: string
+
+    if (config.pruneNotification === "minimal") {
+        message = formatStatsHeader(state.stats.totalPruneTokens, state.stats.pruneTokenCounter)
+    } else {
+        message = formatStatsHeader(state.stats.totalPruneTokens, state.stats.pruneTokenCounter)
+
+        const pruneTokenCounterStr = `~${formatTokenCount(state.stats.pruneTokenCounter)}`
+        const progressBar = formatProgressBar(
+            totalMessages,
+            startResult.messageIndex,
+            endResult.messageIndex,
+            25,
+        )
+        message += `\n\n▣ Squashing (${pruneTokenCounterStr}) ${progressBar}`
+        message += `\n→ Topic: ${topic}`
+        message += `\n→ Items: ${messageIds.length} messages`
+        if (toolIds.length > 0) {
+            message += ` and ${toolIds.length} tools condensed`
+        } else {
+            message += ` condensed`
+        }
+        if (config.tools.squash.showSummary) {
+            message += `\n→ Summary: ${summary}`
         }
     }
 

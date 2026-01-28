@@ -35,6 +35,29 @@ export function truncate(str: string, maxLen: number = 60): string {
     return str.slice(0, maxLen - 3) + "..."
 }
 
+export function formatProgressBar(
+    total: number,
+    start: number,
+    end: number,
+    width: number = 20,
+): string {
+    if (total <= 0) return `│${" ".repeat(width)}│`
+
+    const startIdx = Math.floor((start / total) * width)
+    const endIdx = Math.min(width - 1, Math.floor((end / total) * width))
+
+    let bar = ""
+    for (let i = 0; i < width; i++) {
+        if (i >= startIdx && i <= endIdx) {
+            bar += "░"
+        } else {
+            bar += "█"
+        }
+    }
+
+    return `│${bar}│`
+}
+
 export function shortenPath(input: string, workingDirectory?: string): string {
     const inPathMatch = input.match(/^(.+) in (.+)$/)
     if (inPathMatch) {
@@ -60,9 +83,6 @@ function shortenSinglePath(path: string, workingDirectory?: string): string {
     return path
 }
 
-/**
- * Formats a list of pruned items in the style: "→ tool: parameter"
- */
 export function formatPrunedItemsList(
     pruneToolIds: string[],
     toolMetadata: Map<string, ToolParameterEntry>,
@@ -95,9 +115,6 @@ export function formatPrunedItemsList(
     return lines
 }
 
-/**
- * Formats a PruningResult into a human-readable string for the prune tool output.
- */
 export function formatPruningResultForTool(
     prunedIds: string[],
     toolMetadata: Map<string, ToolParameterEntry>,
