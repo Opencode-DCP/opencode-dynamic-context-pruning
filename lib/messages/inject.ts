@@ -6,9 +6,9 @@ import { loadPrompt } from "../prompts"
 import {
     extractParameterKey,
     buildToolIdList,
-    createSyntheticAssistantMessage,
-    createSyntheticUserMessage,
     createSyntheticToolPart,
+    createSyntheticUserMessage,
+    createSyntheticAssistantMessage,
     isDeepSeekOrKimi,
     isIgnoredUserMessage,
 } from "./utils"
@@ -188,14 +188,10 @@ export const insertPruneToolContext = (
     const userInfo = lastUserMessage.info as UserMessage
     const variant = state.variant ?? userInfo.variant
 
-    let lastNonIgnoredMessage: WithParts | undefined
-    for (let i = messages.length - 1; i >= 0; i--) {
-        const msg = messages[i]
-        if (!(msg.info.role === "user" && isIgnoredUserMessage(msg))) {
-            lastNonIgnoredMessage = msg
-            break
-        }
-    }
+    // Find the last message that isn't an ignored user message
+    const lastNonIgnoredMessage = messages.findLast(
+        (msg) => !(msg.info.role === "user" && isIgnoredUserMessage(msg)),
+    )
 
     if (!lastNonIgnoredMessage || lastNonIgnoredMessage.info.role === "user") {
         messages.push(createSyntheticUserMessage(lastUserMessage, combinedContent, variant))

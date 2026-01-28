@@ -57,63 +57,34 @@ export const createSyntheticUserMessage = (
     }
 }
 
-export const createSyntheticAssistantMessage = (
-    baseMessage: WithParts,
-    content: string,
-    variant?: string,
-): WithParts => {
-    const userInfo = baseMessage.info as UserMessage
+export const createSyntheticToolPart = (assistantMessage: WithParts, content: string): any => {
     const now = Date.now()
-
-    const messageId = generateUniqueId("msg")
     const partId = generateUniqueId("prt")
     const callId = generateUniqueId("call")
 
-    const baseInfo = {
-        id: messageId,
-        sessionID: userInfo.sessionID,
-        role: "assistant" as const,
-        agent: userInfo.agent || "code",
-        parentID: userInfo.id,
-        modelID: userInfo.model.modelID,
-        providerID: userInfo.model.providerID,
-        mode: "default",
-        path: {
-            cwd: "/",
-            root: "/",
-        },
-        time: { created: now, completed: now },
-        cost: 0,
-        tokens: { input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } },
-        ...(variant !== undefined && { variant }),
-    }
+    const modelID = (assistantMessage.info as any).modelID || ""
 
     // For Gemini models, add thoughtSignature bypass to avoid validation errors
-    const toolPartMetadata = isGeminiModel(userInfo.model.modelID)
+    const toolPartMetadata = isGeminiModel(modelID)
         ? { google: { thoughtSignature: "skip_thought_signature_validator" } }
         : undefined
 
     return {
-        info: baseInfo,
-        parts: [
-            {
-                id: partId,
-                sessionID: userInfo.sessionID,
-                messageID: messageId,
-                type: "tool",
-                callID: callId,
-                tool: "context_info",
-                state: {
-                    status: "completed",
-                    input: {},
-                    output: content,
-                    title: "Context Info",
-                    metadata: {},
-                    time: { start: now, end: now },
-                },
-                ...(toolPartMetadata && { metadata: toolPartMetadata }),
-            },
-        ],
+        id: partId,
+        sessionID: assistantMessage.info.sessionID,
+        messageID: assistantMessage.info.id,
+        type: "tool",
+        callID: callId,
+        tool: "context_info",
+        state: {
+            status: "completed",
+            input: {},
+            output: content,
+            title: "Context Info",
+            metadata: {},
+            time: { start: now, end: now },
+        },
+        ...(toolPartMetadata && { metadata: toolPartMetadata }),
     }
 }
 
