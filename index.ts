@@ -9,10 +9,21 @@ import {
     createSystemPromptHandler,
 } from "./lib/hooks"
 
+function isDesktop(): boolean {
+    return process.env.ELECTRON_RUN_AS_NODE !== undefined
+}
+
 const plugin: Plugin = (async (ctx) => {
     const config = getConfig(ctx)
 
     if (!config.enabled) {
+        return {}
+    }
+
+    if (isDesktop()) {
+        console.log(
+            "DCP: Auto-disabled on Desktop – use the TUI version for full DCP functionality",
+        )
         return {}
     }
 

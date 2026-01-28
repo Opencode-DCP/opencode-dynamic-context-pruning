@@ -21,6 +21,8 @@ Using `@latest` ensures you always get the newest version automatically when Ope
 
 Restart OpenCode. The plugin will automatically start optimizing your sessions.
 
+> **Important:** DCP is designed for the TUI (terminal) version of OpenCode. It auto-disables on Desktop/Web clients (see [Known Issues](#known-issues)).
+
 ## How Pruning Works
 
 DCP uses multiple tools and strategies to reduce context size:
@@ -146,6 +148,25 @@ DCP provides a `/dcp` slash command:
 When enabled, turn protection prevents tool outputs from being pruned for a configurable number of message turns. This gives the AI time to reference recent tool outputs before they become prunable. Applies to both `discard` and `extract` tools, as well as automatic strategies.
 
 ### Protected Tools
+
+## Known Issues
+
+### Desktop / Web App Incompatibility
+
+DCP is currently incompatible with OpenCode's desktop and web clients. This is a known issue tracked in [Issue #304](https://github.com/Opencode-DCP/opencode-dynamic-context-pruning/issues/304).
+
+**Symptoms on Desktop/Web:**
+
+- `/dcp` commands fail with `TypeError: {} is not iterable`
+- `discard` and `extract` tools fail with the same error
+- Pruning notifications don't display correctly
+
+**Solution:**
+
+- DCP automatically detects when running on Desktop (Electron-based clients) and **auto-disables itself** with a console message
+- Use the TUI version of OpenCode for full DCP functionality
+
+**Status:** The plugin is designed for TUI usage only. Desktop/Web clients have breaking changes in their `@opencode-ai/plugin` implementation that haven't been addressed yet.
 
 By default, these tools are always protected from pruning across all strategies:
 `task`, `todowrite`, `todoread`, `discard`, `extract`, `batch`, `write`, `edit`
