@@ -7,8 +7,10 @@ import {
     extractParameterKey,
     buildToolIdList,
     createSyntheticAssistantMessage,
+    createSyntheticToolPart,
     createSyntheticUserMessage,
     isIgnoredUserMessage,
+    isDeepSeekOrKimi,
 } from "./utils"
 import { getFilePathFromParameters, isProtectedFilePath } from "../protected-file-patterns"
 import { getLastUserMessage, isMessageCompacted } from "../shared-utils"
@@ -191,10 +193,23 @@ export const insertPruneToolContext = (
         (msg) => !(msg.info.role === "user" && isIgnoredUserMessage(msg)),
     )
 
+    // It's not safe to inject assistant role messages following a user message, as models such
+    // as Claude expect the assistant "turn" to start with reasoning parts. Reasoning parts in many
+    // cases also cannot be faked as they may be encrypted by the model.
     if (!lastNonIgnoredMessage || lastNonIgnoredMessage.info.role === "user") {
         messages.push(createSyntheticUserMessage(lastUserMessage, combinedContent, variant))
     } else {
-        // Create a new assistant message with just a text part
-        messages.push(createSyntheticAssistantMessage(lastUserMessage, combinedContent, variant))
+        // For DeepSeek and Kimi, append tool part to existing message, it seems they only allow assistant
+        // messages to not have reasoning parts if they only have tool parts.
+        const providerID = userInfo.model?.providerID || ""
+        const modelID = userInfo.model?.modelID || ""
+        if (isDeepSeekOrKimi(providerID, modelID)) {
+            const toolPart = createSyntheticToolPart(lastNonIgnoredMessage, combinedContent)
+            lastNonIgnoredMessage.parts.push(toolPart)
+        } else {
+            messages.push(
+                createSyntheticAssistantMessage(lastUserMessage, combinedContent, variant),
+            )
+        }
     }
 }
