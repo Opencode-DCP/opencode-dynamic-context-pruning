@@ -7,6 +7,7 @@ import {
     formatStatsHeader,
     formatTokenCount,
     formatProgressBar,
+    truncate,
 } from "./utils"
 import { ToolParameterEntry } from "../state"
 import { PluginConfig } from "../config"
@@ -16,6 +17,44 @@ export const PRUNE_REASON_LABELS: Record<PruneReason, string> = {
     completion: "Task Complete",
     noise: "Noise Removal",
     extraction: "Extraction",
+}
+
+const TOAST_PRUNED_ITEMS_LIMIT = 9
+const TOAST_TEXT_LIMIT = 600
+
+function buildToastBody(message: string, header: string): string {
+    let toastBody = message.startsWith(header) ? message.slice(header.length).trim() : message
+
+    const lines = toastBody.split("\n")
+    const pruneIndex = lines.findIndex((line) => line.startsWith("▣ Pruning"))
+    if (pruneIndex >= 0) {
+        const itemStart = pruneIndex + 1
+        let itemEnd = itemStart
+        while (itemEnd < lines.length && lines[itemEnd].startsWith("→ ")) {
+            itemEnd++
+        }
+        const itemLines = lines.slice(itemStart, itemEnd)
+        if (itemLines.length > TOAST_PRUNED_ITEMS_LIMIT) {
+            const remaining = itemLines.length - TOAST_PRUNED_ITEMS_LIMIT
+            lines.splice(itemStart, itemLines.length, ...itemLines.slice(0, TOAST_PRUNED_ITEMS_LIMIT), `... and ${remaining} more`)
+            toastBody = lines.join("\n")
+        }
+    }
+
+    for (const marker of ["▣ Extracted", "→ Summary: "]) {
+        const markerIndex = toastBody.indexOf(`\n${marker}`)
+        if (markerIndex >= 0) {
+            const contentStart = markerIndex + marker.length + 1
+            const content = toastBody.slice(contentStart)
+            const leading = content.match(/^\s*/)?.[0] || ""
+            const trimmedContent = content.slice(leading.length)
+            if (trimmedContent.length > TOAST_TEXT_LIMIT) {
+                toastBody = toastBody.slice(0, contentStart) + leading + truncate(trimmedContent, TOAST_TEXT_LIMIT)
+            }
+        }
+    }
+
+    return toastBody
 }
 
 function buildPruneDetails(
@@ -133,10 +172,7 @@ export async function sendUnifiedNotification(
         )
         const title = header.split("\n")[0]
 
-        let toastBody = message
-        if (toastBody.startsWith(header)) {
-            toastBody = toastBody.slice(header.length).trim()
-        }
+        const toastBody = buildToastBody(message, header)
 
         try {
             await client.tui.showToast({
@@ -210,10 +246,7 @@ export async function sendSquashNotification(
         )
         const title = header.split("\n")[0]
 
-        let toastBody = message
-        if (toastBody.startsWith(header)) {
-            toastBody = toastBody.slice(header.length).trim()
-        }
+        const toastBody = buildToastBody(message, header)
 
         try {
             await client.tui.showToast({
