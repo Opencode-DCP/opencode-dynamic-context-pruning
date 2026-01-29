@@ -61,15 +61,6 @@ const plugin: Plugin = (async (ctx) => {
             ctx.directory,
         ),
         tool: {
-            ...(config.tools.prune.enabled && {
-                prune: createPruneTool({
-                    client: ctx.client,
-                    state,
-                    logger,
-                    config,
-                    workingDirectory: ctx.directory,
-                }),
-            }),
             ...(config.tools.distill.enabled && {
                 distill: createDistillTool({
                     client: ctx.client,
@@ -81,6 +72,15 @@ const plugin: Plugin = (async (ctx) => {
             }),
             ...(config.tools.compress.enabled && {
                 compress: createCompressTool({
+                    client: ctx.client,
+                    state,
+                    logger,
+                    config,
+                    workingDirectory: ctx.directory,
+                }),
+            }),
+            ...(config.tools.prune.enabled && {
+                prune: createPruneTool({
                     client: ctx.client,
                     state,
                     logger,
