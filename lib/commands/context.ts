@@ -119,18 +119,14 @@ function analyzeTokens(state: SessionState, messages: WithParts[]): TokenBreakdo
         const isCompacted = isMessageCompacted(state, msg)
         const isIgnoredUser = msg.info.role === "user" && isIgnoredUserMessage(msg)
 
-        // Single pass through parts: always count tools, conditionally collect tokens
         for (const part of parts) {
             if (part.type === "tool") {
-                // Count unique tool calls from ALL messages (including compacted ones)
-                // prunedCount already includes tools from squashed messages
                 const toolPart = part as ToolPart
                 if (toolPart.callID && !foundToolIds.has(toolPart.callID)) {
                     breakdown.toolCount++
                     foundToolIds.add(toolPart.callID)
                 }
 
-                // Only collect tool input/output for token counting from non-compacted messages
                 if (!isCompacted) {
                     if (toolPart.state?.input) {
                         const inputStr =
