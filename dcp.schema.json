@@ -26,6 +26,12 @@
             "default": "detailed",
             "description": "Level of notification shown when pruning occurs"
         },
+        "notificationType": {
+            "type": "string",
+            "enum": ["chat", "toast"],
+            "default": "chat",
+            "description": "Where to display prune notifications (chat message or toast notification)"
+        },
         "commands": {
             "type": "object",
             "description": "Configuration for DCP slash commands (/dcp)",
