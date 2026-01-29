@@ -20,7 +20,7 @@ export interface SessionStats {
     totalPruneTokens: number
 }
 
-export interface SquashSummary {
+export interface CompressSummary {
     anchorMessageId: string
     summary: string
 }
@@ -34,7 +34,7 @@ export interface SessionState {
     sessionId: string | null
     isSubAgent: boolean
     prune: Prune
-    squashSummaries: SquashSummary[]
+    compressSummaries: CompressSummary[]
     stats: SessionStats
     toolParameters: Map<string, ToolParameterEntry>
     nudgeCounter: number

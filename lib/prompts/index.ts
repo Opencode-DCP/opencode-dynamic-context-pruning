@@ -3,9 +3,9 @@ import { dirname, join } from "node:path"
 import { fileURLToPath } from "node:url"
 
 // Tool specs
-import { DISCARD_TOOL_SPEC } from "./discard-tool-spec"
-import { EXTRACT_TOOL_SPEC } from "./extract-tool-spec"
-import { SQUASH_TOOL_SPEC } from "./squash-tool-spec"
+import { PRUNE_TOOL_SPEC } from "./prune-tool-spec"
+import { DISTILL_TOOL_SPEC } from "./distill-tool-spec"
+import { COMPRESS_TOOL_SPEC } from "./compress-tool-spec"
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 
@@ -14,13 +14,13 @@ const SYSTEM_PROMPT = readFileSync(join(__dirname, "system.md"), "utf-8")
 const NUDGE = readFileSync(join(__dirname, "nudge.md"), "utf-8")
 
 export interface ToolFlags {
-    discard: boolean
-    extract: boolean
-    squash: boolean
+    prune: boolean
+    distill: boolean
+    compress: boolean
 }
 
 function processConditionals(template: string, flags: ToolFlags): string {
-    const tools = ["discard", "extract", "squash"] as const
+    const tools = ["prune", "distill", "compress"] as const
     let result = template
     // Strip comments: // ... //
     result = result.replace(/\/\/.*?\/\//g, "")
@@ -42,9 +42,9 @@ export function renderNudge(flags: ToolFlags): string {
 }
 
 const PROMPTS: Record<string, string> = {
-    "discard-tool-spec": DISCARD_TOOL_SPEC,
-    "extract-tool-spec": EXTRACT_TOOL_SPEC,
-    "squash-tool-spec": SQUASH_TOOL_SPEC,
+    "prune-tool-spec": PRUNE_TOOL_SPEC,
+    "distill-tool-spec": DISTILL_TOOL_SPEC,
+    "compress-tool-spec": COMPRESS_TOOL_SPEC,
 }
 
 export function loadPrompt(name: string, vars?: Record<string, string>): string {

@@ -1,11 +1,11 @@
-export const EXTRACT_TOOL_SPEC = `Extracts key findings from tool outputs into distilled knowledge, then removes the raw outputs from context.
+export const DISTILL_TOOL_SPEC = `Distills key findings from tool outputs into preserved knowledge, then removes the raw outputs from context.
 
 ## IMPORTANT: The Prunable List
-A \`<prunable-tools>\` list is provided to you showing available tool outputs you can extract from when there are tools available for pruning. Each line has the format \`ID: tool, parameter\` (e.g., \`20: read, /path/to/file.ts\`). You MUST only use numeric IDs that appear in this list to select which tools to extract.
+A \`<prunable-tools>\` list is provided to you showing available tool outputs you can distill from when there are tools available for pruning. Each line has the format \`ID: tool, parameter\` (e.g., \`20: read, /path/to/file.ts\`). You MUST only use numeric IDs that appear in this list to select which tools to distill.
 
 ## When to Use This Tool
 
-Use \`extract\` when you have individual tool outputs with valuable information you want to **preserve in distilled form** before removing the raw content:
+Use \`distill\` when you have individual tool outputs with valuable information you want to **preserve in distilled form** before removing the raw content:
 
 - **Large Outputs:** The raw output is too large but contains valuable technical details worth keeping.
 - **Knowledge Preservation:** You have context that contains valuable information (signatures, logic, constraints) but also a lot of unnecessary detail.
@@ -17,8 +17,8 @@ Use \`extract\` when you have individual tool outputs with valuable information 
 
 
 ## Best Practices
-- **Strategic Batching:** Wait until you have several items or a few large outputs to extract, rather than doing tiny, frequent extractions. Aim for high-impact extractions that significantly reduce context size.
-- **Think ahead:** Before extracting, ask: "Will I need the raw output for upcoming work?" If you researched a file you'll later edit, do NOT extract it.
+- **Strategic Batching:** Wait until you have several items or a few large outputs to distill, rather than doing tiny, frequent distillations. Aim for high-impact distillations that significantly reduce context size.
+- **Think ahead:** Before distilling, ask: "Will I need the raw output for upcoming work?" If you researched a file you'll later edit, do NOT distill it.
 
 ## Format
 
@@ -29,19 +29,19 @@ Each distillation string should capture the essential information you need to pr
 
 ## Example
 
-<example_extraction>
+<example_distillation>
 Assistant: [Reads auth service and user types]
-I'll preserve the key details before extracting.
-[Uses extract with:
+I'll preserve the key details before distilling.
+[Uses distill with:
   ids: ["10", "11"],
   distillation: [
     "auth.ts: validateToken(token: string) -> User|null checks cache first (5min TTL) then OIDC. hashPassword uses bcrypt 12 rounds. Tokens must be 128+ chars.",
     "user.ts: interface User { id: string; email: string; permissions: ('read'|'write'|'admin')[]; status: 'active'|'suspended' }"
   ]
 ]
-</example_extraction>
+</example_distillation>
 
 <example_keep>
 Assistant: [Reads 'auth.ts' to understand the login flow]
-I've understood the auth flow. I'll need to modify this file to add the new validation, so I'm keeping this read in context rather than extracting.
+I've understood the auth flow. I'll need to modify this file to add the new validation, so I'm keeping this read in context rather than distilling.
 </example_keep>`

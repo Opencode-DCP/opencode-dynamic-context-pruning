@@ -1,24 +1,24 @@
-import type { WithParts, SquashSummary } from "../state"
+import type { WithParts, CompressSummary } from "../state"
 import type { Logger } from "../logger"
 
 /**
  * Searches messages for a string and returns the message ID where it's found.
  * Searches in text parts, tool outputs, tool inputs, and other textual content.
- * Also searches through existing squash summaries to enable chained squashing.
+ * Also searches through existing compress summaries to enable chained compression.
  * Throws an error if the string is not found or found more than once.
  */
 export function findStringInMessages(
     messages: WithParts[],
     searchString: string,
     logger: Logger,
-    squashSummaries: SquashSummary[] = [],
+    compressSummaries: CompressSummary[] = [],
     stringType: "startString" | "endString",
 ): { messageId: string; messageIndex: number } {
     const matches: { messageId: string; messageIndex: number }[] = []
 
-    // First, search through existing squash summaries
-    // This allows referencing text from previous squash operations
-    for (const summary of squashSummaries) {
+    // First, search through existing compress summaries
+    // This allows referencing text from previous compress operations
+    for (const summary of compressSummaries) {
         if (summary.summary.includes(searchString)) {
             const anchorIndex = messages.findIndex((m) => m.info.id === summary.anchorMessageId)
             if (anchorIndex !== -1) {

@@ -40,7 +40,7 @@ export function resetOnCompaction(state: SessionState): void {
     state.toolParameters.clear()
     state.prune.toolIds = []
     state.prune.messageIds = []
-    state.squashSummaries = []
+    state.compressSummaries = []
     state.nudgeCounter = 0
     state.lastToolPrune = false
 }

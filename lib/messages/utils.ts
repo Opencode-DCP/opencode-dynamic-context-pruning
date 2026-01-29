@@ -4,7 +4,7 @@ import { isMessageCompacted } from "../shared-utils"
 import type { SessionState, WithParts } from "../state"
 import type { UserMessage } from "@opencode-ai/sdk/v2"
 
-export const SQUASH_SUMMARY_PREFIX = "[Squashed conversation block]\n\n"
+export const COMPRESS_SUMMARY_PREFIX = "[Compressed conversation block]\n\n"
 
 const generateUniqueId = (prefix: string): string => `${prefix}_${ulid()}`
 

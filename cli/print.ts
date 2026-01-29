@@ -3,57 +3,57 @@
 import { renderSystemPrompt, renderNudge, type ToolFlags } from "../lib/prompts/index.js"
 import {
     wrapPrunableTools,
-    wrapSquashContext,
+    wrapCompressContext,
     wrapCooldownMessage,
 } from "../lib/messages/inject.js"
 
 const args = process.argv.slice(2)
 
 const flags: ToolFlags = {
-    discard: args.includes("-d") || args.includes("--discard"),
-    extract: args.includes("-e") || args.includes("--extract"),
-    squash: args.includes("-s") || args.includes("--squash"),
+    prune: args.includes("-p") || args.includes("--prune"),
+    distill: args.includes("-d") || args.includes("--distill"),
+    compress: args.includes("-c") || args.includes("--compress"),
 }
 
 // Default to all enabled if none specified
-if (!flags.discard && !flags.extract && !flags.squash) {
-    flags.discard = true
-    flags.extract = true
-    flags.squash = true
+if (!flags.prune && !flags.distill && !flags.compress) {
+    flags.prune = true
+    flags.distill = true
+    flags.compress = true
 }
 
 const showSystem = args.includes("--system")
 const showNudge = args.includes("--nudge")
 const showPruneList = args.includes("--prune-list")
-const showSquashContext = args.includes("--squash-context")
+const showCompressContext = args.includes("--compress-context")
 const showCooldown = args.includes("--cooldown")
 const showHelp = args.includes("--help") || args.includes("-h")
 
 if (
     showHelp ||
-    (!showSystem && !showNudge && !showPruneList && !showSquashContext && !showCooldown)
+    (!showSystem && !showNudge && !showPruneList && !showCompressContext && !showCooldown)
 ) {
     console.log(`
-Usage: bun run dcp [TYPE] [-d] [-e] [-s]
+Usage: bun run dcp [TYPE] [-p] [-d] [-c]
 
 Types:
-  --system          System prompt
-  --nudge           Nudge prompt
-  --prune-list      Example prunable tools list
-  --squash-context  Example squash context
-  --cooldown        Cooldown message after pruning
+  --system            System prompt
+  --nudge             Nudge prompt
+  --prune-list        Example prunable tools list
+  --compress-context  Example compress context
+  --cooldown          Cooldown message after pruning
 
 Tool flags (for --system and --nudge):
-  -d, --discard     Enable discard tool
-  -e, --extract     Enable extract tool
-  -s, --squash      Enable squash tool
+  -p, --prune         Enable prune tool
+  -d, --distill       Enable distill tool
+  -c, --compress      Enable compress tool
 
 If no tool flags specified, all are enabled.
 
 Examples:
-  bun run dcp --system -d -e -s   # System prompt with all tools
-  bun run dcp --system -d         # System prompt with discard only
-  bun run dcp --nudge -e -s       # Nudge with extract and squash
+  bun run dcp --system -p -d -c   # System prompt with all tools
+  bun run dcp --system -p         # System prompt with prune only
+  bun run dcp --nudge -d -c       # Nudge with distill and compress
   bun run dcp --prune-list        # Example prunable tools list
 `)
     process.exit(0)
@@ -68,9 +68,9 @@ const header = (title: string) => {
 
 if (showSystem) {
     const enabled = [
-        flags.discard && "discard",
-        flags.extract && "extract",
-        flags.squash && "squash",
+        flags.prune && "prune",
+        flags.distill && "distill",
+        flags.compress && "compress",
     ]
         .filter(Boolean)
         .join(", ")
@@ -80,9 +80,9 @@ if (showSystem) {
 
 if (showNudge) {
     const enabled = [
-        flags.discard && "discard",
-        flags.extract && "extract",
-        flags.squash && "squash",
+        flags.prune && "prune",
+        flags.distill && "distill",
+        flags.compress && "compress",
     ]
         .filter(Boolean)
         .join(", ")
@@ -99,16 +99,16 @@ if (showPruneList) {
     console.log(wrapPrunableTools(mockList))
 }
 
-if (showSquashContext) {
-    header("SQUASH CONTEXT (mock example)")
-    console.log(wrapSquashContext(45))
+if (showCompressContext) {
+    header("COMPRESS CONTEXT (mock example)")
+    console.log(wrapCompressContext(45))
 }
 
 if (showCooldown) {
     const enabled = [
-        flags.discard && "discard",
-        flags.extract && "extract",
-        flags.squash && "squash",
+        flags.prune && "prune",
+        flags.distill && "distill",
+        flags.compress && "compress",
     ]
         .filter(Boolean)
         .join(", ")

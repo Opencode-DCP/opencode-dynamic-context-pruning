@@ -2,7 +2,7 @@ import type { SessionState, WithParts } from "../state"
 import type { Logger } from "../logger"
 import type { PluginConfig } from "../config"
 import { isMessageCompacted, getLastUserMessage } from "../shared-utils"
-import { createSyntheticUserMessage, SQUASH_SUMMARY_PREFIX } from "./utils"
+import { createSyntheticUserMessage, COMPRESS_SUMMARY_PREFIX } from "./utils"
 import type { UserMessage } from "@opencode-ai/sdk/v2"
 
 const PRUNED_TOOL_OUTPUT_REPLACEMENT =
@@ -16,7 +16,7 @@ export const prune = (
     config: PluginConfig,
     messages: WithParts[],
 ): void => {
-    filterSquashedRanges(state, logger, messages)
+    filterCompressedRanges(state, logger, messages)
     pruneToolOutputs(state, logger, messages)
     pruneToolInputs(state, logger, messages)
     pruneToolErrors(state, logger, messages)
@@ -107,7 +107,11 @@ const pruneToolErrors = (state: SessionState, logger: Logger, messages: WithPart
     }
 }
 
-const filterSquashedRanges = (state: SessionState, logger: Logger, messages: WithParts[]): void => {
+const filterCompressedRanges = (
+    state: SessionState,
+    logger: Logger,
+    messages: WithParts[],
+): void => {
     if (!state.prune.messageIds?.length) {
         return
     }
@@ -118,7 +122,7 @@ const filterSquashedRanges = (state: SessionState, logger: Logger, messages: Wit
         const msgId = msg.info.id
 
         // Check if there's a summary to inject at this anchor point
-        const summary = state.squashSummaries?.find((s) => s.anchorMessageId === msgId)
+        const summary = state.compressSummaries?.find((s) => s.anchorMessageId === msgId)
         if (summary) {
             // Find user message for variant and as base for synthetic message
             const msgIndex = messages.indexOf(msg)
@@ -126,17 +130,17 @@ const filterSquashedRanges = (state: SessionState, logger: Logger, messages: Wit
 
             if (userMessage) {
                 const userInfo = userMessage.info as UserMessage
-                const summaryContent = SQUASH_SUMMARY_PREFIX + summary.summary
+                const summaryContent = COMPRESS_SUMMARY_PREFIX + summary.summary
                 result.push(
                     createSyntheticUserMessage(userMessage, summaryContent, userInfo.variant),
                 )
 
-                logger.info("Injected squash summary", {
+                logger.info("Injected compress summary", {
                     anchorMessageId: msgId,
                     summaryLength: summary.summary.length,
                 })
             } else {
-                logger.warn("No user message found for squash summary", {
+                logger.warn("No user message found for compress summary", {
                     anchorMessageId: msgId,
                 })
             }

@@ -105,27 +105,27 @@
                         }
                     }
                 },
-                "discard": {
+                "prune": {
                     "type": "object",
-                    "description": "Configuration for the discard tool",
+                    "description": "Configuration for the prune tool",
                     "additionalProperties": false,
                     "properties": {
                         "enabled": {
                             "type": "boolean",
                             "default": true,
-                            "description": "Enable the discard tool"
+                            "description": "Enable the prune tool"
                         }
                     }
                 },
-                "extract": {
+                "distill": {
                     "type": "object",
-                    "description": "Configuration for the extract tool",
+                    "description": "Configuration for the distill tool",
                     "additionalProperties": false,
                     "properties": {
                         "enabled": {
                             "type": "boolean",
                             "default": true,
-                            "description": "Enable the extract tool"
+                            "description": "Enable the distill tool"
                         },
                         "showDistillation": {
                             "type": "boolean",
@@ -134,15 +134,15 @@
                         }
                     }
                 },
-                "squash": {
+                "compress": {
                     "type": "object",
-                    "description": "Configuration for the squash tool",
+                    "description": "Configuration for the compress tool",
                     "additionalProperties": false,
                     "properties": {
                         "enabled": {
                             "type": "boolean",
                             "default": true,
-                            "description": "Enable the squash tool"
+                            "description": "Enable the compress tool"
                         },
                         "showSummary": {
                             "type": "boolean",

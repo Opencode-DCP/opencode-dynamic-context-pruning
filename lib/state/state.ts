@@ -51,7 +51,7 @@ export function createSessionState(): SessionState {
             toolIds: [],
             messageIds: [],
         },
-        squashSummaries: [],
+        compressSummaries: [],
         stats: {
             pruneTokenCounter: 0,
             totalPruneTokens: 0,
@@ -72,7 +72,7 @@ export function resetSessionState(state: SessionState): void {
         toolIds: [],
         messageIds: [],
     }
-    state.squashSummaries = []
+    state.compressSummaries = []
     state.stats = {
         pruneTokenCounter: 0,
         totalPruneTokens: 0,
@@ -118,7 +118,7 @@ export async function ensureSessionInitialized(
         toolIds: persisted.prune.toolIds || [],
         messageIds: persisted.prune.messageIds || [],
     }
-    state.squashSummaries = persisted.squashSummaries || []
+    state.compressSummaries = persisted.compressSummaries || []
     state.stats = {
         pruneTokenCounter: persisted.stats?.pruneTokenCounter || 0,
         totalPruneTokens: persisted.stats?.totalPruneTokens || 0,

@@ -5,34 +5,34 @@ Dev tool for previewing prompt outputs. Verify parsing works correctly and quick
 ## Usage
 
 ```bash
-bun run dcp [TYPE] [-d] [-e] [-s]
+bun run dcp [TYPE] [-p] [-d] [-c]
 ```
 
 ## Types
 
-| Flag               | Description                 |
-| ------------------ | --------------------------- |
-| `--system`         | System prompt               |
-| `--nudge`          | Nudge prompt                |
-| `--prune-list`     | Example prunable tools list |
-| `--squash-context` | Example squash context      |
+| Flag                 | Description                 |
+| -------------------- | --------------------------- |
+| `--system`           | System prompt               |
+| `--nudge`            | Nudge prompt                |
+| `--prune-list`       | Example prunable tools list |
+| `--compress-context` | Example compress context    |
 
 ## Tool Flags
 
-| Flag            | Description         |
-| --------------- | ------------------- |
-| `-d, --discard` | Enable discard tool |
-| `-e, --extract` | Enable extract tool |
-| `-s, --squash`  | Enable squash tool  |
+| Flag             | Description          |
+| ---------------- | -------------------- |
+| `-p, --prune`    | Enable prune tool    |
+| `-d, --distill`  | Enable distill tool  |
+| `-c, --compress` | Enable compress tool |
 
 If no tool flags specified, all are enabled.
 
 ## Examples
 
 ```bash
-bun run dcp --system -d -e -s   # System prompt with all tools
-bun run dcp --system -d         # System prompt with discard only
-bun run dcp --nudge -e -s       # Nudge with extract and squash
+bun run dcp --system -p -d -c   # System prompt with all tools
+bun run dcp --system -p         # System prompt with prune only
+bun run dcp --nudge -d -c       # Nudge with distill and compress
 bun run dcp --prune-list        # Example prunable tools list
 ```
 

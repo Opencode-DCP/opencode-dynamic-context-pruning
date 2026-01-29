@@ -34,12 +34,12 @@ export function createSystemPromptHandler(
         }
 
         const flags = {
-            discard: config.tools.discard.enabled,
-            extract: config.tools.extract.enabled,
-            squash: config.tools.squash.enabled,
+            prune: config.tools.prune.enabled,
+            distill: config.tools.distill.enabled,
+            compress: config.tools.compress.enabled,
         }
 
-        if (!flags.discard && !flags.extract && !flags.squash) {
+        if (!flags.prune && !flags.distill && !flags.compress) {
             return
         }
 
