@@ -8,6 +8,17 @@ export const SQUASH_SUMMARY_PREFIX = "[Squashed conversation block]\n\n"
 
 const generateUniqueId = (prefix: string): string => `${prefix}_${ulid()}`
 
+export const isDeepSeekOrKimi = (providerID: string, modelID: string): boolean => {
+    const lowerProviderID = providerID.toLowerCase()
+    const lowerModelID = modelID.toLowerCase()
+    return (
+        lowerProviderID.includes("deepseek") ||
+        lowerProviderID.includes("kimi") ||
+        lowerModelID.includes("deepseek") ||
+        lowerModelID.includes("kimi")
+    )
+}
+
 export const createSyntheticUserMessage = (
     baseMessage: WithParts,
     content: string,
@@ -80,6 +91,29 @@ export const createSyntheticAssistantMessage = (
                 text: content,
             },
         ],
+    }
+}
+
+export const createSyntheticToolPart = (assistantMessage: WithParts, content: string): any => {
+    const now = Date.now()
+    const partId = generateUniqueId("prt")
+    const callId = generateUniqueId("call")
+
+    return {
+        id: partId,
+        sessionID: assistantMessage.info.sessionID,
+        messageID: assistantMessage.info.id,
+        type: "tool",
+        callID: callId,
+        tool: "context_info",
+        state: {
+            status: "completed",
+            input: {},
+            output: content,
+            title: "Context Info",
+            metadata: {},
+            time: { start: now, end: now },
+        },
     }
 }
 

@@ -62,6 +62,7 @@ interface TokenBreakdown {
     toolCount: number
     prunedTokens: number
     prunedCount: number
+    prunedMessageCount: number
     total: number
 }
 
@@ -74,6 +75,7 @@ function analyzeTokens(state: SessionState, messages: WithParts[]): TokenBreakdo
         toolCount: 0,
         prunedTokens: state.stats.totalPruneTokens,
         prunedCount: state.prune.toolIds.length,
+        prunedMessageCount: state.prune.messageIds.length,
         total: 0,
     }
 
@@ -232,8 +234,10 @@ function formatContextMessage(breakdown: TokenBreakdown): string {
 
     if (breakdown.prunedTokens > 0) {
         const withoutPruning = breakdown.total + breakdown.prunedTokens
+        const messagePrunePart =
+            breakdown.prunedMessageCount > 0 ? `, ${breakdown.prunedMessageCount} messages` : ""
         lines.push(
-            `  Pruned:          ${breakdown.prunedCount} tools (~${formatTokenCount(breakdown.prunedTokens)})`,
+            `  Pruned:          ${breakdown.prunedCount} tools${messagePrunePart} (~${formatTokenCount(breakdown.prunedTokens)})`,
         )
         lines.push(`  Current context: ~${formatTokenCount(breakdown.total)}`)
         lines.push(`  Without DCP:     ~${formatTokenCount(withoutPruning)}`)
