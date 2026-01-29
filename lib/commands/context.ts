@@ -112,43 +112,58 @@ function analyzeTokens(state: SessionState, messages: WithParts[]): TokenBreakdo
     const toolOutputParts: string[] = []
     let firstUserText = ""
     let foundFirstUser = false
+    const foundToolIds = new Set<string>()
 
     for (const msg of messages) {
-        if (isMessageCompacted(state, msg)) continue
-        if (msg.info.role === "user" && isIgnoredUserMessage(msg)) continue
-
         const parts = Array.isArray(msg.parts) ? msg.parts : []
+        const isCompacted = isMessageCompacted(state, msg)
+        const isIgnoredUser = msg.info.role === "user" && isIgnoredUserMessage(msg)
+
+        // Single pass through parts: always count tools, conditionally collect tokens
         for (const part of parts) {
-            if (part.type === "text" && msg.info.role === "user") {
+            if (part.type === "tool") {
+                // Count unique tool calls from ALL messages (including compacted ones)
+                // prunedCount already includes tools from squashed messages
+                const toolPart = part as ToolPart
+                if (toolPart.callID && !foundToolIds.has(toolPart.callID)) {
+                    breakdown.toolCount++
+                    foundToolIds.add(toolPart.callID)
+                }
+
+                // Only collect tool input/output for token counting from non-compacted messages
+                if (!isCompacted) {
+                    if (toolPart.state?.input) {
+                        const inputStr =
+                            typeof toolPart.state.input === "string"
+                                ? toolPart.state.input
+                                : JSON.stringify(toolPart.state.input)
+                        toolInputParts.push(inputStr)
+                    }
+
+                    if (toolPart.state?.status === "completed" && toolPart.state?.output) {
+                        const outputStr =
+                            typeof toolPart.state.output === "string"
+                                ? toolPart.state.output
+                                : JSON.stringify(toolPart.state.output)
+                        toolOutputParts.push(outputStr)
+                    }
+                }
+            } else if (
+                part.type === "text" &&
+                msg.info.role === "user" &&
+                !isCompacted &&
+                !isIgnoredUser
+            ) {
                 const textPart = part as TextPart
                 const text = textPart.text || ""
                 userTextParts.push(text)
                 if (!foundFirstUser) {
                     firstUserText += text
                 }
-            } else if (part.type === "tool") {
-                const toolPart = part as ToolPart
-                breakdown.toolCount++
-
-                if (toolPart.state?.input) {
-                    const inputStr =
-                        typeof toolPart.state.input === "string"
-                            ? toolPart.state.input
-                            : JSON.stringify(toolPart.state.input)
-                    toolInputParts.push(inputStr)
-                }
-
-                if (toolPart.state?.status === "completed" && toolPart.state?.output) {
-                    const outputStr =
-                        typeof toolPart.state.output === "string"
-                            ? toolPart.state.output
-                            : JSON.stringify(toolPart.state.output)
-                    toolOutputParts.push(outputStr)
-                }
             }
         }
 
-        if (msg.info.role === "user" && !isIgnoredUserMessage(msg) && !foundFirstUser) {
+        if (msg.info.role === "user" && !isIgnoredUser && !foundFirstUser) {
             foundFirstUser = true
         }
     }
