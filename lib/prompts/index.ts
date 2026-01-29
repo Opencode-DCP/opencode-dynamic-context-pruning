@@ -1,44 +1,50 @@
+import { readFileSync } from "node:fs"
+import { dirname, join } from "node:path"
+import { fileURLToPath } from "node:url"
+
 // Tool specs
 import { DISCARD_TOOL_SPEC } from "./discard-tool-spec"
 import { EXTRACT_TOOL_SPEC } from "./extract-tool-spec"
 import { SQUASH_TOOL_SPEC } from "./squash-tool-spec"
 
-// System prompts
-import { SYSTEM_PROMPT_DISCARD } from "./system/discard"
-import { SYSTEM_PROMPT_EXTRACT } from "./system/extract"
-import { SYSTEM_PROMPT_SQUASH } from "./system/squash"
-import { SYSTEM_PROMPT_DISCARD_EXTRACT } from "./system/discard-extract"
-import { SYSTEM_PROMPT_DISCARD_SQUASH } from "./system/discard-squash"
-import { SYSTEM_PROMPT_EXTRACT_SQUASH } from "./system/extract-squash"
-import { SYSTEM_PROMPT_ALL } from "./system/all"
+const __dirname = dirname(fileURLToPath(import.meta.url))
 
-// Nudge prompts
-import { NUDGE_DISCARD } from "./nudge/discard"
-import { NUDGE_EXTRACT } from "./nudge/extract"
-import { NUDGE_SQUASH } from "./nudge/squash"
-import { NUDGE_DISCARD_EXTRACT } from "./nudge/discard-extract"
-import { NUDGE_DISCARD_SQUASH } from "./nudge/discard-squash"
-import { NUDGE_EXTRACT_SQUASH } from "./nudge/extract-squash"
-import { NUDGE_ALL } from "./nudge/all"
+// Load markdown prompts at module init
+const SYSTEM_PROMPT = readFileSync(join(__dirname, "system.md"), "utf-8")
+const NUDGE = readFileSync(join(__dirname, "nudge.md"), "utf-8")
+
+export interface ToolFlags {
+    discard: boolean
+    extract: boolean
+    squash: boolean
+}
+
+function processConditionals(template: string, flags: ToolFlags): string {
+    const tools = ["discard", "extract", "squash"] as const
+    let result = template
+    // Strip comments: // ... //
+    result = result.replace(/\/\/.*?\/\//g, "")
+    // Process tool conditionals
+    for (const tool of tools) {
+        const regex = new RegExp(`<${tool}>([\\s\\S]*?)</${tool}>`, "g")
+        result = result.replace(regex, (_, content) => (flags[tool] ? content : ""))
+    }
+    // Collapse multiple blank/whitespace-only lines to single blank line
+    return result.replace(/\n([ \t]*\n)+/g, "\n\n").trim()
+}
+
+export function renderSystemPrompt(flags: ToolFlags): string {
+    return processConditionals(SYSTEM_PROMPT, flags)
+}
+
+export function renderNudge(flags: ToolFlags): string {
+    return processConditionals(NUDGE, flags)
+}
 
 const PROMPTS: Record<string, string> = {
     "discard-tool-spec": DISCARD_TOOL_SPEC,
     "extract-tool-spec": EXTRACT_TOOL_SPEC,
     "squash-tool-spec": SQUASH_TOOL_SPEC,
-    "system/system-prompt-discard": SYSTEM_PROMPT_DISCARD,
-    "system/system-prompt-extract": SYSTEM_PROMPT_EXTRACT,
-    "system/system-prompt-squash": SYSTEM_PROMPT_SQUASH,
-    "system/system-prompt-discard-extract": SYSTEM_PROMPT_DISCARD_EXTRACT,
-    "system/system-prompt-discard-squash": SYSTEM_PROMPT_DISCARD_SQUASH,
-    "system/system-prompt-extract-squash": SYSTEM_PROMPT_EXTRACT_SQUASH,
-    "system/system-prompt-all": SYSTEM_PROMPT_ALL,
-    "nudge/nudge-discard": NUDGE_DISCARD,
-    "nudge/nudge-extract": NUDGE_EXTRACT,
-    "nudge/nudge-squash": NUDGE_SQUASH,
-    "nudge/nudge-discard-extract": NUDGE_DISCARD_EXTRACT,
-    "nudge/nudge-discard-squash": NUDGE_DISCARD_SQUASH,
-    "nudge/nudge-extract-squash": NUDGE_EXTRACT_SQUASH,
-    "nudge/nudge-all": NUDGE_ALL,
 }
 
 export function loadPrompt(name: string, vars?: Record<string, string>): string {

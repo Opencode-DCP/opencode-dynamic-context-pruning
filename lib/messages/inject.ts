@@ -2,7 +2,7 @@ import type { SessionState, WithParts } from "../state"
 import type { Logger } from "../logger"
 import type { PluginConfig } from "../config"
 import type { UserMessage } from "@opencode-ai/sdk/v2"
-import { loadPrompt } from "../prompts"
+import { renderNudge } from "../prompts"
 import {
     extractParameterKey,
     buildToolIdList,
@@ -13,43 +13,26 @@ import {
 import { getFilePathFromParameters, isProtectedFilePath } from "../protected-file-patterns"
 import { getLastUserMessage, isMessageCompacted } from "../shared-utils"
 
-const getNudgeString = (config: PluginConfig): string => {
-    const discardEnabled = config.tools.discard.enabled
-    const extractEnabled = config.tools.extract.enabled
-    const squashEnabled = config.tools.squash.enabled
-
-    if (discardEnabled && extractEnabled && squashEnabled) {
-        return loadPrompt(`nudge/nudge-all`)
-    } else if (discardEnabled && extractEnabled) {
-        return loadPrompt(`nudge/nudge-discard-extract`)
-    } else if (discardEnabled && squashEnabled) {
-        return loadPrompt(`nudge/nudge-discard-squash`)
-    } else if (extractEnabled && squashEnabled) {
-        return loadPrompt(`nudge/nudge-extract-squash`)
-    } else if (discardEnabled) {
-        return loadPrompt(`nudge/nudge-discard`)
-    } else if (extractEnabled) {
-        return loadPrompt(`nudge/nudge-extract`)
-    } else if (squashEnabled) {
-        return loadPrompt(`nudge/nudge-squash`)
-    }
-    return ""
-}
-
-const wrapPrunableTools = (content: string): string => `<prunable-tools>
+export const wrapPrunableTools = (content: string): string => `<prunable-tools>
 The following tools have been invoked and are available for pruning. This list does not mandate immediate action. Consider your current goals and the resources you need before pruning valuable tool inputs or outputs. Consolidate your prunes for efficiency; it is rarely worth pruning a single tiny tool output. Keep the context free of noise.
 ${content}
 </prunable-tools>`
 
-const getCooldownMessage = (config: PluginConfig): string => {
-    const discardEnabled = config.tools.discard.enabled
-    const extractEnabled = config.tools.extract.enabled
-    const squashEnabled = config.tools.squash.enabled
+export const wrapSquashContext = (messageCount: number): string => `<squash-context>
+Squash available. Conversation: ${messageCount} messages.
+Squash collapses completed task sequences or exploration phases into summaries.
+Uses text boundaries [startString, endString, topic, summary].
+</squash-context>`
 
+export const wrapCooldownMessage = (flags: {
+    discard: boolean
+    extract: boolean
+    squash: boolean
+}): string => {
     const enabledTools: string[] = []
-    if (discardEnabled) enabledTools.push("discard")
-    if (extractEnabled) enabledTools.push("extract")
-    if (squashEnabled) enabledTools.push("squash")
+    if (flags.discard) enabledTools.push("discard")
+    if (flags.extract) enabledTools.push("extract")
+    if (flags.squash) enabledTools.push("squash")
 
     let toolName: string
     if (enabledTools.length === 0) {
@@ -62,18 +45,35 @@ const getCooldownMessage = (config: PluginConfig): string => {
     }
 
     return `<context-info>
-Context management was just performed. Do not use the ${toolName} again. A fresh list will be available after your next tool use.
+Context management was just performed. Do NOT use the ${toolName} again. A fresh list will be available after your next tool use.
 </context-info>`
+}
+
+const getNudgeString = (config: PluginConfig): string => {
+    const flags = {
+        discard: config.tools.discard.enabled,
+        extract: config.tools.extract.enabled,
+        squash: config.tools.squash.enabled,
+    }
+
+    if (!flags.discard && !flags.extract && !flags.squash) {
+        return ""
+    }
+
+    return renderNudge(flags)
+}
+
+const getCooldownMessage = (config: PluginConfig): string => {
+    return wrapCooldownMessage({
+        discard: config.tools.discard.enabled,
+        extract: config.tools.extract.enabled,
+        squash: config.tools.squash.enabled,
+    })
 }
 
 const buildSquashContext = (state: SessionState, messages: WithParts[]): string => {
     const messageCount = messages.filter((msg) => !isMessageCompacted(state, msg)).length
-
-    return `<squash-context>
-Squash available. Conversation: ${messageCount} messages.
-Squash collapses completed task sequences or exploration phases into summaries.
-Uses text boundaries [startString, endString, topic, summary].
-</squash-context>`
+    return wrapSquashContext(messageCount)
 }
 
 const buildPrunableToolsList = (
