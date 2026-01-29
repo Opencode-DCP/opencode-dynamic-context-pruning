@@ -1,4 +1,4 @@
 export { PruneToolContext } from "./types"
-export { createDiscardTool } from "./discard"
-export { createExtractTool } from "./extract"
-export { createSquashTool } from "./squash"
+export { createPruneTool } from "./prune"
+export { createDistillTool } from "./distill"
+export { createCompressTool } from "./compress"

@@ -2,7 +2,7 @@ import type { SessionState, WithParts } from "../state"
 import type { Logger } from "../logger"
 import type { PluginConfig } from "../config"
 import type { UserMessage } from "@opencode-ai/sdk/v2"
-import { loadPrompt } from "../prompts"
+import { renderNudge } from "../prompts"
 import {
     extractParameterKey,
     buildToolIdList,
@@ -15,43 +15,26 @@ import {
 import { getFilePathFromParameters, isProtectedFilePath } from "../protected-file-patterns"
 import { getLastUserMessage, isMessageCompacted } from "../shared-utils"
 
-const getNudgeString = (config: PluginConfig): string => {
-    const discardEnabled = config.tools.discard.enabled
-    const extractEnabled = config.tools.extract.enabled
-    const squashEnabled = config.tools.squash.enabled
-
-    if (discardEnabled && extractEnabled && squashEnabled) {
-        return loadPrompt(`nudge/nudge-all`)
-    } else if (discardEnabled && extractEnabled) {
-        return loadPrompt(`nudge/nudge-discard-extract`)
-    } else if (discardEnabled && squashEnabled) {
-        return loadPrompt(`nudge/nudge-discard-squash`)
-    } else if (extractEnabled && squashEnabled) {
-        return loadPrompt(`nudge/nudge-extract-squash`)
-    } else if (discardEnabled) {
-        return loadPrompt(`nudge/nudge-discard`)
-    } else if (extractEnabled) {
-        return loadPrompt(`nudge/nudge-extract`)
-    } else if (squashEnabled) {
-        return loadPrompt(`nudge/nudge-squash`)
-    }
-    return ""
-}
-
-const wrapPrunableTools = (content: string): string => `<prunable-tools>
+export const wrapPrunableTools = (content: string): string => `<prunable-tools>
 The following tools have been invoked and are available for pruning. This list does not mandate immediate action. Consider your current goals and the resources you need before pruning valuable tool inputs or outputs. Consolidate your prunes for efficiency; it is rarely worth pruning a single tiny tool output. Keep the context free of noise.
 ${content}
 </prunable-tools>`
 
-const getCooldownMessage = (config: PluginConfig): string => {
-    const discardEnabled = config.tools.discard.enabled
-    const extractEnabled = config.tools.extract.enabled
-    const squashEnabled = config.tools.squash.enabled
+export const wrapCompressContext = (messageCount: number): string => `<compress-context>
+Compress available. Conversation: ${messageCount} messages.
+Compress collapses completed task sequences or exploration phases into summaries.
+Uses text boundaries [startString, endString, topic, summary].
+</compress-context>`
 
+export const wrapCooldownMessage = (flags: {
+    prune: boolean
+    distill: boolean
+    compress: boolean
+}): string => {
     const enabledTools: string[] = []
-    if (discardEnabled) enabledTools.push("discard")
-    if (extractEnabled) enabledTools.push("extract")
-    if (squashEnabled) enabledTools.push("squash")
+    if (flags.prune) enabledTools.push("prune")
+    if (flags.distill) enabledTools.push("distill")
+    if (flags.compress) enabledTools.push("compress")
 
     let toolName: string
     if (enabledTools.length === 0) {
@@ -64,18 +47,35 @@ const getCooldownMessage = (config: PluginConfig): string => {
     }
 
     return `<context-info>
-Context management was just performed. Do not use the ${toolName} again. A fresh list will be available after your next tool use.
+Context management was just performed. Do NOT use the ${toolName} again. A fresh list will be available after your next tool use.
 </context-info>`
 }
 
-const buildSquashContext = (state: SessionState, messages: WithParts[]): string => {
-    const messageCount = messages.filter((msg) => !isMessageCompacted(state, msg)).length
+const getNudgeString = (config: PluginConfig): string => {
+    const flags = {
+        prune: config.tools.prune.enabled,
+        distill: config.tools.distill.enabled,
+        compress: config.tools.compress.enabled,
+    }
 
-    return `<squash-context>
-Squash available. Conversation: ${messageCount} messages.
-Squash collapses completed task sequences or exploration phases into summaries.
-Uses text boundaries [startString, endString, topic, summary].
-</squash-context>`
+    if (!flags.prune && !flags.distill && !flags.compress) {
+        return ""
+    }
+
+    return renderNudge(flags)
+}
+
+const getCooldownMessage = (config: PluginConfig): string => {
+    return wrapCooldownMessage({
+        prune: config.tools.prune.enabled,
+        distill: config.tools.distill.enabled,
+        compress: config.tools.compress.enabled,
+    })
+}
+
+const buildCompressContext = (state: SessionState, messages: WithParts[]): string => {
+    const messageCount = messages.filter((msg) => !isMessageCompacted(state, msg)).length
+    return wrapCompressContext(messageCount)
 }
 
 const buildPrunableToolsList = (
@@ -133,23 +133,23 @@ export const insertPruneToolContext = (
     logger: Logger,
     messages: WithParts[],
 ): void => {
-    const discardEnabled = config.tools.discard.enabled
-    const extractEnabled = config.tools.extract.enabled
-    const squashEnabled = config.tools.squash.enabled
+    const pruneEnabled = config.tools.prune.enabled
+    const distillEnabled = config.tools.distill.enabled
+    const compressEnabled = config.tools.compress.enabled
 
-    if (!discardEnabled && !extractEnabled && !squashEnabled) {
+    if (!pruneEnabled && !distillEnabled && !compressEnabled) {
         return
     }
 
-    const discardOrExtractEnabled = discardEnabled || extractEnabled
+    const pruneOrDistillEnabled = pruneEnabled || distillEnabled
     const contentParts: string[] = []
 
     if (state.lastToolPrune) {
         logger.debug("Last tool was prune - injecting cooldown message")
         contentParts.push(getCooldownMessage(config))
     } else {
-        // Inject <prunable-tools> only when discard or extract is enabled
-        if (discardOrExtractEnabled) {
+        // Inject <prunable-tools> only when prune or distill is enabled
+        if (pruneOrDistillEnabled) {
             const prunableToolsList = buildPrunableToolsList(state, config, logger, messages)
             if (prunableToolsList) {
                 // logger.debug("prunable-tools: \n" + prunableToolsList)
@@ -157,11 +157,11 @@ export const insertPruneToolContext = (
             }
         }
 
-        // Inject <squash-context> always when squash is enabled (every turn)
-        if (squashEnabled) {
-            const squashContext = buildSquashContext(state, messages)
-            // logger.debug("squash-context: \n" + squashContext)
-            contentParts.push(squashContext)
+        // Inject <compress-context> always when compress is enabled (every turn)
+        if (compressEnabled) {
+            const compressContext = buildCompressContext(state, messages)
+            // logger.debug("compress-context: \n" + compressContext)
+            contentParts.push(compressContext)
         }
 
         // Add nudge if threshold reached

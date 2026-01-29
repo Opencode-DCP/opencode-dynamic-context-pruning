@@ -4,16 +4,16 @@ import { executePruneOperation } from "./prune-shared"
 import { PruneReason } from "../ui/notification"
 import { loadPrompt } from "../prompts"
 
-const EXTRACT_TOOL_DESCRIPTION = loadPrompt("extract-tool-spec")
+const DISTILL_TOOL_DESCRIPTION = loadPrompt("distill-tool-spec")
 
-export function createExtractTool(ctx: PruneToolContext): ReturnType<typeof tool> {
+export function createDistillTool(ctx: PruneToolContext): ReturnType<typeof tool> {
     return tool({
-        description: EXTRACT_TOOL_DESCRIPTION,
+        description: DISTILL_TOOL_DESCRIPTION,
         args: {
             ids: tool.schema
                 .array(tool.schema.string())
                 .min(1)
-                .describe("Numeric IDs as strings to extract from the <prunable-tools> list"),
+                .describe("Numeric IDs as strings to distill from the <prunable-tools> list"),
             distillation: tool.schema
                 .array(tool.schema.string())
                 .min(1)
@@ -24,7 +24,7 @@ export function createExtractTool(ctx: PruneToolContext): ReturnType<typeof tool
         async execute(args, toolCtx) {
             if (!args.distillation || args.distillation.length === 0) {
                 ctx.logger.debug(
-                    "Extract tool called without distillation: " + JSON.stringify(args),
+                    "Distill tool called without distillation: " + JSON.stringify(args),
                 )
                 throw new Error(
                     "Missing distillation. You must provide a distillation string for each ID.",
@@ -33,7 +33,7 @@ export function createExtractTool(ctx: PruneToolContext): ReturnType<typeof tool
 
             if (!Array.isArray(args.distillation)) {
                 ctx.logger.debug(
-                    "Extract tool called with non-array distillation: " + JSON.stringify(args),
+                    "Distill tool called with non-array distillation: " + JSON.stringify(args),
                 )
                 throw new Error(
                     `Invalid distillation format: expected an array of strings, got ${typeof args.distillation}. ` +
@@ -50,7 +50,7 @@ export function createExtractTool(ctx: PruneToolContext): ReturnType<typeof tool
                 toolCtx,
                 args.ids,
                 "extraction" as PruneReason,
-                "Extract",
+                "Distill",
                 args.distillation,
             )
         },

@@ -8,13 +8,13 @@ import * as fs from "fs/promises"
 import { existsSync } from "fs"
 import { homedir } from "os"
 import { join } from "path"
-import type { SessionState, SessionStats, Prune, SquashSummary } from "./types"
+import type { SessionState, SessionStats, Prune, CompressSummary } from "./types"
 import type { Logger } from "../logger"
 
 export interface PersistedSessionState {
     sessionName?: string
     prune: Prune
-    squashSummaries: SquashSummary[]
+    compressSummaries: CompressSummary[]
     stats: SessionStats
     lastUpdated: string
 }
@@ -46,7 +46,7 @@ export async function saveSessionState(
         const state: PersistedSessionState = {
             sessionName: sessionName,
             prune: sessionState.prune,
-            squashSummaries: sessionState.squashSummaries,
+            compressSummaries: sessionState.compressSummaries,
             stats: sessionState.stats,
             lastUpdated: new Date().toISOString(),
         }

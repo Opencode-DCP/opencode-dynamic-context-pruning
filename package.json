@@ -9,13 +9,14 @@
     "scripts": {
         "clean": "rm -rf dist",
         "build": "npm run clean && tsc",
-        "postbuild": "rm -rf dist/logs",
+        "postbuild": "rm -rf dist/logs && cp lib/prompts/*.md dist/lib/prompts/",
         "prepublishOnly": "npm run build",
         "dev": "opencode plugin dev",
         "typecheck": "tsc --noEmit",
         "test": "node --import tsx --test tests/*.test.ts",
         "format": "prettier --write .",
-        "format:check": "prettier --check ."
+        "format:check": "prettier --check .",
+        "dcp": "tsx cli/print.ts"
     },
     "keywords": [
         "opencode",

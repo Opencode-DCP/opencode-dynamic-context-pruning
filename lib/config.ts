@@ -9,16 +9,16 @@ export interface Deduplication {
     protectedTools: string[]
 }
 
-export interface DiscardTool {
+export interface PruneTool {
     enabled: boolean
 }
 
-export interface ExtractTool {
+export interface DistillTool {
     enabled: boolean
     showDistillation: boolean
 }
 
-export interface SquashTool {
+export interface CompressTool {
     enabled: boolean
     showSummary: boolean
 }
@@ -31,9 +31,9 @@ export interface ToolSettings {
 
 export interface Tools {
     settings: ToolSettings
-    discard: DiscardTool
-    extract: ExtractTool
-    squash: SquashTool
+    prune: PruneTool
+    distill: DistillTool
+    compress: CompressTool
 }
 
 export interface Commands {
@@ -75,9 +75,9 @@ const DEFAULT_PROTECTED_TOOLS = [
     "task",
     "todowrite",
     "todoread",
-    "discard",
-    "extract",
-    "squash",
+    "prune",
+    "distill",
+    "compress",
     "batch",
     "write",
     "edit",
@@ -105,14 +105,14 @@ export const VALID_CONFIG_KEYS = new Set([
     "tools.settings.nudgeEnabled",
     "tools.settings.nudgeFrequency",
     "tools.settings.protectedTools",
-    "tools.discard",
-    "tools.discard.enabled",
-    "tools.extract",
-    "tools.extract.enabled",
-    "tools.extract.showDistillation",
-    "tools.squash",
-    "tools.squash.enabled",
-    "tools.squash.showSummary",
+    "tools.prune",
+    "tools.prune.enabled",
+    "tools.distill",
+    "tools.distill.enabled",
+    "tools.distill.showDistillation",
+    "tools.compress",
+    "tools.compress.enabled",
+    "tools.compress.showSummary",
     "strategies",
     // strategies.deduplication
     "strategies.deduplication",
@@ -277,50 +277,53 @@ function validateConfigTypes(config: Record<string, any>): ValidationError[] {
                 })
             }
         }
-        if (tools.discard) {
-            if (tools.discard.enabled !== undefined && typeof tools.discard.enabled !== "boolean") {
+        if (tools.prune) {
+            if (tools.prune.enabled !== undefined && typeof tools.prune.enabled !== "boolean") {
                 errors.push({
-                    key: "tools.discard.enabled",
+                    key: "tools.prune.enabled",
                     expected: "boolean",
-                    actual: typeof tools.discard.enabled,
+                    actual: typeof tools.prune.enabled,
                 })
             }
         }
-        if (tools.extract) {
-            if (tools.extract.enabled !== undefined && typeof tools.extract.enabled !== "boolean") {
+        if (tools.distill) {
+            if (tools.distill.enabled !== undefined && typeof tools.distill.enabled !== "boolean") {
                 errors.push({
-                    key: "tools.extract.enabled",
+                    key: "tools.distill.enabled",
                     expected: "boolean",
-                    actual: typeof tools.extract.enabled,
+                    actual: typeof tools.distill.enabled,
                 })
             }
             if (
-                tools.extract.showDistillation !== undefined &&
-                typeof tools.extract.showDistillation !== "boolean"
+                tools.distill.showDistillation !== undefined &&
+                typeof tools.distill.showDistillation !== "boolean"
             ) {
                 errors.push({
-                    key: "tools.extract.showDistillation",
+                    key: "tools.distill.showDistillation",
                     expected: "boolean",
-                    actual: typeof tools.extract.showDistillation,
+                    actual: typeof tools.distill.showDistillation,
                 })
             }
         }
-        if (tools.squash) {
-            if (tools.squash.enabled !== undefined && typeof tools.squash.enabled !== "boolean") {
+        if (tools.compress) {
+            if (
+                tools.compress.enabled !== undefined &&
+                typeof tools.compress.enabled !== "boolean"
+            ) {
                 errors.push({
-                    key: "tools.squash.enabled",
+                    key: "tools.compress.enabled",
                     expected: "boolean",
-                    actual: typeof tools.squash.enabled,
+                    actual: typeof tools.compress.enabled,
                 })
             }
             if (
-                tools.squash.showSummary !== undefined &&
-                typeof tools.squash.showSummary !== "boolean"
+                tools.compress.showSummary !== undefined &&
+                typeof tools.compress.showSummary !== "boolean"
             ) {
                 errors.push({
-                    key: "tools.squash.showSummary",
+                    key: "tools.compress.showSummary",
                     expected: "boolean",
-                    actual: typeof tools.squash.showSummary,
+                    actual: typeof tools.compress.showSummary,
                 })
             }
         }
@@ -468,14 +471,14 @@ const defaultConfig: PluginConfig = {
             nudgeFrequency: 10,
             protectedTools: [...DEFAULT_PROTECTED_TOOLS],
         },
-        discard: {
+        prune: {
             enabled: true,
         },
-        extract: {
+        distill: {
             enabled: true,
             showDistillation: false,
         },
-        squash: {
+        compress: {
             enabled: true,
             showSummary: true,
         },
@@ -644,16 +647,16 @@ function mergeTools(
                 ]),
             ],
         },
-        discard: {
-            enabled: override.discard?.enabled ?? base.discard.enabled,
+        prune: {
+            enabled: override.prune?.enabled ?? base.prune.enabled,
         },
-        extract: {
-            enabled: override.extract?.enabled ?? base.extract.enabled,
-            showDistillation: override.extract?.showDistillation ?? base.extract.showDistillation,
+        distill: {
+            enabled: override.distill?.enabled ?? base.distill.enabled,
+            showDistillation: override.distill?.showDistillation ?? base.distill.showDistillation,
         },
-        squash: {
-            enabled: override.squash?.enabled ?? base.squash.enabled,
-            showSummary: override.squash?.showSummary ?? base.squash.showSummary,
+        compress: {
+            enabled: override.compress?.enabled ?? base.compress.enabled,
+            showSummary: override.compress?.showSummary ?? base.compress.showSummary,
         },
     }
 }
@@ -684,9 +687,9 @@ function deepCloneConfig(config: PluginConfig): PluginConfig {
                 ...config.tools.settings,
                 protectedTools: [...config.tools.settings.protectedTools],
             },
-            discard: { ...config.tools.discard },
-            extract: { ...config.tools.extract },
-            squash: { ...config.tools.squash },
+            prune: { ...config.tools.prune },
+            distill: { ...config.tools.distill },
+            compress: { ...config.tools.compress },
         },
         strategies: {
             deduplication: {

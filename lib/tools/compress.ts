@@ -1,5 +1,5 @@
 import { tool } from "@opencode-ai/plugin"
-import type { WithParts, SquashSummary } from "../state"
+import type { WithParts, CompressSummary } from "../state"
 import type { PruneToolContext } from "./types"
 import { ensureSessionInitialized } from "../state"
 import { saveSessionState } from "../state/persistence"
@@ -11,19 +11,19 @@ import {
     collectToolIdsInRange,
     collectMessageIdsInRange,
 } from "./utils"
-import { sendSquashNotification } from "../ui/notification"
+import { sendCompressNotification } from "../ui/notification"
 
-const SQUASH_TOOL_DESCRIPTION = loadPrompt("squash-tool-spec")
+const COMPRESS_TOOL_DESCRIPTION = loadPrompt("compress-tool-spec")
 
-export function createSquashTool(ctx: PruneToolContext): ReturnType<typeof tool> {
+export function createCompressTool(ctx: PruneToolContext): ReturnType<typeof tool> {
     return tool({
-        description: SQUASH_TOOL_DESCRIPTION,
+        description: COMPRESS_TOOL_DESCRIPTION,
         args: {
             input: tool.schema
                 .array(tool.schema.string())
                 .length(4)
                 .describe(
-                    "[startString, endString, topic, summary] - 4 required strings: (1) startString: unique text from conversation marking range start, (2) endString: unique text marking range end, (3) topic: short 3-5 word label for UI, (4) summary: comprehensive text replacing all squashed content",
+                    "[startString, endString, topic, summary] - 4 required strings: (1) startString: unique text from conversation marking range start, (2) endString: unique text marking range end, (3) topic: short 3-5 word label for UI, (4) summary: comprehensive text replacing all compressed content",
                 ),
         },
         async execute(args, toolCtx) {
@@ -32,7 +32,7 @@ export function createSquashTool(ctx: PruneToolContext): ReturnType<typeof tool>
 
             const [startString, endString, topic, summary] = args.input
 
-            logger.info("Squash tool invoked")
+            logger.info("Compress tool invoked")
             // logger.info(
             //     JSON.stringify({
             //         startString: startString?.substring(0, 50) + "...",
@@ -53,14 +53,14 @@ export function createSquashTool(ctx: PruneToolContext): ReturnType<typeof tool>
                 messages,
                 startString,
                 logger,
-                state.squashSummaries,
+                state.compressSummaries,
                 "startString",
             )
             const endResult = findStringInMessages(
                 messages,
                 endString,
                 logger,
-                state.squashSummaries,
+                state.compressSummaries,
                 "endString",
             )
 
@@ -86,37 +86,37 @@ export function createSquashTool(ctx: PruneToolContext): ReturnType<typeof tool>
             state.prune.messageIds.push(...containedMessageIds)
 
             // Remove any existing summaries whose anchors are now inside this range
-            // This prevents duplicate injections when a larger squash subsumes a smaller one
-            const removedSummaries = state.squashSummaries.filter((s) =>
+            // This prevents duplicate injections when a larger compress subsumes a smaller one
+            const removedSummaries = state.compressSummaries.filter((s) =>
                 containedMessageIds.includes(s.anchorMessageId),
             )
             if (removedSummaries.length > 0) {
-                // logger.info("Removing subsumed squash summaries", {
+                // logger.info("Removing subsumed compress summaries", {
                 //     count: removedSummaries.length,
                 //     anchorIds: removedSummaries.map((s) => s.anchorMessageId),
                 // })
-                state.squashSummaries = state.squashSummaries.filter(
+                state.compressSummaries = state.compressSummaries.filter(
                     (s) => !containedMessageIds.includes(s.anchorMessageId),
                 )
             }
 
-            const squashSummary: SquashSummary = {
+            const compressSummary: CompressSummary = {
                 anchorMessageId: startResult.messageId,
                 summary: summary,
             }
-            state.squashSummaries.push(squashSummary)
+            state.compressSummaries.push(compressSummary)
 
             const contentsToTokenize = collectContentInRange(
                 messages,
                 startResult.messageIndex,
                 endResult.messageIndex,
             )
-            const estimatedSquashedTokens = estimateTokensBatch(contentsToTokenize)
+            const estimatedCompressedTokens = estimateTokensBatch(contentsToTokenize)
 
-            state.stats.pruneTokenCounter += estimatedSquashedTokens
+            state.stats.pruneTokenCounter += estimatedCompressedTokens
 
             const currentParams = getCurrentParams(state, messages, logger)
-            await sendSquashNotification(
+            await sendCompressNotification(
                 client,
                 logger,
                 ctx.config,
@@ -136,20 +136,20 @@ export function createSquashTool(ctx: PruneToolContext): ReturnType<typeof tool>
             state.stats.pruneTokenCounter = 0
             state.nudgeCounter = 0
 
-            // logger.info("Squash range created", {
+            // logger.info("Compress range created", {
             //     startMessageId: startResult.messageId,
             //     endMessageId: endResult.messageId,
             //     toolIdsRemoved: containedToolIds.length,
             //     messagesInRange: containedMessageIds.length,
-            //     estimatedTokens: estimatedSquashedTokens,
+            //     estimatedTokens: estimatedCompressedTokens,
             // })
 
             saveSessionState(state, logger).catch((err) =>
                 logger.error("Failed to persist state", { error: err.message }),
             )
 
-            const messagesSquashed = endResult.messageIndex - startResult.messageIndex + 1
-            return `Squashed ${messagesSquashed} messages (${containedToolIds.length} tool calls) into summary. The content will be replaced with your summary.`
+            const messagesCompressed = endResult.messageIndex - startResult.messageIndex + 1
+            return `Compressed ${messagesCompressed} messages (${containedToolIds.length} tool calls) into summary. The content will be replaced with your summary.`
         },
     })
 }

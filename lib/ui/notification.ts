@@ -26,7 +26,7 @@ function buildMinimalMessage(
 ): string {
     const extractedTokens = countDistillationTokens(distillation)
     const extractedSuffix =
-        extractedTokens > 0 ? ` (extracted ${formatTokenCount(extractedTokens)})` : ""
+        extractedTokens > 0 ? ` (distilled ${formatTokenCount(extractedTokens)})` : ""
     const reasonSuffix = reason && extractedTokens === 0 ? ` — ${PRUNE_REASON_LABELS[reason]}` : ""
     let message =
         formatStatsHeader(state.stats.totalPruneTokens, state.stats.pruneTokenCounter) +
@@ -51,7 +51,7 @@ function buildDetailedMessage(
         const pruneTokenCounterStr = `~${formatTokenCount(state.stats.pruneTokenCounter)}`
         const extractedTokens = countDistillationTokens(distillation)
         const extractedSuffix =
-            extractedTokens > 0 ? `, extracted ${formatTokenCount(extractedTokens)}` : ""
+            extractedTokens > 0 ? `, distilled ${formatTokenCount(extractedTokens)}` : ""
         const reasonLabel =
             reason && extractedTokens === 0 ? ` — ${PRUNE_REASON_LABELS[reason]}` : ""
         message += `\n\n▣ Pruning (${pruneTokenCounterStr}${extractedSuffix})${reasonLabel}`
@@ -85,7 +85,7 @@ export async function sendUnifiedNotification(
         return false
     }
 
-    const showDistillation = config.tools.extract.showDistillation
+    const showDistillation = config.tools.distill.showDistillation
 
     const message =
         config.pruneNotification === "minimal"
@@ -104,7 +104,7 @@ export async function sendUnifiedNotification(
     return true
 }
 
-export async function sendSquashNotification(
+export async function sendCompressNotification(
     client: any,
     logger: Logger,
     config: PluginConfig,
@@ -137,7 +137,7 @@ export async function sendSquashNotification(
             endResult.messageIndex,
             25,
         )
-        message += `\n\n▣ Squashing (${pruneTokenCounterStr}) ${progressBar}`
+        message += `\n\n▣ Compressing (${pruneTokenCounterStr}) ${progressBar}`
         message += `\n→ Topic: ${topic}`
         message += `\n→ Items: ${messageIds.length} messages`
         if (toolIds.length > 0) {
@@ -145,7 +145,7 @@ export async function sendSquashNotification(
         } else {
             message += ` condensed`
         }
-        if (config.tools.squash.showSummary) {
+        if (config.tools.compress.showSummary) {
             message += `\n→ Summary: ${summary}`
         }
     }

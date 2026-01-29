@@ -2,7 +2,7 @@ import type { Plugin } from "@opencode-ai/plugin"
 import { getConfig } from "./lib/config"
 import { Logger } from "./lib/logger"
 import { createSessionState } from "./lib/state"
-import { createDiscardTool, createExtractTool, createSquashTool } from "./lib/strategies"
+import { createPruneTool, createDistillTool, createCompressTool } from "./lib/strategies"
 import {
     createChatMessageTransformHandler,
     createCommandExecuteHandler,
@@ -61,8 +61,8 @@ const plugin: Plugin = (async (ctx) => {
             ctx.directory,
         ),
         tool: {
-            ...(config.tools.discard.enabled && {
-                discard: createDiscardTool({
+            ...(config.tools.distill.enabled && {
+                distill: createDistillTool({
                     client: ctx.client,
                     state,
                     logger,
@@ -70,8 +70,8 @@ const plugin: Plugin = (async (ctx) => {
                     workingDirectory: ctx.directory,
                 }),
             }),
-            ...(config.tools.extract.enabled && {
-                extract: createExtractTool({
+            ...(config.tools.compress.enabled && {
+                compress: createCompressTool({
                     client: ctx.client,
                     state,
                     logger,
@@ -79,8 +79,8 @@ const plugin: Plugin = (async (ctx) => {
                     workingDirectory: ctx.directory,
                 }),
             }),
-            ...(config.tools.squash.enabled && {
-                squash: createSquashTool({
+            ...(config.tools.prune.enabled && {
+                prune: createPruneTool({
                     client: ctx.client,
                     state,
                     logger,
@@ -99,9 +99,9 @@ const plugin: Plugin = (async (ctx) => {
             }
 
             const toolsToAdd: string[] = []
-            if (config.tools.discard.enabled) toolsToAdd.push("discard")
-            if (config.tools.extract.enabled) toolsToAdd.push("extract")
-            if (config.tools.squash.enabled) toolsToAdd.push("squash")
+            if (config.tools.prune.enabled) toolsToAdd.push("prune")
+            if (config.tools.distill.enabled) toolsToAdd.push("distill")
+            if (config.tools.compress.enabled) toolsToAdd.push("compress")
 
             if (toolsToAdd.length > 0) {
                 const existingPrimaryTools = opencodeConfig.experimental?.primary_tools ?? []
