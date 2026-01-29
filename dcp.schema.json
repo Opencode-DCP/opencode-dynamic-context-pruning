@@ -106,17 +106,7 @@
                             "items": {
                                 "type": "string"
                             },
-                            "default": [
-                                "task",
-                                "todowrite",
-                                "todoread",
-                                "discard",
-                                "extract",
-                                "squash",
-                                "batch",
-                                "write",
-                                "edit"
-                            ],
+                            "default": [],
                             "description": "Tool names that should be protected from automatic pruning"
                         }
                     }
@@ -189,17 +179,7 @@
                             "items": {
                                 "type": "string"
                             },
-                            "default": [
-                                "task",
-                                "todowrite",
-                                "todoread",
-                                "discard",
-                                "extract",
-                                "squash",
-                                "batch",
-                                "write",
-                                "edit"
-                            ],
+                            "default": [],
                             "description": "Tool names excluded from deduplication"
                         }
                     }
@@ -236,17 +216,7 @@
                             "items": {
                                 "type": "string"
                             },
-                            "default": [
-                                "task",
-                                "todowrite",
-                                "todoread",
-                                "discard",
-                                "extract",
-                                "squash",
-                                "batch",
-                                "write",
-                                "edit"
-                            ],
+                            "default": [],
                             "description": "Tool names excluded from error purging"
                         }
                     }

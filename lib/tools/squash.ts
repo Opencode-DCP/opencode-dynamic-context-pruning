@@ -54,12 +54,14 @@ export function createSquashTool(ctx: PruneToolContext): ReturnType<typeof tool>
                 startString,
                 logger,
                 state.squashSummaries,
+                "startString",
             )
             const endResult = findStringInMessages(
                 messages,
                 endString,
                 logger,
                 state.squashSummaries,
+                "endString",
             )
 
             if (startResult.messageIndex > endResult.messageIndex) {

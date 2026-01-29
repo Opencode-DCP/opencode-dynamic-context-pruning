@@ -6,9 +6,11 @@ import { loadPrompt } from "../prompts"
 import {
     extractParameterKey,
     buildToolIdList,
+    createSyntheticAssistantMessage,
     createSyntheticToolPart,
     createSyntheticUserMessage,
     isIgnoredUserMessage,
+    isDeepSeekOrKimi,
 } from "./utils"
 import { getFilePathFromParameters, isProtectedFilePath } from "../protected-file-patterns"
 import { getLastUserMessage, isMessageCompacted } from "../shared-utils"
@@ -191,11 +193,27 @@ export const insertPruneToolContext = (
         (msg) => !(msg.info.role === "user" && isIgnoredUserMessage(msg)),
     )
 
+    // It's not safe to inject assistant role messages following a user message as models such
+    // as Claude expect the assistant "turn" to start with reasoning parts. Reasoning parts in many
+    // cases also cannot be faked as they may be encrypted by the model.
+    // Gemini only accepts synth reasoning text if it is "skip_thought_signature_validator"
     if (!lastNonIgnoredMessage || lastNonIgnoredMessage.info.role === "user") {
         messages.push(createSyntheticUserMessage(lastUserMessage, combinedContent, variant))
     } else {
-        // Append tool part to the last assistant message instead of creating a new message
-        const toolPart = createSyntheticToolPart(lastNonIgnoredMessage, combinedContent)
-        lastNonIgnoredMessage.parts.push(toolPart)
+        // For DeepSeek and Kimi, append tool part to existing message, for some reason they don't
+        // output reasoning parts following an assistant injection containing either just text part,
+        // or text part with synth reasoning, and there's no docs on how their reasoning encryption
+        // works as far as I can find. IDK what's going on here, seems like the only possible ways
+        // to inject for them is a user role message, or a tool part apeended to last assistant message.
+        const providerID = userInfo.model?.providerID || ""
+        const modelID = userInfo.model?.modelID || ""
+        if (isDeepSeekOrKimi(providerID, modelID)) {
+            const toolPart = createSyntheticToolPart(lastNonIgnoredMessage, combinedContent)
+            lastNonIgnoredMessage.parts.push(toolPart)
+        } else {
+            messages.push(
+                createSyntheticAssistantMessage(lastUserMessage, combinedContent, variant),
+            )
+        }
     }
 }

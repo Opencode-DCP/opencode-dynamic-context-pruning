@@ -31,6 +31,16 @@ export function createExtractTool(ctx: PruneToolContext): ReturnType<typeof tool
                 )
             }
 
+            if (!Array.isArray(args.distillation)) {
+                ctx.logger.debug(
+                    "Extract tool called with non-array distillation: " + JSON.stringify(args),
+                )
+                throw new Error(
+                    `Invalid distillation format: expected an array of strings, got ${typeof args.distillation}. ` +
+                        `Example: distillation: ["summary for id 0", "summary for id 1"]`,
+                )
+            }
+
             // Log the distillation for debugging/analysis
             ctx.logger.info("Distillation data received:")
             ctx.logger.info(JSON.stringify(args.distillation, null, 2))

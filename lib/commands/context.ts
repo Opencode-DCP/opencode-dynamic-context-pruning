@@ -62,6 +62,7 @@ interface TokenBreakdown {
     toolCount: number
     prunedTokens: number
     prunedCount: number
+    prunedMessageCount: number
     total: number
 }
 
@@ -74,6 +75,7 @@ function analyzeTokens(state: SessionState, messages: WithParts[]): TokenBreakdo
         toolCount: 0,
         prunedTokens: state.stats.totalPruneTokens,
         prunedCount: state.prune.toolIds.length,
+        prunedMessageCount: state.prune.messageIds.length,
         total: 0,
     }
 
@@ -112,43 +114,54 @@ function analyzeTokens(state: SessionState, messages: WithParts[]): TokenBreakdo
     const toolOutputParts: string[] = []
     let firstUserText = ""
     let foundFirstUser = false
+    const foundToolIds = new Set<string>()
 
     for (const msg of messages) {
-        if (isMessageCompacted(state, msg)) continue
-        if (msg.info.role === "user" && isIgnoredUserMessage(msg)) continue
-
         const parts = Array.isArray(msg.parts) ? msg.parts : []
+        const isCompacted = isMessageCompacted(state, msg)
+        const isIgnoredUser = msg.info.role === "user" && isIgnoredUserMessage(msg)
+
         for (const part of parts) {
-            if (part.type === "text" && msg.info.role === "user") {
+            if (part.type === "tool") {
+                const toolPart = part as ToolPart
+                if (toolPart.callID && !foundToolIds.has(toolPart.callID)) {
+                    breakdown.toolCount++
+                    foundToolIds.add(toolPart.callID)
+                }
+
+                if (!isCompacted) {
+                    if (toolPart.state?.input) {
+                        const inputStr =
+                            typeof toolPart.state.input === "string"
+                                ? toolPart.state.input
+                                : JSON.stringify(toolPart.state.input)
+                        toolInputParts.push(inputStr)
+                    }
+
+                    if (toolPart.state?.status === "completed" && toolPart.state?.output) {
+                        const outputStr =
+                            typeof toolPart.state.output === "string"
+                                ? toolPart.state.output
+                                : JSON.stringify(toolPart.state.output)
+                        toolOutputParts.push(outputStr)
+                    }
+                }
+            } else if (
+                part.type === "text" &&
+                msg.info.role === "user" &&
+                !isCompacted &&
+                !isIgnoredUser
+            ) {
                 const textPart = part as TextPart
                 const text = textPart.text || ""
                 userTextParts.push(text)
                 if (!foundFirstUser) {
                     firstUserText += text
                 }
-            } else if (part.type === "tool") {
-                const toolPart = part as ToolPart
-                breakdown.toolCount++
-
-                if (toolPart.state?.input) {
-                    const inputStr =
-                        typeof toolPart.state.input === "string"
-                            ? toolPart.state.input
-                            : JSON.stringify(toolPart.state.input)
-                    toolInputParts.push(inputStr)
-                }
-
-                if (toolPart.state?.status === "completed" && toolPart.state?.output) {
-                    const outputStr =
-                        typeof toolPart.state.output === "string"
-                            ? toolPart.state.output
-                            : JSON.stringify(toolPart.state.output)
-                    toolOutputParts.push(outputStr)
-                }
             }
         }
 
-        if (msg.info.role === "user" && !isIgnoredUserMessage(msg) && !foundFirstUser) {
+        if (msg.info.role === "user" && !isIgnoredUser && !foundFirstUser) {
             foundFirstUser = true
         }
     }
@@ -221,8 +234,10 @@ function formatContextMessage(breakdown: TokenBreakdown): string {
 
     if (breakdown.prunedTokens > 0) {
         const withoutPruning = breakdown.total + breakdown.prunedTokens
+        const messagePrunePart =
+            breakdown.prunedMessageCount > 0 ? `, ${breakdown.prunedMessageCount} messages` : ""
         lines.push(
-            `  Pruned:          ${breakdown.prunedCount} tools (~${formatTokenCount(breakdown.prunedTokens)})`,
+            `  Pruned:          ${breakdown.prunedCount} tools${messagePrunePart} (~${formatTokenCount(breakdown.prunedTokens)})`,
         )
         lines.push(`  Current context: ~${formatTokenCount(breakdown.total)}`)
         lines.push(`  Without DCP:     ~${formatTokenCount(withoutPruning)}`)

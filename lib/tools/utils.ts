@@ -12,6 +12,7 @@ export function findStringInMessages(
     searchString: string,
     logger: Logger,
     squashSummaries: SquashSummary[] = [],
+    stringType: "startString" | "endString",
 ): { messageId: string; messageIndex: number } {
     const matches: { messageId: string; messageIndex: number }[] = []
 
@@ -60,13 +61,13 @@ export function findStringInMessages(
 
     if (matches.length === 0) {
         throw new Error(
-            `String not found in conversation. Make sure the string exists in the conversation.`,
+            `${stringType} not found in conversation. Make sure the string exists and is spelled exactly as it appears.`,
         )
     }
 
     if (matches.length > 1) {
         throw new Error(
-            `String found in ${matches.length} messages. Please use a more unique string to identify the range boundary.`,
+            `Found multiple matches for ${stringType}. Provide more surrounding context to uniquely identify the intended match.`,
         )
     }
 

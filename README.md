@@ -1,10 +1,11 @@
 # Dynamic Context Pruning Plugin
 
+[![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/dansmolsky)
 [![npm version](https://img.shields.io/npm/v/@tarquinen/opencode-dcp.svg)](https://www.npmjs.com/package/@tarquinen/opencode-dcp)
 
 Automatically reduces token usage in OpenCode by removing obsolete tools from conversation history.
 
-![DCP in action](dcp-demo5.png)
+![DCP in action](assets/images/dcp-demo5.png)
 
 ## Installation
 
@@ -156,7 +157,7 @@ When enabled, turn protection prevents tool outputs from being pruned for a conf
 ### Protected Tools
 
 By default, these tools are always protected from pruning across all strategies:
-`task`, `todowrite`, `todoread`, `discard`, `extract`, `squash`, `batch`, `write`, `edit`
+`task`, `todowrite`, `todoread`, `discard`, `extract`, `squash`, `batch`, `write`, `edit`, `plan_enter`, `plan_exit`
 
 The `protectedTools` arrays in each section add to this default list.
 

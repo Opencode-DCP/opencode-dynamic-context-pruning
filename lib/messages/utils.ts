@@ -8,9 +8,15 @@ export const SQUASH_SUMMARY_PREFIX = "[Squashed conversation block]\n\n"
 
 const generateUniqueId = (prefix: string): string => `${prefix}_${ulid()}`
 
-const isGeminiModel = (modelID: string): boolean => {
+export const isDeepSeekOrKimi = (providerID: string, modelID: string): boolean => {
+    const lowerProviderID = providerID.toLowerCase()
     const lowerModelID = modelID.toLowerCase()
-    return lowerModelID.includes("gemini")
+    return (
+        lowerProviderID.includes("deepseek") ||
+        lowerProviderID.includes("kimi") ||
+        lowerModelID.includes("deepseek") ||
+        lowerModelID.includes("kimi")
+    )
 }
 
 export const createSyntheticUserMessage = (
@@ -46,17 +52,52 @@ export const createSyntheticUserMessage = (
     }
 }
 
+export const createSyntheticAssistantMessage = (
+    baseMessage: WithParts,
+    content: string,
+    variant?: string,
+): WithParts => {
+    const userInfo = baseMessage.info as UserMessage
+    const now = Date.now()
+
+    const messageId = generateUniqueId("msg")
+    const partId = generateUniqueId("prt")
+
+    return {
+        info: {
+            id: messageId,
+            sessionID: userInfo.sessionID,
+            role: "assistant" as const,
+            agent: userInfo.agent || "code",
+            parentID: userInfo.id,
+            modelID: userInfo.model.modelID,
+            providerID: userInfo.model.providerID,
+            mode: "default",
+            path: {
+                cwd: "/",
+                root: "/",
+            },
+            time: { created: now, completed: now },
+            cost: 0,
+            tokens: { input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } },
+            ...(variant !== undefined && { variant }),
+        },
+        parts: [
+            {
+                id: partId,
+                sessionID: userInfo.sessionID,
+                messageID: messageId,
+                type: "text",
+                text: content,
+            },
+        ],
+    }
+}
+
 export const createSyntheticToolPart = (assistantMessage: WithParts, content: string): any => {
     const now = Date.now()
     const partId = generateUniqueId("prt")
     const callId = generateUniqueId("call")
-
-    const modelID = (assistantMessage.info as any).modelID || ""
-
-    // For Gemini models, add thoughtSignature bypass to avoid validation errors
-    const toolPartMetadata = isGeminiModel(modelID)
-        ? { google: { thoughtSignature: "skip_thought_signature_validator" } }
-        : undefined
 
     return {
         id: partId,
@@ -73,7 +114,6 @@ export const createSyntheticToolPart = (assistantMessage: WithParts, content: st
             metadata: {},
             time: { start: now, end: now },
         },
-        ...(toolPartMetadata && { metadata: toolPartMetadata }),
     }
 }
 
