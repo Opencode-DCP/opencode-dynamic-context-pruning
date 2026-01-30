@@ -1,3 +1,4 @@
+import type { PluginInput } from "@opencode-ai/plugin"
 import type { SessionState, WithParts } from "./state"
 import type { Logger } from "./logger"
 import type { PluginConfig } from "./config"
@@ -53,7 +54,7 @@ export function createSystemPromptHandler(
 }
 
 export function createChatMessageTransformHandler(
-    client: any,
+    client: PluginInput["client"],
     state: SessionState,
     logger: Logger,
     config: PluginConfig,
@@ -82,7 +83,7 @@ export function createChatMessageTransformHandler(
 }
 
 export function createCommandExecuteHandler(
-    client: any,
+    client: PluginInput["client"],
     state: SessionState,
     logger: Logger,
     config: PluginConfig,

@@ -530,10 +530,16 @@ function createDefaultConfig(): void {
         mkdirSync(GLOBAL_CONFIG_DIR, { recursive: true })
     }
 
-    const configContent = `{
-  "$schema": "https://raw.githubusercontent.com/Opencode-DCP/opencode-dynamic-context-pruning/master/dcp.schema.json"
-}
-`
+    // Use a more reliable schema URL or omit it if unavailable
+    // The schema is optional and primarily used for IDE autocomplete
+    const schemaUrl = "https://raw.githubusercontent.com/Opencode-DCP/opencode-dynamic-context-pruning/master/dcp.schema.json"
+    const configContent = JSON.stringify(
+        {
+            $schema: schemaUrl,
+        },
+        null,
+        2,
+    )
     writeFileSync(GLOBAL_CONFIG_PATH_JSONC, configContent, "utf-8")
 }
 
