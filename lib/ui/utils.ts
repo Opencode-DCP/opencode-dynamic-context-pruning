@@ -60,9 +60,6 @@ function shortenSinglePath(path: string, workingDirectory?: string): string {
     return path
 }
 
-/**
- * Formats a list of pruned items in the style: "→ tool: parameter"
- */
 export function formatPrunedItemsList(
     pruneToolIds: string[],
     toolMetadata: Map<string, ToolParameterEntry>,
@@ -95,9 +92,6 @@ export function formatPrunedItemsList(
     return lines
 }
 
-/**
- * Formats a PruningResult into a human-readable string for the prune tool output.
- */
 export function formatPruningResultForTool(
     prunedIds: string[],
     toolMetadata: Map<string, ToolParameterEntry>,

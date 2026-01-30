@@ -8,6 +8,8 @@ import {
     buildToolIdList,
     createSyntheticAssistantMessage,
     createSyntheticUserMessage,
+    createSyntheticToolPart,
+    isDeepSeekOrKimi,
     isIgnoredUserMessage,
 } from "./utils"
 import { getFilePathFromParameters, isProtectedFilePath } from "../protected-file-patterns"
@@ -142,15 +144,28 @@ export const insertPruneToolContext = (
     const userInfo = lastUserMessage.info as UserMessage
     const variant = state.variant ?? userInfo.variant
 
-    const lastMessage = messages[messages.length - 1]
-    const isLastMessageUser =
-        lastMessage?.info?.role === "user" && !isIgnoredUserMessage(lastMessage)
+    let lastNonIgnoredMessage: WithParts | undefined
+    for (let i = messages.length - 1; i >= 0; i--) {
+        const msg = messages[i]
+        if (!(msg.info.role === "user" && isIgnoredUserMessage(msg))) {
+            lastNonIgnoredMessage = msg
+            break
+        }
+    }
 
-    if (isLastMessageUser) {
+    if (!lastNonIgnoredMessage || lastNonIgnoredMessage.info.role === "user") {
         messages.push(createSyntheticUserMessage(lastUserMessage, prunableToolsContent, variant))
     } else {
-        messages.push(
-            createSyntheticAssistantMessage(lastUserMessage, prunableToolsContent, variant),
-        )
+        const providerID = userInfo.model?.providerID || ""
+        const modelID = userInfo.model?.modelID || ""
+
+        if (isDeepSeekOrKimi(providerID, modelID)) {
+            const toolPart = createSyntheticToolPart(lastNonIgnoredMessage, prunableToolsContent)
+            lastNonIgnoredMessage.parts.push(toolPart)
+        } else {
+            messages.push(
+                createSyntheticAssistantMessage(lastUserMessage, prunableToolsContent, variant),
+            )
+        }
     }
 }

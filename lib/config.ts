@@ -450,7 +450,7 @@ const defaultConfig: PluginConfig = {
     strategies: {
         deduplication: {
             enabled: true,
-            protectedTools: [...DEFAULT_PROTECTED_TOOLS],
+            protectedTools: [],
         },
         supersedeWrites: {
             enabled: false,
@@ -458,7 +458,7 @@ const defaultConfig: PluginConfig = {
         purgeErrors: {
             enabled: true,
             turns: 4,
-            protectedTools: [...DEFAULT_PROTECTED_TOOLS],
+            protectedTools: [],
         },
     },
 }

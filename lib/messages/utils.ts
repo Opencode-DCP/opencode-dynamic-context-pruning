@@ -7,9 +7,15 @@ const SYNTHETIC_MESSAGE_ID = "msg_01234567890123456789012345"
 const SYNTHETIC_PART_ID = "prt_01234567890123456789012345"
 const SYNTHETIC_CALL_ID = "call_01234567890123456789012345"
 
-const isGeminiModel = (modelID: string): boolean => {
+export const isDeepSeekOrKimi = (providerID: string, modelID: string): boolean => {
+    const lowerProviderID = providerID.toLowerCase()
     const lowerModelID = modelID.toLowerCase()
-    return lowerModelID.includes("gemini")
+    return (
+        lowerProviderID.includes("deepseek") ||
+        lowerProviderID.includes("kimi") ||
+        lowerModelID.includes("deepseek") ||
+        lowerModelID.includes("kimi")
+    )
 }
 
 export const createSyntheticUserMessage = (
@@ -50,51 +56,56 @@ export const createSyntheticAssistantMessage = (
     const userInfo = baseMessage.info as UserMessage
     const now = Date.now()
 
-    const baseInfo = {
-        id: SYNTHETIC_MESSAGE_ID,
-        sessionID: userInfo.sessionID,
-        role: "assistant" as const,
-        agent: userInfo.agent || "code",
-        parentID: userInfo.id,
-        modelID: userInfo.model.modelID,
-        providerID: userInfo.model.providerID,
-        mode: "default",
-        path: {
-            cwd: "/",
-            root: "/",
-        },
-        time: { created: now, completed: now },
-        cost: 0,
-        tokens: { input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } },
-        ...(variant !== undefined && { variant }),
-    }
-
-    // For Gemini models, add thoughtSignature bypass to avoid validation errors
-    const toolPartMetadata = isGeminiModel(userInfo.model.modelID)
-        ? { google: { thoughtSignature: "skip_thought_signature_validator" } }
-        : undefined
-
     return {
-        info: baseInfo,
+        info: {
+            id: SYNTHETIC_MESSAGE_ID,
+            sessionID: userInfo.sessionID,
+            role: "assistant" as const,
+            agent: userInfo.agent || "code",
+            parentID: userInfo.id,
+            modelID: userInfo.model.modelID,
+            providerID: userInfo.model.providerID,
+            mode: "default",
+            path: {
+                cwd: "/",
+                root: "/",
+            },
+            time: { created: now, completed: now },
+            cost: 0,
+            tokens: { input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } },
+            ...(variant !== undefined && { variant }),
+        },
         parts: [
             {
                 id: SYNTHETIC_PART_ID,
                 sessionID: userInfo.sessionID,
                 messageID: SYNTHETIC_MESSAGE_ID,
-                type: "tool",
-                callID: SYNTHETIC_CALL_ID,
-                tool: "context_info",
-                state: {
-                    status: "completed",
-                    input: {},
-                    output: content,
-                    title: "Context Info",
-                    metadata: {},
-                    time: { start: now, end: now },
-                },
-                ...(toolPartMetadata && { metadata: toolPartMetadata }),
+                type: "text",
+                text: content,
             },
         ],
+    }
+}
+
+export const createSyntheticToolPart = (baseMessage: WithParts, content: string) => {
+    const userInfo = baseMessage.info as UserMessage
+    const now = Date.now()
+
+    return {
+        id: SYNTHETIC_PART_ID,
+        sessionID: userInfo.sessionID,
+        messageID: baseMessage.info.id,
+        type: "tool" as const,
+        callID: SYNTHETIC_CALL_ID,
+        tool: "context_info",
+        state: {
+            status: "completed" as const,
+            input: {},
+            output: content,
+            title: "Context Info",
+            metadata: {},
+            time: { start: now, end: now },
+        },
     }
 }
 
