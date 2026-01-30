@@ -11,6 +11,30 @@ import { loadPrompt } from "../prompts"
 import { calculateTokensSaved, getCurrentParams } from "./utils"
 import { getFilePathFromParameters, isProtectedFilePath } from "../protected-file-patterns"
 
+const MAX_TOOL_ID = 10000;
+const MAX_PATH_LENGTH = 4096;
+const MAX_LOG_LENGTH = 500;
+
+function validateToolId(id: string): number | null {
+    const num = parseInt(id, 10);
+    if (isNaN(num) || !Number.isInteger(num)) return null;
+    if (num < 0 || num > MAX_TOOL_ID) return null;
+    return num;
+}
+
+function sanitizeFilePath(path: string | null | undefined): string | null {
+    if (!path) return null;
+    // Remove path traversal attempts
+    const cleaned = path.replace(/\.\.\//g, '/');
+    if (cleaned.length > MAX_PATH_LENGTH) return null;
+    return cleaned;
+}
+
+function sanitizeForLog(data: any): string {
+    const str = JSON.stringify(data);
+    return str.length > MAX_LOG_LENGTH ? str.substring(0, MAX_LOG_LENGTH) + '...' : str;
+}
+
 const DISCARD_TOOL_DESCRIPTION = loadPrompt("discard-tool-spec")
 const EXTRACT_TOOL_DESCRIPTION = loadPrompt("extract-tool-spec")
 
@@ -44,13 +68,13 @@ async function executePruneOperation(
         )
     }
 
-    const numericToolIds: number[] = ids
-        .map((id) => parseInt(id, 10))
-        .filter((n): n is number => !isNaN(n))
+const numericToolIds: number[] = ids
+        .map((id) => validateToolId(id))
+        .filter((n): n is number => n !== null)
 
     if (numericToolIds.length === 0) {
-        logger.debug(`No numeric tool IDs provided for ${toolName}: ` + JSON.stringify(ids))
-        throw new Error("No numeric IDs provided. Format: ids: [id1, id2, ...]")
+        logger.debug(`No valid numeric tool IDs provided for ${toolName}: ` + JSON.stringify(ids))
+        throw new Error("No valid numeric IDs provided. Format: ids: [id1, id2, ...]")
     }
 
     // Fetch messages to calculate tokens and find current agent
@@ -77,6 +101,13 @@ async function executePruneOperation(
     for (const index of numericToolIds) {
         const id = toolIdList[index]
         const metadata = state.toolParameters.get(id)
+        
+        // Update cache access tracking for LRU
+        if (metadata) {
+            metadata.accessCount++
+            metadata.timestamp = Date.now()
+            state.toolParameters.set(id, metadata)
+        }
         if (!metadata) {
             logger.debug(
                 "Rejecting prune request - ID not in cache (turn-protected or hallucinated)",
@@ -98,8 +129,8 @@ async function executePruneOperation(
             )
         }
 
-        const filePath = getFilePathFromParameters(metadata.parameters)
-        if (isProtectedFilePath(filePath, config.protectedFilePatterns)) {
+const filePath = sanitizeFilePath(getFilePathFromParameters(metadata.parameters))
+        if (filePath && isProtectedFilePath(filePath, config.protectedFilePatterns)) {
             logger.debug("Rejecting prune request - protected file path", {
                 index,
                 id,
@@ -115,10 +146,15 @@ async function executePruneOperation(
     const pruneToolIds: string[] = numericToolIds.map((index) => toolIdList[index])
     state.prune.toolIds.push(...pruneToolIds)
 
-    const toolMetadata = new Map<string, ToolParameterEntry>()
+const toolMetadata = new Map<string, ToolParameterEntry>()
     for (const id of pruneToolIds) {
         const toolParameters = state.toolParameters.get(id)
         if (toolParameters) {
+            // Update cache access tracking for LRU
+            toolParameters.accessCount++
+            toolParameters.timestamp = Date.now()
+            state.toolParameters.set(id, toolParameters)
+            
             toolMetadata.set(id, toolParameters)
         } else {
             logger.debug("No metadata found for ID", { id })
@@ -203,9 +239,9 @@ export function createExtractTool(ctx: PruneToolContext): ReturnType<typeof tool
                 )
             }
 
-            // Log the distillation for debugging/analysis
+// Log the distillation for debugging/analysis (sanitized)
             ctx.logger.info("Distillation data received:")
-            ctx.logger.info(JSON.stringify(args.distillation, null, 2))
+            ctx.logger.info(sanitizeForLog(args.distillation))
 
             return executePruneOperation(
                 ctx,

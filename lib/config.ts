@@ -144,6 +144,12 @@ interface ValidationError {
     actual: string
 }
 
+// Size validation errors for config values
+interface SizeValidationError {
+    key: string
+    message: string
+}
+
 function validateConfigTypes(config: Record<string, any>): ValidationError[] {
     const errors: ValidationError[] = []
 
@@ -371,6 +377,56 @@ function validateConfigTypes(config: Record<string, any>): ValidationError[] {
         }
     }
 
+return errors
+}
+
+function validateConfigSizes(config: Record<string, any>): SizeValidationError[] {
+    const errors: SizeValidationError[] = []
+    
+    // Max limits
+    const MAX_PATTERNS = 100
+    const MAX_TOOLS = 50
+    const MAX_STRING_LENGTH = 1000
+    
+    function checkArray(key: string, arr: any[], maxItems: number, maxItemLength: number) {
+        if (arr.length > maxItems) {
+            errors.push({
+                key,
+                message: `exceeds max items (${maxItems})`
+            })
+        }
+        for (let i = 0; i < Math.min(arr.length, maxItems); i++) {
+            if (typeof arr[i] === 'string' && arr[i].length > maxItemLength) {
+                errors.push({
+                    key: `${key}[${i}]`,
+                    message: `item exceeds max length (${maxItemLength})`
+                })
+            }
+        }
+    }
+    
+    // Check protectedFilePatterns
+    if (config.protectedFilePatterns) {
+        checkArray('protectedFilePatterns', config.protectedFilePatterns, MAX_PATTERNS, MAX_STRING_LENGTH)
+    }
+    
+    // Check protectedTools arrays
+    if (config.commands?.protectedTools) {
+        checkArray('commands.protectedTools', config.commands.protectedTools, MAX_TOOLS, MAX_STRING_LENGTH)
+    }
+    
+    if (config.tools?.settings?.protectedTools) {
+        checkArray('tools.settings.protectedTools', config.tools.settings.protectedTools, MAX_TOOLS, MAX_STRING_LENGTH)
+    }
+    
+    if (config.strategies?.deduplication?.protectedTools) {
+        checkArray('strategies.deduplication.protectedTools', config.strategies.deduplication.protectedTools, MAX_TOOLS, MAX_STRING_LENGTH)
+    }
+    
+    if (config.strategies?.purgeErrors?.protectedTools) {
+        checkArray('strategies.purgeErrors.protectedTools', config.strategies.purgeErrors.protectedTools, MAX_TOOLS, MAX_STRING_LENGTH)
+    }
+    
     return errors
 }
 
@@ -383,8 +439,9 @@ function showConfigValidationWarnings(
 ): void {
     const invalidKeys = getInvalidConfigKeys(configData)
     const typeErrors = validateConfigTypes(configData)
+    const sizeErrors = validateConfigSizes(configData)
 
-    if (invalidKeys.length === 0 && typeErrors.length === 0) {
+    if (invalidKeys.length === 0 && typeErrors.length === 0 && sizeErrors.length === 0) {
         return
     }
 
@@ -406,6 +463,16 @@ function showConfigValidationWarnings(
         }
     }
 
+    // Add size validation messages
+    if (sizeErrors.length > 0) {
+        for (const err of sizeErrors.slice(0, 2)) {
+            messages.push(`${err.key}: ${err.message}`)
+        }
+        if (sizeErrors.length > 2) {
+            messages.push(`(+${sizeErrors.length - 2} more size violations)`)
+        }
+    }
+
     setTimeout(() => {
         try {
             ctx.client.tui.showToast({
@@ -416,7 +483,10 @@ function showConfigValidationWarnings(
                     duration: 7000,
                 },
             })
-        } catch {}
+        } catch (error) {
+            // Fallback: log to console if toast fails
+            console.warn(`DCP config validation failed: ${messages.join('\n')}`);
+        }
     }, 7000)
 }
 
@@ -530,12 +600,12 @@ function createDefaultConfig(): void {
         mkdirSync(GLOBAL_CONFIG_DIR, { recursive: true })
     }
 
-    // Use a more reliable schema URL or omit it if unavailable
-    // The schema is optional and primarily used for IDE autocomplete
-    const schemaUrl = "https://raw.githubusercontent.com/Opencode-DCP/opencode-dynamic-context-pruning/master/dcp.schema.json"
+    // Create minimal config without schema (schema is optional)
+    // This prevents issues if GitHub raw URL is unavailable
     const configContent = JSON.stringify(
         {
-            $schema: schemaUrl,
+            // Schema is intentionally omitted - users can add manually if needed
+            // This prevents startup failures due to network issues
         },
         null,
         2,
@@ -680,7 +750,7 @@ export function getConfig(ctx: PluginInput): PluginConfig {
     if (configPaths.global) {
         const result = loadConfigFile(configPaths.global)
         if (result.parseError) {
-            setTimeout(async () => {
+setTimeout(async () => {
                 try {
                     ctx.client.tui.showToast({
                         body: {
@@ -690,7 +760,10 @@ export function getConfig(ctx: PluginInput): PluginConfig {
                             duration: 7000,
                         },
                     })
-                } catch {}
+                } catch (error) {
+                    // Fallback: log to console if toast fails
+                    console.warn(`DCP config parse error: ${result.parseError}`);
+                }
             }, 7000)
         } else if (result.data) {
             // Validate config keys and types
@@ -723,7 +796,7 @@ export function getConfig(ctx: PluginInput): PluginConfig {
     if (configPaths.configDir) {
         const result = loadConfigFile(configPaths.configDir)
         if (result.parseError) {
-            setTimeout(async () => {
+setTimeout(async () => {
                 try {
                     ctx.client.tui.showToast({
                         body: {
@@ -733,7 +806,10 @@ export function getConfig(ctx: PluginInput): PluginConfig {
                             duration: 7000,
                         },
                     })
-                } catch {}
+                } catch (error) {
+                    // Fallback: log to console if toast fails
+                    console.warn(`DCP configDir parse error: ${result.parseError}`);
+                }
             }, 7000)
         } else if (result.data) {
             // Validate config keys and types
@@ -763,7 +839,7 @@ export function getConfig(ctx: PluginInput): PluginConfig {
     if (configPaths.project) {
         const result = loadConfigFile(configPaths.project)
         if (result.parseError) {
-            setTimeout(async () => {
+setTimeout(async () => {
                 try {
                     ctx.client.tui.showToast({
                         body: {
@@ -773,7 +849,10 @@ export function getConfig(ctx: PluginInput): PluginConfig {
                             duration: 7000,
                         },
                     })
-                } catch {}
+                } catch (error) {
+                    // Fallback: log to console if toast fails
+                    console.warn(`DCP project config parse error: ${result.parseError}`);
+                }
             }, 7000)
         } else if (result.data) {
             // Validate config keys and types

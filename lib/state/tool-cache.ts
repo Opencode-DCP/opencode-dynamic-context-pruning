@@ -4,6 +4,19 @@ import { PluginConfig } from "../config"
 import { isMessageCompacted } from "../shared-utils"
 
 const MAX_TOOL_CACHE_SIZE = 1000
+const MAX_PARAM_SIZE = 10 * 1024 // 10KB limit per parameter entry
+const MAX_PATH_LENGTH = 4096
+
+/**
+ * Calculate the size of an object in bytes using JSON serialization.
+ */
+function calculateObjectSize(obj: any): number {
+    try {
+        return new Blob([JSON.stringify(obj)]).size;
+    } catch {
+        return 0;
+    }
+}
 
 /**
  * Sync tool parameters from OpenCode's session.messages() API.
@@ -63,12 +76,26 @@ export async function syncToolCache(
                     continue
                 }
 
+// Calculate parameter size before caching
+                const parameters = part.state?.input
+                const paramSize = calculateObjectSize(parameters)
+                
+                if (paramSize > MAX_PARAM_SIZE) {
+                    logger.warn(`Skipping tool cache entry ${part.callID}: parameters size (${paramSize} bytes) exceeds limit (${MAX_PARAM_SIZE} bytes)`)
+                    continue
+                }
+
+                // Preserve null/undefined distinction explicitly
+                const paramValue = parameters !== undefined ? parameters : undefined
+
                 state.toolParameters.set(part.callID, {
                     tool: part.tool,
-                    parameters: part.state?.input ?? {},
+                    parameters: paramValue,
                     status: part.state.status as ToolStatus | undefined,
                     error: part.state.status === "error" ? part.state.error : undefined,
                     turn: turnCounter,
+                    timestamp: Date.now(),
+                    accessCount: 1,
                 })
                 logger.info(`Cached tool id: ${part.callID} (created on turn ${turnCounter})`)
             }
@@ -87,19 +114,29 @@ export async function syncToolCache(
 
 /**
  * Trim the tool parameters cache to prevent unbounded memory growth.
- * Uses FIFO eviction - removes oldest entries first.
+ * Uses LRU (Least Recently Used) eviction - removes least frequently used entries first.
  */
 export function trimToolParametersCache(state: SessionState): void {
     if (state.toolParameters.size <= MAX_TOOL_CACHE_SIZE) {
-        return
+        return;
     }
 
-    const keysToRemove = Array.from(state.toolParameters.keys()).slice(
-        0,
-        state.toolParameters.size - MAX_TOOL_CACHE_SIZE,
-    )
+    // Convert to array and sort by accessCount (ascending) then timestamp (ascending)
+    const entries = Array.from(state.toolParameters.entries());
+    entries.sort((a, b) => {
+        const aEntry = a[1];
+        const bEntry = b[1];
+        // First sort by access count (less used = remove first)
+        if (aEntry.accessCount !== bEntry.accessCount) {
+            return aEntry.accessCount - bEntry.accessCount;
+        }
+        // Then by timestamp (older = remove first)
+        return aEntry.timestamp - bEntry.timestamp;
+    });
 
-    for (const key of keysToRemove) {
-        state.toolParameters.delete(key)
+    // Remove entries until we're under limit
+    const entriesToRemove = entries.slice(0, state.toolParameters.size - MAX_TOOL_CACHE_SIZE);
+    for (const [key] of entriesToRemove) {
+        state.toolParameters.delete(key);
     }
 }

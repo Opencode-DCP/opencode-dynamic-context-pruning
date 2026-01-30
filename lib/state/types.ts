@@ -13,6 +13,8 @@ export interface ToolParameterEntry {
     status?: ToolStatus
     error?: string
     turn: number
+    timestamp: number
+    accessCount: number
 }
 
 export interface SessionStats {
