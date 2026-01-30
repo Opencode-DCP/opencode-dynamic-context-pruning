@@ -9,6 +9,7 @@ import { sendIgnoredMessage } from "../ui/notification"
 import { formatTokenCount } from "../ui/utils"
 import { loadAllSessionStats, type AggregatedStats } from "../state/persistence"
 import { getCurrentParams } from "../strategies/utils"
+import { UI } from "../constants"
 
 export interface StatsCommandContext {
     client: any

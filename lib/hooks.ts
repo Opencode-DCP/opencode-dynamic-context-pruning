@@ -11,12 +11,12 @@ import { handleStatsCommand } from "./commands/stats"
 import { handleContextCommand } from "./commands/context"
 import { handleHelpCommand } from "./commands/help"
 import { handleSweepCommand } from "./commands/sweep"
+import { 
+    INTERNAL_AGENT_SIGNATURES,
+    COMMANDS,
+} from "./constants"
 
-const INTERNAL_AGENT_SIGNATURES = [
-    "You are a title generator",
-    "You are a helpful AI assistant tasked with summarizing conversations",
-    "Summarize what was done in this conversation",
-]
+
 
 export function createSystemPromptHandler(
     state: SessionState,
@@ -97,7 +97,7 @@ export function createCommandExecuteHandler(
             return
         }
 
-        if (input.command === "dcp") {
+        if (input.command === COMMANDS.NAME) {
             const args = (input.arguments || "").trim().split(/\s+/).filter(Boolean)
             const subcommand = args[0]?.toLowerCase() || ""
             const _subArgs = args.slice(1)
@@ -115,7 +115,7 @@ export function createCommandExecuteHandler(
                     sessionId: input.sessionID,
                     messages,
                 })
-                throw new Error("__DCP_CONTEXT_HANDLED__")
+                throw new Error(COMMANDS.HANDLED_CONTEXT)
             }
 
             if (subcommand === "stats") {
@@ -126,7 +126,7 @@ export function createCommandExecuteHandler(
                     sessionId: input.sessionID,
                     messages,
                 })
-                throw new Error("__DCP_STATS_HANDLED__")
+                throw new Error(COMMANDS.HANDLED_STATS)
             }
 
             if (subcommand === "sweep") {
@@ -140,7 +140,7 @@ export function createCommandExecuteHandler(
                     args: _subArgs,
                     workingDirectory,
                 })
-                throw new Error("__DCP_SWEEP_HANDLED__")
+                throw new Error(COMMANDS.HANDLED_SWEEP)
             }
 
             await handleHelpCommand({
@@ -150,7 +150,7 @@ export function createCommandExecuteHandler(
                 sessionId: input.sessionID,
                 messages,
             })
-            throw new Error("__DCP_HELP_HANDLED__")
+            throw new Error(COMMANDS.HANDLED_HELP)
         }
     }
 }

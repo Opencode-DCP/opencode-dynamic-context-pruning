@@ -10,15 +10,17 @@ import type { Logger } from "../logger"
 import { loadPrompt } from "../prompts"
 import { calculateTokensSaved, getCurrentParams } from "./utils"
 import { getFilePathFromParameters, isProtectedFilePath } from "../protected-file-patterns"
+import {
+    LIMITS,
+    ERRORS,
+} from "../constants"
 
-const MAX_TOOL_ID = 10000;
-const MAX_PATH_LENGTH = 4096;
-const MAX_LOG_LENGTH = 500;
+
 
 function validateToolId(id: string): number | null {
     const num = parseInt(id, 10);
     if (isNaN(num) || !Number.isInteger(num)) return null;
-    if (num < 0 || num > MAX_TOOL_ID) return null;
+    if (num < 0 || num > LIMITS.VALIDATION.MAX_TOOL_ID) return null;
     return num;
 }
 
@@ -26,13 +28,13 @@ function sanitizeFilePath(path: string | null | undefined): string | null {
     if (!path) return null;
     // Remove path traversal attempts
     const cleaned = path.replace(/\.\.\//g, '/');
-    if (cleaned.length > MAX_PATH_LENGTH) return null;
+    if (cleaned.length > LIMITS.CACHE.MAX_PATH_LENGTH) return null;
     return cleaned;
 }
 
 function sanitizeForLog(data: any): string {
     const str = JSON.stringify(data);
-    return str.length > MAX_LOG_LENGTH ? str.substring(0, MAX_LOG_LENGTH) + '...' : str;
+    return str.length > LIMITS.VALIDATION.MAX_LOG_LENGTH ? str.substring(0, LIMITS.VALIDATION.MAX_LOG_LENGTH) + '...' : str;
 }
 
 const DISCARD_TOOL_DESCRIPTION = loadPrompt("discard-tool-spec")
@@ -63,9 +65,7 @@ async function executePruneOperation(
 
     if (!ids || ids.length === 0) {
         logger.debug(`${toolName} tool called but ids is empty or undefined`)
-        throw new Error(
-            `No IDs provided. Check the <prunable-tools> list for available IDs to ${toolName.toLowerCase()}.`,
-        )
+        throw new Error(ERRORS.TOOLS.NO_IDS)
     }
 
 const numericToolIds: number[] = ids
@@ -74,7 +74,7 @@ const numericToolIds: number[] = ids
 
     if (numericToolIds.length === 0) {
         logger.debug(`No valid numeric tool IDs provided for ${toolName}: ` + JSON.stringify(ids))
-        throw new Error("No valid numeric IDs provided. Format: ids: [id1, id2, ...]")
+        throw new Error(ERRORS.TOOLS.NO_NUMERIC_IDS)
     }
 
     // Fetch messages to calculate tokens and find current agent
@@ -91,9 +91,7 @@ const numericToolIds: number[] = ids
     // Validate that all numeric IDs are within bounds
     if (numericToolIds.some((id) => id < 0 || id >= toolIdList.length)) {
         logger.debug("Invalid tool IDs provided: " + numericToolIds.join(", "))
-        throw new Error(
-            "Invalid IDs provided. Only use numeric IDs from the <prunable-tools> list.",
-        )
+        throw new Error(ERRORS.TOOLS.INVALID_IDS)
     }
 
     // Validate that all IDs exist in cache and aren't protected
@@ -113,9 +111,7 @@ const numericToolIds: number[] = ids
                 "Rejecting prune request - ID not in cache (turn-protected or hallucinated)",
                 { index, id },
             )
-            throw new Error(
-                "Invalid IDs provided. Only use numeric IDs from the <prunable-tools> list.",
-            )
+            throw new Error(ERRORS.TOOLS.INVALID_IDS)
         }
         const allProtectedTools = config.tools.settings.protectedTools
         if (allProtectedTools.includes(metadata.tool)) {
@@ -124,9 +120,7 @@ const numericToolIds: number[] = ids
                 id,
                 tool: metadata.tool,
             })
-            throw new Error(
-                "Invalid IDs provided. Only use numeric IDs from the <prunable-tools> list.",
-            )
+            throw new Error(ERRORS.TOOLS.INVALID_IDS)
         }
 
 const filePath = sanitizeFilePath(getFilePathFromParameters(metadata.parameters))
@@ -137,9 +131,7 @@ const filePath = sanitizeFilePath(getFilePathFromParameters(metadata.parameters)
                 tool: metadata.tool,
                 filePath,
             })
-            throw new Error(
-                "Invalid IDs provided. Only use numeric IDs from the <prunable-tools> list.",
-            )
+            throw new Error(ERRORS.TOOLS.INVALID_IDS)
         }
     }
 
@@ -204,9 +196,7 @@ export function createDiscardTool(ctx: PruneToolContext): ReturnType<typeof tool
             const validReasons = ["completion", "noise"] as const
             if (typeof reason !== "string" || !validReasons.includes(reason as any)) {
                 ctx.logger.debug("Invalid discard reason provided: " + reason)
-                throw new Error(
-                    "No valid reason found. Use 'completion' or 'noise' as the first element.",
-                )
+                throw new Error(ERRORS.TOOLS.NO_REASON)
             }
 
             const numericIds = args.ids.slice(1)
@@ -234,9 +224,7 @@ export function createExtractTool(ctx: PruneToolContext): ReturnType<typeof tool
                 ctx.logger.debug(
                     "Extract tool called without distillation: " + JSON.stringify(args),
                 )
-                throw new Error(
-                    "Missing distillation. You must provide a distillation string for each ID.",
-                )
+                throw new Error(ERRORS.TOOLS.NO_DISTILLATION)
             }
 
 // Log the distillation for debugging/analysis (sanitized)

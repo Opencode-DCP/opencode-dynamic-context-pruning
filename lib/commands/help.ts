@@ -7,6 +7,7 @@ import type { Logger } from "../logger"
 import type { SessionState, WithParts } from "../state"
 import { sendIgnoredMessage } from "../ui/notification"
 import { getCurrentParams } from "../strategies/utils"
+import { UI } from "../constants"
 
 export interface HelpCommandContext {
     client: any

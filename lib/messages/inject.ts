@@ -14,6 +14,7 @@ import {
 } from "./utils"
 import { getFilePathFromParameters, isProtectedFilePath } from "../protected-file-patterns"
 import { getLastUserMessage } from "../shared-utils"
+import { UI } from "../constants"
 
 const getNudgeString = (config: PluginConfig): string => {
     const discardEnabled = config.tools.discard.enabled
@@ -47,9 +48,7 @@ const getCooldownMessage = (config: PluginConfig): string => {
         toolName = "extract tool"
     }
 
-    return `<prunable-tools>
-Context management was just performed. Do not use the ${toolName} again. A fresh list will be available after your next tool use.
-</prunable-tools>`
+    return UI.COOLDOWN.HEADER + "\n" + UI.COOLDOWN.MESSAGE(toolName) + "\n</prunable-tools>"
 }
 
 const buildPrunableToolsList = (

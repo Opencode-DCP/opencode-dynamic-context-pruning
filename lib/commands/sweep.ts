@@ -17,6 +17,7 @@ import { buildToolIdList, isIgnoredUserMessage } from "../messages/utils"
 import { saveSessionState } from "../state/persistence"
 import { isMessageCompacted } from "../shared-utils"
 import { getFilePathFromParameters, isProtectedFilePath } from "../protected-file-patterns"
+import { UI } from "../constants"
 
 export interface SweepCommandContext {
     client: any

@@ -2,6 +2,7 @@ import { writeFile, mkdir } from "fs/promises"
 import { join } from "path"
 import { existsSync } from "fs"
 import { homedir } from "os"
+import { PATHS, LOG_FORMATS } from "./constants"
 
 export class Logger {
     private logDir: string
@@ -9,8 +10,8 @@ export class Logger {
 
     constructor(enabled: boolean) {
         this.enabled = enabled
-        const opencodeConfigDir = join(homedir(), ".config", "opencode")
-        this.logDir = join(opencodeConfigDir, "logs", "dcp")
+        const opencodeConfigDir = join(homedir(), PATHS.OPENCODE.CONFIG_DIR)
+        this.logDir = join(opencodeConfigDir, PATHS.OPENCODE.LOGS_DIR, PATHS.OPENCODE.DCP_LOGS_DIR)
     }
 
     private async ensureLogDir() {
@@ -83,7 +84,7 @@ export class Logger {
                 await mkdir(dailyLogDir, { recursive: true })
             }
 
-            const logFile = join(dailyLogDir, `${new Date().toISOString().split("T")[0]}.log`)
+            const logFile = join(dailyLogDir, `${new Date().toISOString().split("T")[0]}${PATHS.EXTENSIONS.LOG}`)
             await writeFile(logFile, logLine, { flag: "a" })
         } catch (error) {
             // Silently fail to avoid logging errors during logging
@@ -207,7 +208,7 @@ export class Logger {
 
             const minimized = this.minimizeForDebug(messages)
             const timestamp = new Date().toISOString().replace(/[:.]/g, "-")
-            const contextFile = join(contextDir, `${timestamp}.json`)
+            const contextFile = join(contextDir, `${timestamp}${PATHS.EXTENSIONS.JSON}`)
             await writeFile(contextFile, JSON.stringify(minimized, null, 2))
         } catch (error) {
             // Silently fail to avoid logging errors during context saving

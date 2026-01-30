@@ -3,6 +3,13 @@ import { join, dirname } from "path"
 import { homedir } from "os"
 import { parse } from "jsonc-parser"
 import type { PluginInput } from "@opencode-ai/plugin"
+import { 
+    DEFAULT_PROTECTED_TOOLS,
+    PATHS,
+    LIMITS,
+    ERRORS,
+    TOOL_NAMES,
+} from "./constants"
 
 export interface Deduplication {
     enabled: boolean
@@ -65,18 +72,7 @@ export interface PluginConfig {
     }
 }
 
-const DEFAULT_PROTECTED_TOOLS = [
-    "task",
-    "todowrite",
-    "todoread",
-    "discard",
-    "extract",
-    "batch",
-    "write",
-    "edit",
-    "plan_enter",
-    "plan_exit",
-]
+
 
 // Valid config keys for validation against user config
 export const VALID_CONFIG_KEYS = new Set([
@@ -384,9 +380,9 @@ function validateConfigSizes(config: Record<string, any>): SizeValidationError[]
     const errors: SizeValidationError[] = []
     
     // Max limits
-    const MAX_PATTERNS = 100
-    const MAX_TOOLS = 50
-    const MAX_STRING_LENGTH = 1000
+    const MAX_PATTERNS = LIMITS.VALIDATION.MAX_PATTERNS
+    const MAX_TOOLS = LIMITS.VALIDATION.MAX_TOOLS
+    const MAX_STRING_LENGTH = LIMITS.VALIDATION.MAX_STRING_LENGTH
     
     function checkArray(key: string, arr: any[], maxItems: number, maxItemLength: number) {
         if (arr.length > maxItems) {
@@ -477,7 +473,7 @@ function showConfigValidationWarnings(
         try {
             ctx.client.tui.showToast({
                 body: {
-                    title: `DCP: Invalid ${configType}`,
+                    title: ERRORS.DCP.INVALID_CONFIG(configType),
                     message: `${configPath}\n${messages.join("\n")}`,
                     variant: "warning",
                     duration: 7000,
@@ -533,9 +529,9 @@ const defaultConfig: PluginConfig = {
     },
 }
 
-const GLOBAL_CONFIG_DIR = join(homedir(), ".config", "opencode")
-const GLOBAL_CONFIG_PATH_JSONC = join(GLOBAL_CONFIG_DIR, "dcp.jsonc")
-const GLOBAL_CONFIG_PATH_JSON = join(GLOBAL_CONFIG_DIR, "dcp.json")
+const GLOBAL_CONFIG_DIR = join(homedir(), PATHS.OPENCODE.CONFIG_DIR)
+const GLOBAL_CONFIG_PATH_JSONC = join(GLOBAL_CONFIG_DIR, PATHS.DCP.CONFIG_JSONC)
+const GLOBAL_CONFIG_PATH_JSON = join(GLOBAL_CONFIG_DIR, PATHS.DCP.CONFIG_JSON)
 
 function findOpencodeDir(startDir: string): string | null {
     let current = startDir
@@ -630,11 +626,11 @@ function loadConfigFile(configPath: string): ConfigLoadResult {
     try {
         const parsed = parse(fileContent)
         if (parsed === undefined || parsed === null) {
-            return { data: null, parseError: "Config file is empty or invalid" }
+            return { data: null, parseError: ERRORS.CONFIG.EMPTY_OR_INVALID }
         }
         return { data: parsed }
     } catch (error: any) {
-        return { data: null, parseError: error.message || "Failed to parse config" }
+        return { data: null, parseError: error.message || ERRORS.CONFIG.PARSE_FAILED }
     }
 }
 
@@ -758,7 +754,7 @@ setTimeout(async () => {
                 try {
                     ctx.client.tui.showToast({
                         body: {
-                            title: "DCP: Invalid config",
+                            title: ERRORS.DCP.INVALID_CONFIG("config"),
                             message: `${configPaths.global}\n${result.parseError}\nUsing default values`,
                             variant: "warning",
                             duration: 7000,
@@ -802,7 +798,7 @@ setTimeout(async () => {
                 try {
                     ctx.client.tui.showToast({
                         body: {
-                            title: "DCP: Invalid configDir config",
+                            title: ERRORS.DCP.INVALID_CONFIG("configDir config"),
                             message: `${configPaths.configDir}\n${result.parseError}\nUsing global/default values`,
                             variant: "warning",
                             duration: 7000,
@@ -843,7 +839,7 @@ setTimeout(async () => {
                 try {
                     ctx.client.tui.showToast({
                         body: {
-                            title: "DCP: Invalid project config",
+                            title: ERRORS.DCP.INVALID_CONFIG("project config"),
                             message: `${configPaths.project}\n${result.parseError}\nUsing global/default values`,
                             variant: "warning",
                             duration: 7000,

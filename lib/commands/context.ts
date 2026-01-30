@@ -45,6 +45,7 @@ import { isMessageCompacted } from "../shared-utils"
 import { isIgnoredUserMessage } from "../messages/utils"
 import { countTokens, getCurrentParams } from "../strategies/utils"
 import type { AssistantMessage, TextPart, ToolPart } from "@opencode-ai/sdk/v2"
+import { UI } from "../constants"
 
 export interface ContextCommandContext {
     client: any
