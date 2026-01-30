@@ -8,7 +8,7 @@ AVAILABLE TOOLS FOR CONTEXT MANAGEMENT
 <prune>`prune`: remove individual tool calls that are noise, irrelevant, or superseded. No preservation of content. Do NOT let irrelevant context accumulate but be judicious and strategic when pruning to maintain necessary context.</prune>
 
 // **🡇 add an <any></any> tag for conditionals 🡇** //
-AVOID CONTEXT ROT - EVALUATE YOUR CONTEXT AND MANAGE REGULARLY. AVOID USING MANAGEMENT TOOLS AS THE ONLY TOOL CALL IN YOUR RESPONSE, PARALLELIZE IT WITH OTHER TOOL RELEVANT TO YOUR TASK CONTINUATION (read, edit, bash...)
+AVOID CONTEXT ROT - EVALUATE YOUR CONTEXT AND MANAGE REGULARLY. AVOID USING MANAGEMENT TOOLS AS THE ONLY TOOL CALLS IN YOUR RESPONSE, PARALLELIZE WITH OTHER RELEVANT TOOLS TO YOUR TASK CONTINUATION (read, edit, bash...)
 
 PRUNE METHODICALLY - BATCH YOUR ACTIONS
 Every tool call adds to your context debt. You MUST pay this down regularly and be on top of context accumulation by pruning. Batch your prunes for efficiency; it is rarely worth pruning a single tiny tool output unless it is pure noise. Evaluate what SHOULD be pruned before jumping the gun.
@@ -46,8 +46,8 @@ You WILL evaluate distilling when ANY of these are true:
   </distill>
   <compress>
   WHEN TO COMPRESS
-- **Phase Completion:** When a phase is complete, condense the entire sequence (research, tool calls, implementation) into a summary.
-- **Exploration Done:** When you've explored multiple files or ran multiple commands and only need a summary of findings.
+- Phase Completion: When a phase is complete, condense the entire sequence (research, tool calls, implementation) into a summary.
+- Exploration Done: When you've explored multiple files or ran multiple commands and only need a summary of findings.
 
 You WILL evaluate compressing when ANY of these are true:
 
