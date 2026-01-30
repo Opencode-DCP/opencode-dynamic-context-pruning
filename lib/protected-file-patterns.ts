@@ -1,9 +1,84 @@
+// Cache for compiled regex patterns
+const patternCache = new Map<string, RegExp>()
+const CACHE_MAX_SIZE = 100 // Prevent memory bloat
+
 function normalizePath(input: string): string {
-    return input.replaceAll("\\\\", "/")
+    // Use replaceAll for better performance or single regex
+    return input.includes('\\') ? input.replaceAll('\\', '/') : input
 }
 
 function escapeRegExpChar(ch: string): string {
     return /[\\.^$+{}()|\[\]]/.test(ch) ? `\\${ch}` : ch
+}
+
+function buildGlobRegex(pattern: string): string {
+    const parts: string[] = []
+    
+    for (let i = 0; i < pattern.length; i++) {
+        const ch = pattern[i]
+        
+        if (ch === "*") {
+            const next = pattern[i + 1]
+            if (next === "*") {
+                const after = pattern[i + 2]
+                if (after === "/") {
+                    parts.push("(?:.*/)?")
+                    i += 2
+                    continue
+                }
+                parts.push(".*")
+                i++
+                continue
+            }
+            parts.push("[^/]*")
+            continue
+        }
+        
+        if (ch === "?") {
+            parts.push("[^/]")
+            continue
+        }
+        
+        if (ch === "/") {
+            parts.push("/")
+            continue
+        }
+        
+        // Escape special regex characters
+        if (/[\\.^$+{}()|\[\]]/.test(ch)) {
+            parts.push(`\\${ch}`)
+        } else {
+            parts.push(ch)
+        }
+    }
+    
+    return "^" + parts.join("") + "$"
+}
+
+function getCompiledRegex(pattern: string): RegExp {
+    // Check cache first
+    const cached = patternCache.get(pattern)
+    if (cached) {
+        return cached
+    }
+    
+    // Build regex string using optimized function
+    const regex = buildGlobRegex(pattern)
+    
+    // Compile and cache
+    const compiled = new RegExp(regex)
+    
+    // Manage cache size (LRU-like eviction)
+    if (patternCache.size >= CACHE_MAX_SIZE) {
+        // Remove oldest entry (first entry in Map)
+        const firstKey = patternCache.keys().next().value
+        if (firstKey !== undefined) {
+            patternCache.delete(firstKey)
+        }
+    }
+    
+    patternCache.set(pattern, compiled)
+    return compiled
 }
 
 /**
@@ -13,6 +88,7 @@ function escapeRegExpChar(ch: string): string {
  * - Matching is performed against the full (normalized) string.
  * - `*` and `?` do not match `/`.
  * - `**` matches across `/`.
+ * - Uses compiled regex cache for performance optimization.
  */
 export function matchesGlob(inputPath: string, pattern: string): boolean {
     if (!pattern) return false
@@ -20,49 +96,8 @@ export function matchesGlob(inputPath: string, pattern: string): boolean {
     const input = normalizePath(inputPath)
     const pat = normalizePath(pattern)
 
-    let regex = "^"
-
-    for (let i = 0; i < pat.length; i++) {
-        const ch = pat[i]
-
-        if (ch === "*") {
-            const next = pat[i + 1]
-            if (next === "*") {
-                const after = pat[i + 2]
-                if (after === "/") {
-                    // **/  (zero or more directories)
-                    regex += "(?:.*/)?"
-                    i += 2
-                    continue
-                }
-
-                // **
-                regex += ".*"
-                i++
-                continue
-            }
-
-            // *
-            regex += "[^/]*"
-            continue
-        }
-
-        if (ch === "?") {
-            regex += "[^/]"
-            continue
-        }
-
-        if (ch === "/") {
-            regex += "/"
-            continue
-        }
-
-        regex += escapeRegExpChar(ch)
-    }
-
-    regex += "$"
-
-    return new RegExp(regex).test(input)
+    const regex = getCompiledRegex(pat)
+    return regex.test(input)
 }
 
 export function getFilePathFromParameters(parameters: unknown): string | undefined {

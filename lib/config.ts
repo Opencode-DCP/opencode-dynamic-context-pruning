@@ -638,6 +638,16 @@ function loadConfigFile(configPath: string): ConfigLoadResult {
     }
 }
 
+function deduplicateArray<T>(base: T[], override?: T[]): T[] {
+    if (!override || override.length === 0) {
+        return base
+    }
+    if (base.length === 0) {
+        return override
+    }
+    return Array.from(new Set([...base, ...override]))
+}
+
 function mergeStrategies(
     base: PluginConfig["strategies"],
     override?: Partial<PluginConfig["strategies"]>,
@@ -647,12 +657,10 @@ function mergeStrategies(
     return {
         deduplication: {
             enabled: override.deduplication?.enabled ?? base.deduplication.enabled,
-            protectedTools: [
-                ...new Set([
-                    ...base.deduplication.protectedTools,
-                    ...(override.deduplication?.protectedTools ?? []),
-                ]),
-            ],
+            protectedTools: deduplicateArray(
+                base.deduplication.protectedTools,
+                override.deduplication?.protectedTools
+            ),
         },
         supersedeWrites: {
             enabled: override.supersedeWrites?.enabled ?? base.supersedeWrites.enabled,
@@ -660,12 +668,10 @@ function mergeStrategies(
         purgeErrors: {
             enabled: override.purgeErrors?.enabled ?? base.purgeErrors.enabled,
             turns: override.purgeErrors?.turns ?? base.purgeErrors.turns,
-            protectedTools: [
-                ...new Set([
-                    ...base.purgeErrors.protectedTools,
-                    ...(override.purgeErrors?.protectedTools ?? []),
-                ]),
-            ],
+            protectedTools: deduplicateArray(
+                base.purgeErrors.protectedTools,
+                override.purgeErrors?.protectedTools
+            ),
         },
     }
 }
@@ -680,12 +686,10 @@ function mergeTools(
         settings: {
             nudgeEnabled: override.settings?.nudgeEnabled ?? base.settings.nudgeEnabled,
             nudgeFrequency: override.settings?.nudgeFrequency ?? base.settings.nudgeFrequency,
-            protectedTools: [
-                ...new Set([
-                    ...base.settings.protectedTools,
-                    ...(override.settings?.protectedTools ?? []),
-                ]),
-            ],
+            protectedTools: deduplicateArray(
+                base.settings.protectedTools,
+                override.settings?.protectedTools
+            ),
         },
         discard: {
             enabled: override.discard?.enabled ?? base.discard.enabled,
@@ -705,7 +709,7 @@ function mergeCommands(
 
     return {
         enabled: override.enabled ?? base.enabled,
-        protectedTools: [...new Set([...base.protectedTools, ...(override.protectedTools ?? [])])],
+        protectedTools: deduplicateArray(base.protectedTools, override.protectedTools),
     }
 }
 
@@ -777,12 +781,10 @@ setTimeout(async () => {
                     enabled: result.data.turnProtection?.enabled ?? config.turnProtection.enabled,
                     turns: result.data.turnProtection?.turns ?? config.turnProtection.turns,
                 },
-                protectedFilePatterns: [
-                    ...new Set([
-                        ...config.protectedFilePatterns,
-                        ...(result.data.protectedFilePatterns ?? []),
-                    ]),
-                ],
+                protectedFilePatterns: Array.from(new Set([
+                    ...config.protectedFilePatterns,
+                    ...(result.data.protectedFilePatterns ?? []),
+                ])),
                 tools: mergeTools(config.tools, result.data.tools as any),
                 strategies: mergeStrategies(config.strategies, result.data.strategies as any),
             }
@@ -823,12 +825,10 @@ setTimeout(async () => {
                     enabled: result.data.turnProtection?.enabled ?? config.turnProtection.enabled,
                     turns: result.data.turnProtection?.turns ?? config.turnProtection.turns,
                 },
-                protectedFilePatterns: [
-                    ...new Set([
-                        ...config.protectedFilePatterns,
-                        ...(result.data.protectedFilePatterns ?? []),
-                    ]),
-                ],
+                protectedFilePatterns: Array.from(new Set([
+                    ...config.protectedFilePatterns,
+                    ...(result.data.protectedFilePatterns ?? []),
+                ])),
                 tools: mergeTools(config.tools, result.data.tools as any),
                 strategies: mergeStrategies(config.strategies, result.data.strategies as any),
             }
@@ -855,7 +855,7 @@ setTimeout(async () => {
                 }
             }, 7000)
         } else if (result.data) {
-            // Validate config keys and types
+// Validate config keys and types
             showConfigValidationWarnings(ctx, configPaths.project, result.data, true)
             config = {
                 enabled: result.data.enabled ?? config.enabled,
@@ -866,12 +866,10 @@ setTimeout(async () => {
                     enabled: result.data.turnProtection?.enabled ?? config.turnProtection.enabled,
                     turns: result.data.turnProtection?.turns ?? config.turnProtection.turns,
                 },
-                protectedFilePatterns: [
-                    ...new Set([
-                        ...config.protectedFilePatterns,
-                        ...(result.data.protectedFilePatterns ?? []),
-                    ]),
-                ],
+                protectedFilePatterns: Array.from(new Set([
+                    ...config.protectedFilePatterns,
+                    ...(result.data.protectedFilePatterns ?? []),
+                ])),
                 tools: mergeTools(config.tools, result.data.tools as any),
                 strategies: mergeStrategies(config.strategies, result.data.strategies as any),
             }

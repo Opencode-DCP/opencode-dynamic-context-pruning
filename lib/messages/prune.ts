@@ -14,89 +14,46 @@ export const prune = (
     config: PluginConfig,
     messages: WithParts[],
 ): void => {
-    pruneToolOutputs(state, logger, messages)
-    pruneToolInputs(state, logger, messages)
-    pruneToolErrors(state, logger, messages)
-}
-
-const pruneToolOutputs = (state: SessionState, logger: Logger, messages: WithParts[]): void => {
+    const pruneSet = new Set(state.prune.toolIds)
+    
     for (const msg of messages) {
         if (isMessageCompacted(state, msg)) {
             continue
         }
 
         const parts = Array.isArray(msg.parts) ? msg.parts : []
+        
         for (const part of parts) {
             if (part.type !== "tool") {
                 continue
             }
-            if (!state.prune.toolIds.includes(part.callID)) {
-                continue
-            }
-            if (part.state.status !== "completed") {
-                continue
-            }
-            if (part.tool === "question") {
+            
+            if (!pruneSet.has(part.callID)) {
                 continue
             }
 
-            part.state.output = PRUNED_TOOL_OUTPUT_REPLACEMENT
-        }
-    }
-}
-
-const pruneToolInputs = (state: SessionState, logger: Logger, messages: WithParts[]): void => {
-    for (const msg of messages) {
-        if (isMessageCompacted(state, msg)) {
-            continue
-        }
-
-        const parts = Array.isArray(msg.parts) ? msg.parts : []
-        for (const part of parts) {
-            if (part.type !== "tool") {
-                continue
+            const status = part.state.status
+            
+            // 1. Prune completed tool outputs (except "question" tool)
+            if (status === "completed" && part.tool !== "question") {
+                part.state.output = PRUNED_TOOL_OUTPUT_REPLACEMENT
             }
-            if (!state.prune.toolIds.includes(part.callID)) {
-                continue
+            
+            // 2. Prune question tool inputs
+            if (status === "completed" && part.tool === "question") {
+                if (part.state.input?.questions !== undefined) {
+                    part.state.input.questions = PRUNED_QUESTION_INPUT_REPLACEMENT
+                }
             }
-            if (part.state.status !== "completed") {
-                continue
-            }
-            if (part.tool !== "question") {
-                continue
-            }
-
-            if (part.state.input?.questions !== undefined) {
-                part.state.input.questions = PRUNED_QUESTION_INPUT_REPLACEMENT
-            }
-        }
-    }
-}
-
-const pruneToolErrors = (state: SessionState, logger: Logger, messages: WithParts[]): void => {
-    for (const msg of messages) {
-        if (isMessageCompacted(state, msg)) {
-            continue
-        }
-
-        const parts = Array.isArray(msg.parts) ? msg.parts : []
-        for (const part of parts) {
-            if (part.type !== "tool") {
-                continue
-            }
-            if (!state.prune.toolIds.includes(part.callID)) {
-                continue
-            }
-            if (part.state.status !== "error") {
-                continue
-            }
-
-            // Prune all string inputs for errored tools
-            const input = part.state.input
-            if (input && typeof input === "object") {
-                for (const key of Object.keys(input)) {
-                    if (typeof input[key] === "string") {
-                        input[key] = PRUNED_TOOL_ERROR_INPUT_REPLACEMENT
+            
+            // 3. Prune error tool inputs
+            if (status === "error") {
+                const input = part.state.input
+                if (input && typeof input === "object") {
+                    for (const key of Object.keys(input)) {
+                        if (typeof input[key] === "string") {
+                            input[key] = PRUNED_TOOL_ERROR_INPUT_REPLACEMENT
+                        }
                     }
                 }
             }
