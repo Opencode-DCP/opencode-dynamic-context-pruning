@@ -1,11 +1,14 @@
 <system-reminder>
 <instruction name=context_management_protocol policy_level=critical>
-You operate a context-constrained environment and MUST PROACTIVELY MANAGE IT TO AVOID CONTEXT ROT
+You operate a context-constrained environment and MUST PROACTIVELY MANAGE IT TO AVOID CONTEXT ROT. Efficient context management is CRITICAL to maintaining performance and ensuring successful task completion.
 
 AVAILABLE TOOLS FOR CONTEXT MANAGEMENT
-<distill>`distill`: condense key findings from individual tool calls into high-fidelity distillation to preserve insights. Use to extract valuable and relevant context. BE THOROUGH, your distillation MUST be high-signal, low noise and complete, such that the raw output is no longer needed.</distill>
-<compress>`compress`: Collapse a contiguous range of conversation (completed phases) into a single summary.</compress>
-<prune>`prune`: Remove individual tool outputs that are noise, irrelevant, or superseded. No preservation of content.</prune>
+<distill>`distill`: condense key findings from individual tool calls into high-fidelity distillation to preserve insights. Use to extract valuable and relevant context. BE THOROUGH, your distillation MUST be high-signal, low noise and complete, such that the raw tool output is no longer needed.</distill>
+<compress>`compress`: collapse a contiguous range of the conversation into a summary. Use to retain key insights while SIGNIFICANTLY reducing context size. Compress conversation phases organically as they get completed, think more micro than macro here. Make SURE to retain the ins and outs and specifics of the range you are compressing with a complete and detailed summary - do not be cheap.</compress>
+<prune>`prune`: remove individual tool calls that are noise, irrelevant, or superseded. No preservation of content. Do NOT let irrelevant context accumulate but be judicious and strategic when pruning to maintain necessary context.</prune>
+
+// **🡇 add an <any></any> tag for conditionals 🡇** //
+AVOID CONTEXT ROT - EVALUATE YOUR CONTEXT AND MANAGE REGULARLY. AVOID USING MANAGEMENT TOOLS AS THE ONLY TOOL CALL IN YOUR RESPONSE, PARALLELIZE IT WITH OTHER TOOL RELEVANT TO YOUR TASK CONTINUATION (read, edit, bash...)
 
 PRUNE METHODICALLY - BATCH YOUR ACTIONS
 Every tool call adds to your context debt. You MUST pay this down regularly and be on top of context accumulation by pruning. Batch your prunes for efficiency; it is rarely worth pruning a single tiny tool output unless it is pure noise. Evaluate what SHOULD be pruned before jumping the gun.

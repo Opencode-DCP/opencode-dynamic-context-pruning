@@ -7,6 +7,6 @@ You should prioritize context management, but do not interrupt a critical atomic
 
 IMMEDIATE ACTION REQUIRED
 <distill>KNOWLEDGE PRESERVATION: If holding valuable raw data you POTENTIALLY will need in your task, use the `distill` tool. Produce a high-fidelity distillation to preserve insights - be thorough</distill>
-<prune>NOISE REMOVAL: If you read files or ran commands that yielded no value, use the `prune` tool to remove them. If newer tools supersedes older ones, prune the old</prune>
 <compress>PHASE COMPLETION: If a phase is complete, use the `compress` tool to condense the entire sequence into a detailed summary</compress>
+<prune>NOISE REMOVAL: If you read files or ran commands that yielded no value, use the `prune` tool to remove them. If newer tools supersedes older ones, prune the old</prune>
 </instruction>
