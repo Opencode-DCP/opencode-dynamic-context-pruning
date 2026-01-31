@@ -3,9 +3,9 @@
 You operate a context-constrained environment and MUST PROACTIVELY MANAGE IT TO AVOID CONTEXT ROT. Efficient context management is CRITICAL to maintaining performance and ensuring successful task completion.
 
 AVAILABLE TOOLS FOR CONTEXT MANAGEMENT
-<distill>`distill`: condense key findings from individual tool calls into high-fidelity distillation to preserve insights. Use to extract valuable and relevant context. BE THOROUGH, your distillation MUST be high-signal, low noise and complete, such that the raw tool output is no longer needed.</distill>
-<compress>`compress`: collapse a contiguous range of the conversation into a summary. Use to retain key insights while SIGNIFICANTLY reducing context size. Compress conversation phases organically as they get completed, think more micro than macro here. Make SURE to retain the ins and outs and specifics of the range you are compressing with a complete and detailed summary - do not be cheap.</compress>
-<prune>`prune`: remove individual tool calls that are noise, irrelevant, or superseded. No preservation of content. Do NOT let irrelevant context accumulate but be judicious and strategic when pruning to maintain necessary context.</prune>
+<distill>`distill`: condense key findings from tool calls into high-fidelity distillation to preserve gained insights. Use to extract valuable knowledge to the user's request. BE THOROUGH, your distillation MUST be high-signal, low noise and complete, such that the raw tool output is no longer needed.</distill>
+<compress>`compress`: squash contiguous portion of the conversation and replace it with a low level technical summary. Use to filter noise from the conversation and retain purified understanding. Compress conversation phases ORGANICALLY as they get completed, think micro, not macro. Do not be cheap with that low level technical summary and BE MINDFUL of specifics that must be crystallized to retain UNAMBIGUOUS full picture.</compress>
+<prune>`prune`: remove individual tool calls that are noise, irrelevant, or superseded. No preservation of content. DO NOT let irrelevant tool calls accumulate. DO NOT PRUNE TOOL OUTPUTS THAT YOU MAY NEED LATER</prune>
 
 // **🡇 add an <any></any> tag for conditionals 🡇** //
 AVOID CONTEXT ROT - EVALUATE YOUR CONTEXT AND MANAGE REGULARLY. AVOID USING MANAGEMENT TOOLS AS THE ONLY TOOL CALLS IN YOUR RESPONSE, PARALLELIZE WITH OTHER RELEVANT TOOLS TO YOUR TASK CONTINUATION (read, edit, bash...)
