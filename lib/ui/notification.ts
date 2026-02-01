@@ -6,6 +6,7 @@ import {
     formatPrunedItemsList,
     formatStatsHeader,
     formatTokenCount,
+    formatProgressBar,
 } from "./utils"
 import { ToolParameterEntry } from "../state"
 import { PluginConfig } from "../config"
@@ -25,7 +26,7 @@ function buildMinimalMessage(
 ): string {
     const extractedTokens = countDistillationTokens(distillation)
     const extractedSuffix =
-        extractedTokens > 0 ? ` (extracted ${formatTokenCount(extractedTokens)})` : ""
+        extractedTokens > 0 ? ` (distilled ${formatTokenCount(extractedTokens)})` : ""
     const reasonSuffix = reason && extractedTokens === 0 ? ` — ${PRUNE_REASON_LABELS[reason]}` : ""
     let message =
         formatStatsHeader(state.stats.totalPruneTokens, state.stats.pruneTokenCounter) +
@@ -50,7 +51,7 @@ function buildDetailedMessage(
         const pruneTokenCounterStr = `~${formatTokenCount(state.stats.pruneTokenCounter)}`
         const extractedTokens = countDistillationTokens(distillation)
         const extractedSuffix =
-            extractedTokens > 0 ? `, extracted ${formatTokenCount(extractedTokens)}` : ""
+            extractedTokens > 0 ? `, distilled ${formatTokenCount(extractedTokens)}` : ""
         const reasonLabel =
             reason && extractedTokens === 0 ? ` — ${PRUNE_REASON_LABELS[reason]}` : ""
         message += `\n\n▣ Pruning (${pruneTokenCounterStr}${extractedSuffix})${reasonLabel}`
@@ -60,6 +61,42 @@ function buildDetailedMessage(
     }
 
     return (message + formatExtracted(showDistillation ? distillation : undefined)).trim()
+}
+
+const TOAST_BODY_MAX_LINES = 12
+const TOAST_SUMMARY_MAX_CHARS = 600
+
+function truncateToastBody(body: string, maxLines: number = TOAST_BODY_MAX_LINES): string {
+    const lines = body.split("\n")
+    if (lines.length <= maxLines) {
+        return body
+    }
+    const kept = lines.slice(0, maxLines - 1)
+    const remaining = lines.length - maxLines + 1
+    return kept.join("\n") + `\n... and ${remaining} more`
+}
+
+function truncateToastSummary(summary: string, maxChars: number = TOAST_SUMMARY_MAX_CHARS): string {
+    if (summary.length <= maxChars) {
+        return summary
+    }
+    return summary.slice(0, maxChars - 3) + "..."
+}
+
+function truncateExtractedSection(
+    message: string,
+    maxChars: number = TOAST_SUMMARY_MAX_CHARS,
+): string {
+    const marker = "\n\n▣ Extracted"
+    const index = message.indexOf(marker)
+    if (index === -1) {
+        return message
+    }
+    const extracted = message.slice(index)
+    if (extracted.length <= maxChars) {
+        return message
+    }
+    return message.slice(0, index) + truncateToastSummary(extracted, maxChars)
 }
 
 export async function sendUnifiedNotification(
@@ -84,7 +121,7 @@ export async function sendUnifiedNotification(
         return false
     }
 
-    const showDistillation = config.tools.extract.showDistillation
+    const showDistillation = config.tools.distill.showDistillation
 
     const message =
         config.pruneNotification === "minimal"
@@ -98,6 +135,97 @@ export async function sendUnifiedNotification(
                   distillation,
                   showDistillation,
               )
+
+    if (config.pruneNotificationType === "toast") {
+        let toastMessage = truncateExtractedSection(message)
+        toastMessage =
+            config.pruneNotification === "minimal" ? toastMessage : truncateToastBody(toastMessage)
+
+        await client.tui.showToast({
+            body: {
+                title: "DCP: Prune Notification",
+                message: toastMessage,
+                variant: "info",
+                duration: 5000,
+            },
+        })
+        return true
+    }
+
+    await sendIgnoredMessage(client, sessionId, message, params, logger)
+    return true
+}
+
+export async function sendCompressNotification(
+    client: any,
+    logger: Logger,
+    config: PluginConfig,
+    state: SessionState,
+    sessionId: string,
+    toolIds: string[],
+    messageIds: string[],
+    topic: string,
+    summary: string,
+    startResult: any,
+    endResult: any,
+    totalMessages: number,
+    params: any,
+): Promise<boolean> {
+    if (config.pruneNotification === "off") {
+        return false
+    }
+
+    let message: string
+
+    if (config.pruneNotification === "minimal") {
+        message = formatStatsHeader(state.stats.totalPruneTokens, state.stats.pruneTokenCounter)
+    } else {
+        message = formatStatsHeader(state.stats.totalPruneTokens, state.stats.pruneTokenCounter)
+
+        const pruneTokenCounterStr = `~${formatTokenCount(state.stats.pruneTokenCounter)}`
+        const progressBar = formatProgressBar(
+            totalMessages,
+            startResult.messageIndex,
+            endResult.messageIndex,
+            25,
+        )
+        message += `\n\n▣ Compressing (${pruneTokenCounterStr}) ${progressBar}`
+        message += `\n→ Topic: ${topic}`
+        message += `\n→ Items: ${messageIds.length} messages`
+        if (toolIds.length > 0) {
+            message += ` and ${toolIds.length} tools condensed`
+        } else {
+            message += ` condensed`
+        }
+        if (config.tools.compress.showCompression) {
+            message += `\n→ Compression: ${summary}`
+        }
+    }
+
+    if (config.pruneNotificationType === "toast") {
+        let toastMessage = message
+        if (config.tools.compress.showCompression) {
+            const truncatedSummary = truncateToastSummary(summary)
+            if (truncatedSummary !== summary) {
+                toastMessage = toastMessage.replace(
+                    `\n→ Compression: ${summary}`,
+                    `\n→ Compression: ${truncatedSummary}`,
+                )
+            }
+        }
+        toastMessage =
+            config.pruneNotification === "minimal" ? toastMessage : truncateToastBody(toastMessage)
+
+        await client.tui.showToast({
+            body: {
+                title: "DCP: Compress Notification",
+                message: toastMessage,
+                variant: "info",
+                duration: 5000,
+            },
+        })
+        return true
+    }
 
     await sendIgnoredMessage(client, sessionId, message, params, logger)
     return true

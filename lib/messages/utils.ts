@@ -1,21 +1,16 @@
-import { Logger } from "../logger"
+import { ulid } from "ulid"
 import { isMessageCompacted } from "../shared-utils"
+import { Logger } from "../logger"
 import type { SessionState, WithParts } from "../state"
 import type { UserMessage } from "@opencode-ai/sdk/v2"
 
-const SYNTHETIC_MESSAGE_ID = "msg_01234567890123456789012345"
-const SYNTHETIC_PART_ID = "prt_01234567890123456789012345"
-const SYNTHETIC_CALL_ID = "call_01234567890123456789012345"
+export const COMPRESS_SUMMARY_PREFIX = "[Compressed conversation block]\n\n"
 
-export const isDeepSeekOrKimi = (providerID: string, modelID: string): boolean => {
-    const lowerProviderID = providerID.toLowerCase()
+const generateUniqueId = (prefix: string): string => `${prefix}_${ulid()}`
+
+const isGeminiModel = (modelID: string): boolean => {
     const lowerModelID = modelID.toLowerCase()
-    return (
-        lowerProviderID.includes("deepseek") ||
-        lowerProviderID.includes("kimi") ||
-        lowerModelID.includes("deepseek") ||
-        lowerModelID.includes("kimi")
-    )
+    return lowerModelID.includes("gemini")
 }
 
 export const createSyntheticUserMessage = (
@@ -25,85 +20,60 @@ export const createSyntheticUserMessage = (
 ): WithParts => {
     const userInfo = baseMessage.info as UserMessage
     const now = Date.now()
+    const messageId = generateUniqueId("msg")
+    const partId = generateUniqueId("prt")
 
     return {
         info: {
-            id: SYNTHETIC_MESSAGE_ID,
+            id: messageId,
             sessionID: userInfo.sessionID,
             role: "user" as const,
-            agent: userInfo.agent || "code",
+            agent: userInfo.agent,
             model: userInfo.model,
             time: { created: now },
             ...(variant !== undefined && { variant }),
         },
         parts: [
             {
-                id: SYNTHETIC_PART_ID,
+                id: partId,
                 sessionID: userInfo.sessionID,
-                messageID: SYNTHETIC_MESSAGE_ID,
-                type: "text",
+                messageID: messageId,
+                type: "text" as const,
                 text: content,
             },
         ],
     }
 }
 
-export const createSyntheticAssistantMessage = (
+export const createSyntheticToolPart = (
     baseMessage: WithParts,
     content: string,
-    variant?: string,
-): WithParts => {
+    modelID: string,
+) => {
     const userInfo = baseMessage.info as UserMessage
     const now = Date.now()
 
-    return {
-        info: {
-            id: SYNTHETIC_MESSAGE_ID,
-            sessionID: userInfo.sessionID,
-            role: "assistant" as const,
-            agent: userInfo.agent || "code",
-            parentID: userInfo.id,
-            modelID: userInfo.model.modelID,
-            providerID: userInfo.model.providerID,
-            mode: "default",
-            path: {
-                cwd: "/",
-                root: "/",
-            },
-            time: { created: now, completed: now },
-            cost: 0,
-            tokens: { input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } },
-            ...(variant !== undefined && { variant }),
-        },
-        parts: [
-            {
-                id: SYNTHETIC_PART_ID,
-                sessionID: userInfo.sessionID,
-                messageID: SYNTHETIC_MESSAGE_ID,
-                type: "text",
-                text: content,
-            },
-        ],
-    }
-}
+    const partId = generateUniqueId("prt")
+    const callId = generateUniqueId("call")
 
-export const createSyntheticToolPart = (baseMessage: WithParts, content: string) => {
-    const userInfo = baseMessage.info as UserMessage
-    const now = Date.now()
+    // Gemini requires thoughtSignature bypass to accept synthetic tool parts
+    const toolPartMetadata = isGeminiModel(modelID)
+        ? { google: { thoughtSignature: "skip_thought_signature_validator" } }
+        : {}
 
     return {
-        id: SYNTHETIC_PART_ID,
+        id: partId,
         sessionID: userInfo.sessionID,
         messageID: baseMessage.info.id,
         type: "tool" as const,
-        callID: SYNTHETIC_CALL_ID,
+        callID: callId,
         tool: "context_info",
         state: {
             status: "completed" as const,
             input: {},
             output: content,
             title: "Context Info",
-            metadata: {},
+            metadata: toolPartMetadata,
             time: { start: now, end: now },
         },
     }
@@ -263,4 +233,8 @@ export const isIgnoredUserMessage = (message: WithParts): boolean => {
     }
 
     return true
+}
+
+export const findMessageIndex = (messages: WithParts[], messageId: string): number => {
+    return messages.findIndex((msg) => msg.info.id === messageId)
 }

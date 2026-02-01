@@ -2,11 +2,21 @@ import { SessionState, WithParts } from "./state"
 import { isIgnoredUserMessage } from "./messages/utils"
 
 export const isMessageCompacted = (state: SessionState, msg: WithParts): boolean => {
-    return msg.info.time.created < state.lastCompaction
+    if (msg.info.time.created < state.lastCompaction) {
+        return true
+    }
+    if (state.prune.messageIds.has(msg.info.id)) {
+        return true
+    }
+    return false
 }
 
-export const getLastUserMessage = (messages: WithParts[]): WithParts | null => {
-    for (let i = messages.length - 1; i >= 0; i--) {
+export const getLastUserMessage = (
+    messages: WithParts[],
+    startIndex?: number,
+): WithParts | null => {
+    const start = startIndex ?? messages.length - 1
+    for (let i = start; i >= 0; i--) {
         const msg = messages[i]
         if (msg.info.role === "user" && !isIgnoredUserMessage(msg)) {
             return msg

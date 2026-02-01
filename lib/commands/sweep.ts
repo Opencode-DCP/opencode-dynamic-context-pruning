@@ -160,9 +160,8 @@ export async function handleSweepCommand(ctx: SweepCommandContext): Promise<void
     }
 
     // Filter out already-pruned tools, protected tools, and protected file paths
-    const existingPrunedSet = new Set(state.prune.toolIds)
     const newToolIds = toolIdsToSweep.filter((id) => {
-        if (existingPrunedSet.has(id)) {
+        if (state.prune.toolIds.has(id)) {
             return false
         }
         const entry = state.toolParameters.get(id)
@@ -213,7 +212,9 @@ export async function handleSweepCommand(ctx: SweepCommandContext): Promise<void
     }
 
     // Add to prune list
-    state.prune.toolIds.push(...newToolIds)
+    for (const id of newToolIds) {
+        state.prune.toolIds.add(id)
+    }
 
     // Calculate tokens saved
     const tokensSaved = calculateTokensSaved(state, messages, newToolIds)

@@ -26,6 +26,12 @@
             "default": "detailed",
             "description": "Level of notification shown when pruning occurs"
         },
+        "pruneNotificationType": {
+            "type": "string",
+            "enum": ["chat", "toast"],
+            "default": "chat",
+            "description": "Where to display prune notifications (chat message or toast notification)"
+        },
         "commands": {
             "type": "object",
             "description": "Configuration for DCP slash commands (/dcp)",
@@ -100,46 +106,54 @@
                             "items": {
                                 "type": "string"
                             },
-                            "default": [
-                                "task",
-                                "todowrite",
-                                "todoread",
-                                "discard",
-                                "extract",
-                                "batch",
-                                "write",
-                                "edit"
-                            ],
+                            "default": [],
                             "description": "Tool names that should be protected from automatic pruning"
                         }
                     }
                 },
-                "discard": {
+                "distill": {
                     "type": "object",
-                    "description": "Configuration for the discard tool",
+                    "description": "Configuration for the distill tool",
                     "additionalProperties": false,
                     "properties": {
                         "enabled": {
                             "type": "boolean",
                             "default": true,
-                            "description": "Enable the discard tool"
-                        }
-                    }
-                },
-                "extract": {
-                    "type": "object",
-                    "description": "Configuration for the extract tool",
-                    "additionalProperties": false,
-                    "properties": {
-                        "enabled": {
-                            "type": "boolean",
-                            "default": true,
-                            "description": "Enable the extract tool"
+                            "description": "Enable the distill tool"
                         },
                         "showDistillation": {
                             "type": "boolean",
                             "default": false,
                             "description": "Show distillation output in the UI"
+                        }
+                    }
+                },
+                "compress": {
+                    "type": "object",
+                    "description": "Configuration for the compress tool",
+                    "additionalProperties": false,
+                    "properties": {
+                        "enabled": {
+                            "type": "boolean",
+                            "default": true,
+                            "description": "Enable the compress tool"
+                        },
+                        "showCompression": {
+                            "type": "boolean",
+                            "default": true,
+                            "description": "Show summary output in the UI"
+                        }
+                    }
+                },
+                "prune": {
+                    "type": "object",
+                    "description": "Configuration for the prune tool",
+                    "additionalProperties": false,
+                    "properties": {
+                        "enabled": {
+                            "type": "boolean",
+                            "default": true,
+                            "description": "Enable the prune tool"
                         }
                     }
                 }
@@ -165,16 +179,7 @@
                             "items": {
                                 "type": "string"
                             },
-                            "default": [
-                                "task",
-                                "todowrite",
-                                "todoread",
-                                "discard",
-                                "extract",
-                                "batch",
-                                "write",
-                                "edit"
-                            ],
+                            "default": [],
                             "description": "Tool names excluded from deduplication"
                         }
                     }
@@ -211,16 +216,7 @@
                             "items": {
                                 "type": "string"
                             },
-                            "default": [
-                                "task",
-                                "todowrite",
-                                "todoread",
-                                "discard",
-                                "extract",
-                                "batch",
-                                "write",
-                                "edit"
-                            ],
+                            "default": [],
                             "description": "Tool names excluded from error purging"
                         }
                     }

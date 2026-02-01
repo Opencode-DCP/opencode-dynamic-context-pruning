@@ -21,6 +21,7 @@ export interface StatsCommandContext {
 function formatStatsMessage(
     sessionTokens: number,
     sessionTools: number,
+    sessionMessages: number,
     allTime: AggregatedStats,
 ): string {
     const lines: string[] = []
@@ -31,14 +32,16 @@ function formatStatsMessage(
     lines.push("")
     lines.push("Session:")
     lines.push("─".repeat(60))
-    lines.push(`  Tokens pruned: ~${formatTokenCount(sessionTokens)}`)
-    lines.push(`  Tools pruned:   ${sessionTools}`)
+    lines.push(`  Tokens pruned:   ~${formatTokenCount(sessionTokens)}`)
+    lines.push(`  Tools pruned:     ${sessionTools}`)
+    lines.push(`  Messages pruned:  ${sessionMessages}`)
     lines.push("")
     lines.push("All-time:")
     lines.push("─".repeat(60))
-    lines.push(`  Tokens saved:  ~${formatTokenCount(allTime.totalTokens)}`)
-    lines.push(`  Tools pruned:   ${allTime.totalTools}`)
-    lines.push(`  Sessions:       ${allTime.sessionCount}`)
+    lines.push(`  Tokens saved:    ~${formatTokenCount(allTime.totalTokens)}`)
+    lines.push(`  Tools pruned:     ${allTime.totalTools}`)
+    lines.push(`  Messages pruned:  ${allTime.totalMessages}`)
+    lines.push(`  Sessions:         ${allTime.sessionCount}`)
 
     return lines.join("\n")
 }
@@ -48,12 +51,13 @@ export async function handleStatsCommand(ctx: StatsCommandContext): Promise<void
 
     // Session stats from in-memory state
     const sessionTokens = state.stats.totalPruneTokens
-    const sessionTools = state.prune.toolIds.length
+    const sessionTools = state.prune.toolIds.size
+    const sessionMessages = state.prune.messageIds.size
 
     // All-time stats from storage files
     const allTime = await loadAllSessionStats(logger)
 
-    const message = formatStatsMessage(sessionTokens, sessionTools, allTime)
+    const message = formatStatsMessage(sessionTokens, sessionTools, sessionMessages, allTime)
 
     const params = getCurrentParams(state, messages, logger)
     await sendIgnoredMessage(client, sessionId, message, params, logger)
@@ -61,7 +65,9 @@ export async function handleStatsCommand(ctx: StatsCommandContext): Promise<void
     logger.info("Stats command executed", {
         sessionTokens,
         sessionTools,
+        sessionMessages,
         allTimeTokens: allTime.totalTokens,
         allTimeTools: allTime.totalTools,
+        allTimeMessages: allTime.totalMessages,
     })
 }

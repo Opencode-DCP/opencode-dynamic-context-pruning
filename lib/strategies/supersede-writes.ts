@@ -30,9 +30,7 @@ export const supersedeWrites = (
     }
 
     // Filter out IDs already pruned
-    const alreadyPruned = new Set(state.prune.toolIds)
-
-    const unprunedIds = allToolIds.filter((id) => !alreadyPruned.has(id))
+    const unprunedIds = allToolIds.filter((id) => !state.prune.toolIds.has(id))
     if (unprunedIds.length === 0) {
         return
     }
@@ -85,7 +83,7 @@ export const supersedeWrites = (
         // For each write, check if there's a read that comes after it
         for (const write of writes) {
             // Skip if already pruned
-            if (alreadyPruned.has(write.id)) {
+            if (state.prune.toolIds.has(write.id)) {
                 continue
             }
 
@@ -99,7 +97,9 @@ export const supersedeWrites = (
 
     if (newPruneIds.length > 0) {
         state.stats.totalPruneTokens += calculateTokensSaved(state, messages, newPruneIds)
-        state.prune.toolIds.push(...newPruneIds)
+        for (const id of newPruneIds) {
+            state.prune.toolIds.add(id)
+        }
         logger.debug(`Marked ${newPruneIds.length} superseded write tool calls for pruning`)
     }
 }

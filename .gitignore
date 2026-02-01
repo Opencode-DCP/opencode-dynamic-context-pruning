@@ -28,6 +28,9 @@ Thumbs.db
 # OpenCode
 .opencode/
 
+# Generated prompt files (from scripts/generate-prompts.ts)
+lib/prompts/*.generated.ts
+
 # Tests (local development only)
 tests/
 notes/
@@ -36,3 +39,5 @@ test-update.ts
 # Documentation (local development only)
 docs/
 SCHEMA_NOTES.md
+
+repomix-output.xml

@@ -30,8 +30,7 @@ export const purgeErrors = (
     }
 
     // Filter out IDs already pruned
-    const alreadyPruned = new Set(state.prune.toolIds)
-    const unprunedIds = allToolIds.filter((id) => !alreadyPruned.has(id))
+    const unprunedIds = allToolIds.filter((id) => !state.prune.toolIds.has(id))
 
     if (unprunedIds.length === 0) {
         return
@@ -72,7 +71,9 @@ export const purgeErrors = (
 
     if (newPruneIds.length > 0) {
         state.stats.totalPruneTokens += calculateTokensSaved(state, messages, newPruneIds)
-        state.prune.toolIds.push(...newPruneIds)
+        for (const id of newPruneIds) {
+            state.prune.toolIds.add(id)
+        }
         logger.debug(
             `Marked ${newPruneIds.length} error tool calls for pruning (older than ${turnThreshold} turns)`,
         )

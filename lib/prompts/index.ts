@@ -1,26 +1,44 @@
 // Tool specs
-import { DISCARD_TOOL_SPEC } from "./discard-tool-spec"
-import { EXTRACT_TOOL_SPEC } from "./extract-tool-spec"
+import { PRUNE_TOOL_SPEC } from "./prune-tool-spec"
+import { DISTILL_TOOL_SPEC } from "./distill-tool-spec"
+import { COMPRESS_TOOL_SPEC } from "./compress-tool-spec"
 
-// System prompts
-import { SYSTEM_PROMPT_BOTH } from "./system/both"
-import { SYSTEM_PROMPT_DISCARD } from "./system/discard"
-import { SYSTEM_PROMPT_EXTRACT } from "./system/extract"
+// Generated prompts (from .md files via scripts/generate-prompts.ts)
+import { SYSTEM as SYSTEM_PROMPT } from "./system.generated"
+import { NUDGE } from "./nudge.generated"
 
-// Nudge prompts
-import { NUDGE_BOTH } from "./nudge/both"
-import { NUDGE_DISCARD } from "./nudge/discard"
-import { NUDGE_EXTRACT } from "./nudge/extract"
+export interface ToolFlags {
+    distill: boolean
+    compress: boolean
+    prune: boolean
+}
+
+function processConditionals(template: string, flags: ToolFlags): string {
+    const tools = ["distill", "compress", "prune"] as const
+    let result = template
+    // Strip comments: // ... //
+    result = result.replace(/\/\/.*?\/\//g, "")
+    // Process tool conditionals
+    for (const tool of tools) {
+        const regex = new RegExp(`<${tool}>([\\s\\S]*?)</${tool}>`, "g")
+        result = result.replace(regex, (_, content) => (flags[tool] ? content : ""))
+    }
+    // Collapse multiple blank/whitespace-only lines to single blank line
+    return result.replace(/\n([ \t]*\n)+/g, "\n\n").trim()
+}
+
+export function renderSystemPrompt(flags: ToolFlags): string {
+    return processConditionals(SYSTEM_PROMPT, flags)
+}
+
+export function renderNudge(flags: ToolFlags): string {
+    return processConditionals(NUDGE, flags)
+}
 
 const PROMPTS: Record<string, string> = {
-    "discard-tool-spec": DISCARD_TOOL_SPEC,
-    "extract-tool-spec": EXTRACT_TOOL_SPEC,
-    "system/system-prompt-both": SYSTEM_PROMPT_BOTH,
-    "system/system-prompt-discard": SYSTEM_PROMPT_DISCARD,
-    "system/system-prompt-extract": SYSTEM_PROMPT_EXTRACT,
-    "nudge/nudge-both": NUDGE_BOTH,
-    "nudge/nudge-discard": NUDGE_DISCARD,
-    "nudge/nudge-extract": NUDGE_EXTRACT,
+    "prune-tool-spec": PRUNE_TOOL_SPEC,
+    "distill-tool-spec": DISTILL_TOOL_SPEC,
+    "compress-tool-spec": COMPRESS_TOOL_SPEC,
 }
 
 export function loadPrompt(name: string, vars?: Record<string, string>): string {

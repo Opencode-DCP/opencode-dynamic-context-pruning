@@ -9,13 +9,18 @@ export interface Deduplication {
     protectedTools: string[]
 }
 
-export interface DiscardTool {
+export interface PruneTool {
     enabled: boolean
 }
 
-export interface ExtractTool {
+export interface DistillTool {
     enabled: boolean
     showDistillation: boolean
+}
+
+export interface CompressTool {
+    enabled: boolean
+    showCompression: boolean
 }
 
 export interface ToolSettings {
@@ -26,8 +31,9 @@ export interface ToolSettings {
 
 export interface Tools {
     settings: ToolSettings
-    discard: DiscardTool
-    extract: ExtractTool
+    prune: PruneTool
+    distill: DistillTool
+    compress: CompressTool
 }
 
 export interface Commands {
@@ -54,6 +60,7 @@ export interface PluginConfig {
     enabled: boolean
     debug: boolean
     pruneNotification: "off" | "minimal" | "detailed"
+    pruneNotificationType: "chat" | "toast"
     commands: Commands
     turnProtection: TurnProtection
     protectedFilePatterns: string[]
@@ -69,11 +76,10 @@ const DEFAULT_PROTECTED_TOOLS = [
     "task",
     "todowrite",
     "todoread",
-    "discard",
-    "extract",
+    "prune",
+    "distill",
+    "compress",
     "batch",
-    "write",
-    "edit",
     "plan_enter",
     "plan_exit",
 ]
@@ -86,6 +92,7 @@ export const VALID_CONFIG_KEYS = new Set([
     "debug",
     "showUpdateToasts", // Deprecated but kept for backwards compatibility
     "pruneNotification",
+    "pruneNotificationType",
     "turnProtection",
     "turnProtection.enabled",
     "turnProtection.turns",
@@ -98,11 +105,14 @@ export const VALID_CONFIG_KEYS = new Set([
     "tools.settings.nudgeEnabled",
     "tools.settings.nudgeFrequency",
     "tools.settings.protectedTools",
-    "tools.discard",
-    "tools.discard.enabled",
-    "tools.extract",
-    "tools.extract.enabled",
-    "tools.extract.showDistillation",
+    "tools.prune",
+    "tools.prune.enabled",
+    "tools.distill",
+    "tools.distill.enabled",
+    "tools.distill.showDistillation",
+    "tools.compress",
+    "tools.compress.enabled",
+    "tools.compress.showCompression",
     "strategies",
     // strategies.deduplication
     "strategies.deduplication",
@@ -161,6 +171,17 @@ function validateConfigTypes(config: Record<string, any>): ValidationError[] {
                 key: "pruneNotification",
                 expected: '"off" | "minimal" | "detailed"',
                 actual: JSON.stringify(config.pruneNotification),
+            })
+        }
+    }
+
+    if (config.pruneNotificationType !== undefined) {
+        const validValues = ["chat", "toast"]
+        if (!validValues.includes(config.pruneNotificationType)) {
+            errors.push({
+                key: "pruneNotificationType",
+                expected: '"chat" | "toast"',
+                actual: JSON.stringify(config.pruneNotificationType),
             })
         }
     }
@@ -267,31 +288,53 @@ function validateConfigTypes(config: Record<string, any>): ValidationError[] {
                 })
             }
         }
-        if (tools.discard) {
-            if (tools.discard.enabled !== undefined && typeof tools.discard.enabled !== "boolean") {
+        if (tools.prune) {
+            if (tools.prune.enabled !== undefined && typeof tools.prune.enabled !== "boolean") {
                 errors.push({
-                    key: "tools.discard.enabled",
+                    key: "tools.prune.enabled",
                     expected: "boolean",
-                    actual: typeof tools.discard.enabled,
+                    actual: typeof tools.prune.enabled,
                 })
             }
         }
-        if (tools.extract) {
-            if (tools.extract.enabled !== undefined && typeof tools.extract.enabled !== "boolean") {
+        if (tools.distill) {
+            if (tools.distill.enabled !== undefined && typeof tools.distill.enabled !== "boolean") {
                 errors.push({
-                    key: "tools.extract.enabled",
+                    key: "tools.distill.enabled",
                     expected: "boolean",
-                    actual: typeof tools.extract.enabled,
+                    actual: typeof tools.distill.enabled,
                 })
             }
             if (
-                tools.extract.showDistillation !== undefined &&
-                typeof tools.extract.showDistillation !== "boolean"
+                tools.distill.showDistillation !== undefined &&
+                typeof tools.distill.showDistillation !== "boolean"
             ) {
                 errors.push({
-                    key: "tools.extract.showDistillation",
+                    key: "tools.distill.showDistillation",
                     expected: "boolean",
-                    actual: typeof tools.extract.showDistillation,
+                    actual: typeof tools.distill.showDistillation,
+                })
+            }
+        }
+        if (tools.compress) {
+            if (
+                tools.compress.enabled !== undefined &&
+                typeof tools.compress.enabled !== "boolean"
+            ) {
+                errors.push({
+                    key: "tools.compress.enabled",
+                    expected: "boolean",
+                    actual: typeof tools.compress.enabled,
+                })
+            }
+            if (
+                tools.compress.showCompression !== undefined &&
+                typeof tools.compress.showCompression !== "boolean"
+            ) {
+                errors.push({
+                    key: "tools.compress.showCompression",
+                    expected: "boolean",
+                    actual: typeof tools.compress.showCompression,
                 })
             }
         }
@@ -424,6 +467,7 @@ const defaultConfig: PluginConfig = {
     enabled: true,
     debug: false,
     pruneNotification: "detailed",
+    pruneNotificationType: "chat",
     commands: {
         enabled: true,
         protectedTools: [...DEFAULT_PROTECTED_TOOLS],
@@ -439,12 +483,16 @@ const defaultConfig: PluginConfig = {
             nudgeFrequency: 10,
             protectedTools: [...DEFAULT_PROTECTED_TOOLS],
         },
-        discard: {
+        prune: {
             enabled: true,
         },
-        extract: {
+        distill: {
             enabled: true,
             showDistillation: false,
+        },
+        compress: {
+            enabled: true,
+            showCompression: true,
         },
     },
     strategies: {
@@ -453,7 +501,7 @@ const defaultConfig: PluginConfig = {
             protectedTools: [],
         },
         supersedeWrites: {
-            enabled: false,
+            enabled: true,
         },
         purgeErrors: {
             enabled: true,
@@ -611,12 +659,16 @@ function mergeTools(
                 ]),
             ],
         },
-        discard: {
-            enabled: override.discard?.enabled ?? base.discard.enabled,
+        prune: {
+            enabled: override.prune?.enabled ?? base.prune.enabled,
         },
-        extract: {
-            enabled: override.extract?.enabled ?? base.extract.enabled,
-            showDistillation: override.extract?.showDistillation ?? base.extract.showDistillation,
+        distill: {
+            enabled: override.distill?.enabled ?? base.distill.enabled,
+            showDistillation: override.distill?.showDistillation ?? base.distill.showDistillation,
+        },
+        compress: {
+            enabled: override.compress?.enabled ?? base.compress.enabled,
+            showCompression: override.compress?.showCompression ?? base.compress.showCompression,
         },
     }
 }
@@ -647,8 +699,9 @@ function deepCloneConfig(config: PluginConfig): PluginConfig {
                 ...config.tools.settings,
                 protectedTools: [...config.tools.settings.protectedTools],
             },
-            discard: { ...config.tools.discard },
-            extract: { ...config.tools.extract },
+            prune: { ...config.tools.prune },
+            distill: { ...config.tools.distill },
+            compress: { ...config.tools.compress },
         },
         strategies: {
             deduplication: {
@@ -693,6 +746,8 @@ export function getConfig(ctx: PluginInput): PluginConfig {
                 enabled: result.data.enabled ?? config.enabled,
                 debug: result.data.debug ?? config.debug,
                 pruneNotification: result.data.pruneNotification ?? config.pruneNotification,
+                pruneNotificationType:
+                    result.data.pruneNotificationType ?? config.pruneNotificationType,
                 commands: mergeCommands(config.commands, result.data.commands as any),
                 turnProtection: {
                     enabled: result.data.turnProtection?.enabled ?? config.turnProtection.enabled,
@@ -736,6 +791,8 @@ export function getConfig(ctx: PluginInput): PluginConfig {
                 enabled: result.data.enabled ?? config.enabled,
                 debug: result.data.debug ?? config.debug,
                 pruneNotification: result.data.pruneNotification ?? config.pruneNotification,
+                pruneNotificationType:
+                    result.data.pruneNotificationType ?? config.pruneNotificationType,
                 commands: mergeCommands(config.commands, result.data.commands as any),
                 turnProtection: {
                     enabled: result.data.turnProtection?.enabled ?? config.turnProtection.enabled,
@@ -776,6 +833,8 @@ export function getConfig(ctx: PluginInput): PluginConfig {
                 enabled: result.data.enabled ?? config.enabled,
                 debug: result.data.debug ?? config.debug,
                 pruneNotification: result.data.pruneNotification ?? config.pruneNotification,
+                pruneNotificationType:
+                    result.data.pruneNotificationType ?? config.pruneNotificationType,
                 commands: mergeCommands(config.commands, result.data.commands as any),
                 turnProtection: {
                     enabled: result.data.turnProtection?.enabled ?? config.turnProtection.enabled,

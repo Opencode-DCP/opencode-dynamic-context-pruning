@@ -1,21 +1,23 @@
 {
     "$schema": "https://json.schemastore.org/package.json",
     "name": "@tarquinen/opencode-dcp",
-    "version": "1.2.8",
+    "version": "1.3.3-beta.0",
     "type": "module",
     "description": "OpenCode plugin that optimizes token usage by pruning obsolete tool outputs from conversation context",
     "main": "./dist/index.js",
     "types": "./dist/index.d.ts",
     "scripts": {
         "clean": "rm -rf dist",
+        "generate:prompts": "tsx scripts/generate-prompts.ts",
+        "prebuild": "npm run generate:prompts",
         "build": "npm run clean && tsc",
-        "postbuild": "rm -rf dist/logs",
         "prepublishOnly": "npm run build",
         "dev": "opencode plugin dev",
-        "typecheck": "tsc --noEmit",
+        "typecheck": "npm run generate:prompts && tsc --noEmit",
         "test": "node --import tsx --test tests/*.test.ts",
         "format": "prettier --write .",
-        "format:check": "prettier --check ."
+        "format:check": "prettier --check .",
+        "dcp": "tsx scripts/print.ts"
     },
     "keywords": [
         "opencode",
@@ -41,14 +43,15 @@
     },
     "dependencies": {
         "@anthropic-ai/tokenizer": "^0.0.4",
-        "@opencode-ai/sdk": "^1.1.3",
+        "@opencode-ai/sdk": "^1.1.48",
         "jsonc-parser": "^3.3.1",
-        "zod": "^4.1.13"
+        "ulid": "^3.0.2",
+        "zod": "^4.3.6"
     },
     "devDependencies": {
-        "@opencode-ai/plugin": "^1.0.143",
-        "@types/node": "^24.10.1",
-        "prettier": "^3.4.2",
+        "@opencode-ai/plugin": "^1.1.48",
+        "@types/node": "^25.1.0",
+        "prettier": "^3.8.1",
         "tsx": "^4.21.0",
         "typescript": "^5.9.3"
     },
