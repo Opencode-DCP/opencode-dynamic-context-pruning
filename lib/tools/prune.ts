@@ -6,6 +6,15 @@ import { loadPrompt } from "../prompts"
 
 const PRUNE_TOOL_DESCRIPTION = loadPrompt("prune-tool-spec")
 
+/**
+ * Creates a tool for pruning tool outputs from the conversation context.
+ *
+ * This tool allows LLMs to remove individual tool outputs that are no longer needed,
+ * such as irrelevant information, outdated data, or superseded outputs.
+ *
+ * @param ctx - The prune tool context containing logger and state
+ * @returns A configured tool instance for the OpenCode plugin
+ */
 export function createPruneTool(ctx: PruneToolContext): ReturnType<typeof tool> {
     return tool({
         description: PRUNE_TOOL_DESCRIPTION,

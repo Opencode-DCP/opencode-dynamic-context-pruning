@@ -15,38 +15,44 @@ import { sendCompressNotification } from "../ui/notification"
 
 const COMPRESS_TOOL_DESCRIPTION = loadPrompt("compress-tool-spec")
 
+/**
+ * Creates a tool for compressing contiguous ranges of conversation into summaries.
+ *
+ * This tool allows LLMs to collapse sequences of messages and tool outputs into
+ * concise topic+summary pairs, significantly reducing context size while preserving
+ * key information.
+ *
+ * @param ctx - The prune tool context containing client, state, and logger
+ * @returns A configured tool instance for the OpenCode plugin
+ */
 export function createCompressTool(ctx: PruneToolContext): ReturnType<typeof tool> {
     return tool({
         description: COMPRESS_TOOL_DESCRIPTION,
         args: {
-            input: tool.schema
-                .array(tool.schema.string())
-                .describe(
-                    "[startString, endString, topic, summary] - 4 required strings: (1) startString: unique text from conversation marking range start, (2) endString: unique text marking range end, (3) topic: short 3-5 word label for UI, (4) summary: comprehensive text replacing all compressed content",
-                ),
+            startMarker: tool.schema
+                .string()
+                .describe("Unique text from conversation marking the start of the range to compress"),
+            endMarker: tool.schema
+                .string()
+                .describe("Unique text from conversation marking the end of the range to compress"),
+            topic: tool.schema
+                .string()
+                .describe("Short label (3-5 words) describing the compressed content for UI"),
+            summary: tool.schema
+                .string()
+                .describe("Comprehensive text that will replace all compressed content"),
         },
         async execute(args, toolCtx) {
             const { client, state, logger } = ctx
             const sessionId = toolCtx.sessionID
 
-            if (!Array.isArray(args.input)) {
-                throw new Error(
-                    'input must be an array of 4 strings: ["startString", "endString", "topic", "summary"]',
-                )
-            }
-            if (args.input.length !== 4) {
-                throw new Error(
-                    `input must be an array of exactly 4 strings: ["startString", "endString", "topic", "summary"], got ${args.input.length} elements`,
-                )
-            }
+            const { startMarker, endMarker, topic, summary } = args
 
-            const [startString, endString, topic, summary] = args.input
-
-            if (!startString || typeof startString !== "string") {
-                throw new Error("startString is required and must be a non-empty string")
+            if (!startMarker || typeof startMarker !== "string") {
+                throw new Error("startMarker is required and must be a non-empty string")
             }
-            if (!endString || typeof endString !== "string") {
-                throw new Error("endString is required and must be a non-empty string")
+            if (!endMarker || typeof endMarker !== "string") {
+                throw new Error("endMarker is required and must be a non-empty string")
             }
             if (!topic || typeof topic !== "string") {
                 throw new Error("topic is required and must be a non-empty string")
@@ -56,14 +62,6 @@ export function createCompressTool(ctx: PruneToolContext): ReturnType<typeof too
             }
 
             logger.info("Compress tool invoked")
-            // logger.info(
-            //     JSON.stringify({
-            //         startString: startString?.substring(0, 50) + "...",
-            //         endString: endString?.substring(0, 50) + "...",
-            //         topic: topic,
-            //         summaryLength: summary?.length,
-            //     }),
-            // )
 
             const messagesResponse = await client.session.messages({
                 path: { id: sessionId },
@@ -74,14 +72,14 @@ export function createCompressTool(ctx: PruneToolContext): ReturnType<typeof too
 
             const startResult = findStringInMessages(
                 messages,
-                startString,
+                startMarker,
                 logger,
                 state.compressSummaries,
                 "startString",
             )
             const endResult = findStringInMessages(
                 messages,
-                endString,
+                endMarker,
                 logger,
                 state.compressSummaries,
                 "endString",
@@ -162,14 +160,6 @@ export function createCompressTool(ctx: PruneToolContext): ReturnType<typeof too
             state.stats.totalPruneTokens += state.stats.pruneTokenCounter
             state.stats.pruneTokenCounter = 0
             state.nudgeCounter = 0
-
-            // logger.info("Compress range created", {
-            //     startMessageId: startResult.messageId,
-            //     endMessageId: endResult.messageId,
-            //     toolIdsRemoved: containedToolIds.length,
-            //     messagesInRange: containedMessageIds.length,
-            //     estimatedTokens: estimatedCompressedTokens,
-            // })
 
             saveSessionState(state, logger).catch((err) =>
                 logger.error("Failed to persist state", { error: err.message }),

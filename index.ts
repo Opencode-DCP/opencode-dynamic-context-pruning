@@ -2,7 +2,7 @@ import type { Plugin } from "@opencode-ai/plugin"
 import { getConfig } from "./lib/config"
 import { Logger } from "./lib/logger"
 import { createSessionState } from "./lib/state"
-import { createPruneTool, createDistillTool, createCompressTool } from "./lib/strategies"
+import { createPruneTool, createDistillTool, createCompressTool } from "./lib/tools"
 import {
     createChatMessageTransformHandler,
     createCommandExecuteHandler,
