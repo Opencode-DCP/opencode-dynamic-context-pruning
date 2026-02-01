@@ -746,7 +746,8 @@ export function getConfig(ctx: PluginInput): PluginConfig {
                 enabled: result.data.enabled ?? config.enabled,
                 debug: result.data.debug ?? config.debug,
                 pruneNotification: result.data.pruneNotification ?? config.pruneNotification,
-                pruneNotificationType: result.data.pruneNotificationType ?? config.pruneNotificationType,
+                pruneNotificationType:
+                    result.data.pruneNotificationType ?? config.pruneNotificationType,
                 commands: mergeCommands(config.commands, result.data.commands as any),
                 turnProtection: {
                     enabled: result.data.turnProtection?.enabled ?? config.turnProtection.enabled,
@@ -790,7 +791,8 @@ export function getConfig(ctx: PluginInput): PluginConfig {
                 enabled: result.data.enabled ?? config.enabled,
                 debug: result.data.debug ?? config.debug,
                 pruneNotification: result.data.pruneNotification ?? config.pruneNotification,
-                pruneNotificationType: result.data.pruneNotificationType ?? config.pruneNotificationType,
+                pruneNotificationType:
+                    result.data.pruneNotificationType ?? config.pruneNotificationType,
                 commands: mergeCommands(config.commands, result.data.commands as any),
                 turnProtection: {
                     enabled: result.data.turnProtection?.enabled ?? config.turnProtection.enabled,
@@ -831,7 +833,8 @@ export function getConfig(ctx: PluginInput): PluginConfig {
                 enabled: result.data.enabled ?? config.enabled,
                 debug: result.data.debug ?? config.debug,
                 pruneNotification: result.data.pruneNotification ?? config.pruneNotification,
-                pruneNotificationType: result.data.pruneNotificationType ?? config.pruneNotificationType,
+                pruneNotificationType:
+                    result.data.pruneNotificationType ?? config.pruneNotificationType,
                 commands: mergeCommands(config.commands, result.data.commands as any),
                 turnProtection: {
                     enabled: result.data.turnProtection?.enabled ?? config.turnProtection.enabled,

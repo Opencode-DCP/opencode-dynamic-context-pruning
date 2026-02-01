@@ -83,7 +83,10 @@ function truncateToastSummary(summary: string, maxChars: number = TOAST_SUMMARY_
     return summary.slice(0, maxChars - 3) + "..."
 }
 
-function truncateExtractedSection(message: string, maxChars: number = TOAST_SUMMARY_MAX_CHARS): string {
+function truncateExtractedSection(
+    message: string,
+    maxChars: number = TOAST_SUMMARY_MAX_CHARS,
+): string {
     const marker = "\n\n▣ Extracted"
     const index = message.indexOf(marker)
     if (index === -1) {
