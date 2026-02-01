@@ -1,15 +1,14 @@
 <system-reminder>
 <instruction name=context_management_protocol policy_level=critical>
+You operate a context-constrained environment and MUST PROACTIVELY MANAGE IT TO AVOID CONTEXT ROT. Efficient context management is CRITICAL to maintaining performance and ensuring successful task completion.
 
-ENVIRONMENT
-You are operating in a context-constrained environment and must proactively manage your context window. The environment calls the `context_info` tool to provide an up-to-date <prunable-tools> list after each turn. Use this information when deciding what to prune.
+AVAILABLE TOOLS FOR CONTEXT MANAGEMENT
+<distill>`distill`: condense key findings from tool calls into high-fidelity distillation to preserve gained insights. Use to extract valuable knowledge to the user's request. BE THOROUGH, your distillation MUST be high-signal, low noise and complete, such that the raw tool output is no longer needed.</distill>
+<compress>`compress`: squash contiguous portion of the conversation and replace it with a low level technical summary. Use to filter noise from the conversation and retain purified understanding. Compress conversation phases ORGANICALLY as they get completed, think micro, not macro. Do not be cheap with that low level technical summary and BE MINDFUL of specifics that must be crystallized to retain UNAMBIGUOUS full picture.</compress>
+<prune>`prune`: remove individual tool calls that are noise, irrelevant, or superseded. No preservation of content. DO NOT let irrelevant tool calls accumulate. DO NOT PRUNE TOOL OUTPUTS THAT YOU MAY NEED LATER</prune>
 
-IMPORTANT: The `context_info` tool is only available to the environment - you do not have access to it and must not attempt to call it.
-
-AVAILABLE TOOLS
-<prune>`prune`: Remove individual tool outputs that are noise, irrelevant, or superseded. No preservation of content.</prune>
-<distill>`distill`: Distill key findings from individual tool outputs into preserved knowledge. Use when you need to preserve valuable technical details.</distill>
-<compress>`compress`: Collapse a contiguous range of conversation (completed phases) into a single summary.</compress>
+// **🡇 add an <any></any> tag for conditionals 🡇** //
+AVOID CONTEXT ROT - EVALUATE YOUR CONTEXT AND MANAGE REGULARLY. AVOID USING MANAGEMENT TOOLS AS THE ONLY TOOL CALLS IN YOUR RESPONSE, PARALLELIZE WITH OTHER RELEVANT TOOLS TO YOUR TASK CONTINUATION (read, edit, bash...)
 
 PRUNE METHODICALLY - BATCH YOUR ACTIONS
 Every tool call adds to your context debt. You MUST pay this down regularly and be on top of context accumulation by pruning. Batch your prunes for efficiency; it is rarely worth pruning a single tiny tool output unless it is pure noise. Evaluate what SHOULD be pruned before jumping the gun.
@@ -47,8 +46,8 @@ You WILL evaluate distilling when ANY of these are true:
   </distill>
   <compress>
   WHEN TO COMPRESS
-- **Phase Completion:** When a phase is complete, condense the entire sequence (research, tool calls, implementation) into a summary.
-- **Exploration Done:** When you've explored multiple files or ran multiple commands and only need a summary of findings.
+- Phase Completion: When a phase is complete, condense the entire sequence (research, tool calls, implementation) into a summary.
+- Exploration Done: When you've explored multiple files or ran multiple commands and only need a summary of findings.
 
 You WILL evaluate compressing when ANY of these are true:
 
@@ -69,6 +68,10 @@ There may be tools in session context that do not appear in the <prunable-tools>
 
 <instruction name=injected_context_handling policy_level=critical>
 After each turn, the environment injects a synthetic message containing a <prunable-tools> list and optional nudge instruction. You do not have access to this mechanism.
+
+The environment calls the `context_info` tool to provide an up-to-date <prunable-tools> list after each turn. Use this information when deciding what to prune.
+
+IMPORTANT: The `context_info` tool is only available to the environment - you do not have access to it and must not attempt to call it.
 
 CRITICAL REQUIREMENTS - VIOLATION IS UNACCEPTABLE:
 
