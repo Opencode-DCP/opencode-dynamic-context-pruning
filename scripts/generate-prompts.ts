@@ -9,7 +9,7 @@
  * .ts files with exported string constants that bundle correctly.
  */
 
-import { readFileSync, writeFileSync, readdirSync, mkdirSync } from "node:fs"
+import { readFileSync, writeFileSync, readdirSync, mkdirSync, unlinkSync } from "node:fs"
 import { dirname, join, basename } from "node:path"
 import { fileURLToPath } from "node:url"
 
@@ -19,6 +19,13 @@ const CODEGEN_DIR = join(PROMPTS_DIR, "_codegen")
 
 // Ensure _codegen directory exists
 mkdirSync(CODEGEN_DIR, { recursive: true })
+
+// MIGRATION - Clean up old generated files from the prompts directory root (they're now in _codegen/)
+const oldGeneratedFiles = readdirSync(PROMPTS_DIR).filter((f) => f.endsWith(".generated.ts"))
+for (const file of oldGeneratedFiles) {
+    unlinkSync(join(PROMPTS_DIR, file))
+    console.log(`Cleaned up old: ${file}`)
+}
 
 // Find all .md files in the prompts directory
 const mdFiles = readdirSync(PROMPTS_DIR).filter((f) => f.endsWith(".md"))
