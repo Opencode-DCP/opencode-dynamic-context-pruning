@@ -9,8 +9,9 @@ export class Logger {
 
     constructor(enabled: boolean) {
         this.enabled = enabled
-        const opencodeConfigDir = join(homedir(), ".config", "opencode")
-        this.logDir = join(opencodeConfigDir, "logs", "dcp")
+        const dataHome =
+            process.env.XDG_DATA_HOME || join(homedir(), ".local", "share")
+        this.logDir = join(dataHome, "opencode", "logs", "dcp")
     }
 
     private async ensureLogDir() {

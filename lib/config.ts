@@ -526,7 +526,9 @@ const defaultConfig: PluginConfig = {
     },
 }
 
-const GLOBAL_CONFIG_DIR = join(homedir(), ".config", "opencode")
+const GLOBAL_CONFIG_DIR = process.env.XDG_CONFIG_HOME
+    ? join(process.env.XDG_CONFIG_HOME, "opencode")
+    : join(homedir(), ".config", "opencode")
 const GLOBAL_CONFIG_PATH_JSONC = join(GLOBAL_CONFIG_DIR, "dcp.jsonc")
 const GLOBAL_CONFIG_PATH_JSON = join(GLOBAL_CONFIG_DIR, "dcp.json")
 
