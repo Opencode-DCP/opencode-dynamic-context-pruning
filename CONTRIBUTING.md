@@ -4,12 +4,11 @@ Thank you for your interest in contributing to Dynamic Context Pruning (DCP)!
 
 ## License and Contributor License Agreement (CLA)
 
-By contributing to this project, you agree that:
+This project uses the **GNU Affero General Public License v3.0 (AGPL-3.0)**. 
 
-1.  Your contributions are licensed under the **GNU Affero General Public License v3.0 (AGPL-3.0)**.
-2.  You grant the project maintainer(s) a non-exclusive, perpetual, worldwide, royalty-free license to use, modify, and re-license your contributions under any terms they choose, including commercial or proprietary licenses.
+To maintain the project's sustainability, we require contributors to sign a **Contributor License Agreement (CLA)**. We use the standard **SAP Individual Contributor License Agreement**, which allows us to keep the project open-source while preserving the ability to offer commercial licenses to organizations that cannot comply with the AGPL-3.0.
 
-This "Dual Licensing" model allows the project to remain free and open source while providing a path for commercial sustainability by offering alternative licensing arrangements to corporations.
+When you open a Pull Request, the **[CLA Assistant](https://cla-assistant.io/)** bot will automatically ask you to sign the agreement if you haven't already.
 
 ## Getting Started
 
