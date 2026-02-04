@@ -12,7 +12,7 @@ import {
     formatContextHeader,
     type ContextInfo,
 } from "./utils"
-import { getFilePathFromParameters, isProtectedFilePath } from "../protected-file-patterns"
+import { getFilePathsFromParameters, isProtected } from "../protected-file-patterns"
 import { getLastUserMessage, isMessageCompacted } from "../shared-utils"
 import { getCurrentTokenUsage } from "../strategies/utils"
 
@@ -101,8 +101,11 @@ const buildPrunableToolsList = (
             return
         }
 
-        const filePath = getFilePathFromParameters(toolParameterEntry.parameters)
-        if (isProtectedFilePath(filePath, config.protectedFilePatterns)) {
+        const filePaths = getFilePathsFromParameters(
+            toolParameterEntry.tool,
+            toolParameterEntry.parameters,
+        )
+        if (isProtected(filePaths, config.protectedFilePatterns)) {
             return
         }
 

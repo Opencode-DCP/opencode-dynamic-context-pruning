@@ -2,7 +2,7 @@ import { PluginConfig } from "../config"
 import { Logger } from "../logger"
 import type { SessionState, WithParts } from "../state"
 import { buildToolIdList } from "../messages/utils"
-import { getFilePathFromParameters, isProtectedFilePath } from "../protected-file-patterns"
+import { getFilePathsFromParameters, isProtected } from "../protected-file-patterns"
 import { calculateTokensSaved } from "./utils"
 
 /**
@@ -50,8 +50,8 @@ export const deduplicate = (
             continue
         }
 
-        const filePath = getFilePathFromParameters(metadata.parameters)
-        if (isProtectedFilePath(filePath, config.protectedFilePatterns)) {
+        const filePaths = getFilePathsFromParameters(metadata.tool, metadata.parameters)
+        if (isProtected(filePaths, config.protectedFilePatterns)) {
             continue
         }
 

@@ -134,11 +134,26 @@ export const extractParameterKey = (tool: string, parameters: any): string => {
         }
         return parameters.filePath
     }
-    if (tool === "write" && parameters.filePath) {
+    if ((tool === "write" || tool === "edit" || tool === "multiedit") && parameters.filePath) {
         return parameters.filePath
     }
-    if (tool === "edit" && parameters.filePath) {
-        return parameters.filePath
+
+    if (tool === "apply_patch" && typeof parameters.patchText === "string") {
+        const pathRegex = /\*\*\* (?:Add|Delete|Update) File: ([^\n\r]+)/g
+        const paths: string[] = []
+        let match
+        while ((match = pathRegex.exec(parameters.patchText)) !== null) {
+            paths.push(match[1].trim())
+        }
+        if (paths.length > 0) {
+            const uniquePaths = [...new Set(paths)]
+            const count = uniquePaths.length
+            const plural = count > 1 ? "s" : ""
+            if (count === 1) return uniquePaths[0]
+            if (count === 2) return uniquePaths.join(", ")
+            return `${count} file${plural}: ${uniquePaths[0]}, ${uniquePaths[1]}...`
+        }
+        return "patch"
     }
 
     if (tool === "list") {

@@ -9,7 +9,7 @@ import { formatPruningResultForTool } from "../ui/utils"
 import { ensureSessionInitialized } from "../state"
 import { saveSessionState } from "../state/persistence"
 import { calculateTokensSaved, getCurrentParams } from "../strategies/utils"
-import { getFilePathFromParameters, isProtectedFilePath } from "../protected-file-patterns"
+import { getFilePathsFromParameters, isProtected } from "../protected-file-patterns"
 
 // Shared logic for executing prune operations.
 export async function executePruneOperation(
@@ -91,13 +91,13 @@ export async function executePruneOperation(
             continue
         }
 
-        const filePath = getFilePathFromParameters(metadata.parameters)
-        if (isProtectedFilePath(filePath, config.protectedFilePatterns)) {
+        const filePaths = getFilePathsFromParameters(metadata.tool, metadata.parameters)
+        if (isProtected(filePaths, config.protectedFilePatterns)) {
             logger.debug("Rejecting prune request - protected file path", {
                 index,
                 id,
                 tool: metadata.tool,
-                filePath,
+                filePaths,
             })
             skippedIds.push(index.toString())
             continue

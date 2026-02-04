@@ -65,18 +65,49 @@ export function matchesGlob(inputPath: string, pattern: string): boolean {
     return new RegExp(regex).test(input)
 }
 
-export function getFilePathFromParameters(parameters: unknown): string | undefined {
+export function getFilePathsFromParameters(tool: string, parameters: unknown): string[] {
     if (typeof parameters !== "object" || parameters === null) {
-        return undefined
+        return []
     }
 
-    const filePath = (parameters as Record<string, unknown>).filePath
-    return typeof filePath === "string" && filePath.length > 0 ? filePath : undefined
+    const paths: string[] = []
+    const params = parameters as Record<string, any>
+
+    // 1. apply_patch uses patchText with embedded paths
+    if (tool === "apply_patch" && typeof params.patchText === "string") {
+        const pathRegex = /\*\*\* (?:Add|Delete|Update) File: ([^\n\r]+)/g
+        let match
+        while ((match = pathRegex.exec(params.patchText)) !== null) {
+            paths.push(match[1].trim())
+        }
+    }
+
+    // 2. multiedit uses top-level filePath and nested edits array
+    if (tool === "multiedit") {
+        if (typeof params.filePath === "string") {
+            paths.push(params.filePath)
+        }
+        if (Array.isArray(params.edits)) {
+            for (const edit of params.edits) {
+                if (edit && typeof edit.filePath === "string") {
+                    paths.push(edit.filePath)
+                }
+            }
+        }
+    }
+
+    // 3. Default check for common filePath parameter (read, write, edit, etc)
+    if (typeof params.filePath === "string") {
+        paths.push(params.filePath)
+    }
+
+    // Return unique non-empty paths
+    return [...new Set(paths)].filter((p) => p.length > 0)
 }
 
-export function isProtectedFilePath(filePath: string | undefined, patterns: string[]): boolean {
-    if (!filePath) return false
+export function isProtected(filePaths: string[], patterns: string[]): boolean {
+    if (!filePaths || filePaths.length === 0) return false
     if (!patterns || patterns.length === 0) return false
 
-    return patterns.some((pattern) => matchesGlob(filePath, pattern))
+    return filePaths.some((path) => patterns.some((pattern) => matchesGlob(path, pattern)))
 }
