@@ -121,6 +121,11 @@
                                     "pattern": "^\\d+(?:\\.\\d+)?%$"
                                 }
                             ]
+                        },
+                        "contextLimitFallback": {
+                            "description": "Fallback token limit when model context window is unknown and percentage-based contextLimit is used (defaults to 100000)",
+                            "type": "number",
+                            "default": 100000
                         }
                     }
                 },

@@ -28,6 +28,7 @@ export interface ToolSettings {
     nudgeFrequency: number
     protectedTools: string[]
     contextLimit: number | `${number}%`
+    contextLimitFallback?: number
 }
 
 export interface Tools {
@@ -107,6 +108,7 @@ export const VALID_CONFIG_KEYS = new Set([
     "tools.settings.nudgeFrequency",
     "tools.settings.protectedTools",
     "tools.settings.contextLimit",
+    "tools.settings.contextLimitFallback",
     "tools.distill",
     "tools.distill.permission",
     "tools.distill.showDistillation",
@@ -300,6 +302,15 @@ function validateConfigTypes(config: Record<string, any>): ValidationError[] {
                         key: "tools.settings.contextLimit",
                         expected: 'number | "${number}%"',
                         actual: JSON.stringify(tools.settings.contextLimit),
+                    })
+                }
+            }
+            if (tools.settings.contextLimitFallback !== undefined) {
+                if (typeof tools.settings.contextLimitFallback !== "number") {
+                    errors.push({
+                        key: "tools.settings.contextLimitFallback",
+                        expected: "number",
+                        actual: typeof tools.settings.contextLimitFallback,
                     })
                 }
             }
@@ -684,6 +695,8 @@ function mergeTools(
                 ]),
             ],
             contextLimit: override.settings?.contextLimit ?? base.settings.contextLimit,
+            contextLimitFallback:
+                override.settings?.contextLimitFallback ?? base.settings.contextLimitFallback,
         },
         distill: {
             permission: override.distill?.permission ?? base.distill.permission,
