@@ -68,11 +68,14 @@ Context management was just performed. Do NOT use the ${toolName} again. A fresh
 
 const resolveContextLimit = (config: PluginConfig, state: SessionState): number | undefined => {
     const configLimit = config.tools.settings.contextLimit
+    const contextLimitFallback = config.tools.settings.contextLimitFallback
+    const DEFAULT_FALLBACK = 100_000 // 100k tokens hardcoded fallback
 
     if (typeof configLimit === "string") {
         if (configLimit.endsWith("%")) {
             if (state.modelContextLimit === undefined) {
-                return undefined
+                const fallback = contextLimitFallback ?? DEFAULT_FALLBACK
+                return parsePercentageString(configLimit, fallback)
             }
             return parsePercentageString(configLimit, state.modelContextLimit)
         }
