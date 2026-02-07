@@ -61,6 +61,8 @@ LLM providers like Anthropic and OpenAI cache prompts based on exact prefix matc
 
 **Claude Subscriptions:** Anthropic subscription users (who receive "free" caching) may experience faster limit depletion than hit-rate ratios suggest due to the higher relative cost of cache misses. See [Claude Cache Limits](https://she-llac.com/claude-limits) for details.
 
+> **Important:** DCP is designed for the TUI (terminal) version of OpenCode. It auto-disables on Desktop/Web clients (see [Known Issues](#known-issues)).
+
 ## Configuration
 
 DCP uses its own config file:
@@ -180,6 +182,25 @@ Defaults → Global (`~/.config/opencode/dcp.jsonc`) → Config Dir (`$OPENCODE_
 Each level overrides the previous, so project settings take priority over config-dir and global, which take priority over defaults.
 
 Restart OpenCode after making config changes.
+
+## Known Issues
+
+### Desktop / Web App Incompatibility
+
+DCP is currently incompatible with OpenCode's desktop and web clients. This is a known issue tracked in [Issue #304](https://github.com/Opencode-DCP/opencode-dynamic-context-pruning/issues/304).
+
+**Symptoms on Desktop/Web:**
+
+- `/dcp` commands fail with errors
+- `discard` and `extract` tools fail
+- Pruning notifications don't display correctly
+
+**Solution:**
+
+- DCP automatically detects when running on Desktop/Web and auto-disables itself with a console message
+- Use the TUI version of OpenCode for full DCP functionality
+
+**Status:** The plugin is designed for TUI usage only. Desktop/Web clients have breaking changes in their `@opencode-ai/plugin` implementation that haven't been addressed yet.
 
 ## Limitations
 
