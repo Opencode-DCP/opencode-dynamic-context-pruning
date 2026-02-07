@@ -24,7 +24,7 @@ export const prune = (
 }
 
 const pruneFullTool = (state: SessionState, logger: Logger, messages: WithParts[]): void => {
-    const messagesToRemove: string[] = []
+    let prunedCount = 0
 
     for (const msg of messages) {
         if (isMessageCompacted(state, msg)) {
@@ -32,7 +32,6 @@ const pruneFullTool = (state: SessionState, logger: Logger, messages: WithParts[
         }
 
         const parts = Array.isArray(msg.parts) ? msg.parts : []
-        const partsToRemove: string[] = []
 
         for (const part of parts) {
             if (part.type !== "tool") {
@@ -45,26 +44,27 @@ const pruneFullTool = (state: SessionState, logger: Logger, messages: WithParts[
                 continue
             }
 
-            partsToRemove.push(part.callID)
-        }
+            // Instead of removing the tool part entirely (which breaks Claude's
+            // tool_use/tool_result pairing in VALIDATED mode), replace the content
+            // with a placeholder. This preserves the tool part structure so the
+            // model-level conversion still generates matched functionCall/functionResponse pairs.
+            if (part.state?.input && typeof part.state.input === "object") {
+                for (const key of Object.keys(part.state.input)) {
+                    if (typeof part.state.input[key] === "string") {
+                        part.state.input[key] = PRUNED_TOOL_ERROR_INPUT_REPLACEMENT
+                    }
+                }
+            }
+            if (part.state?.status === "completed") {
+                part.state.output = PRUNED_TOOL_OUTPUT_REPLACEMENT
+            }
 
-        if (partsToRemove.length === 0) {
-            continue
-        }
-
-        msg.parts = parts.filter(
-            (part) => part.type !== "tool" || !partsToRemove.includes(part.callID),
-        )
-
-        if (msg.parts.length === 0) {
-            messagesToRemove.push(msg.info.id)
+            prunedCount++
         }
     }
 
-    if (messagesToRemove.length > 0) {
-        const result = messages.filter((msg) => !messagesToRemove.includes(msg.info.id))
-        messages.length = 0
-        messages.push(...result)
+    if (prunedCount > 0) {
+        logger.info(`Pruned content for ${prunedCount} edit/write tool parts`)
     }
 }
 
