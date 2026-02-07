@@ -28,6 +28,7 @@ export interface ToolSettings {
     nudgeFrequency: number
     protectedTools: string[]
     contextLimit: number | `${number}%`
+    modelLimits?: Record<string, number | `${number}%`>
 }
 
 export interface Tools {
@@ -107,6 +108,7 @@ export const VALID_CONFIG_KEYS = new Set([
     "tools.settings.nudgeFrequency",
     "tools.settings.protectedTools",
     "tools.settings.contextLimit",
+    "tools.settings.modelLimits",
     "tools.distill",
     "tools.distill.permission",
     "tools.distill.showDistillation",
@@ -136,6 +138,12 @@ function getConfigKeyPaths(obj: Record<string, any>, prefix = ""): string[] {
     for (const key of Object.keys(obj)) {
         const fullKey = prefix ? `${prefix}.${key}` : key
         keys.push(fullKey)
+
+        // modelLimits is a dynamic map keyed by model ID; do not recurse into arbitrary IDs.
+        if (fullKey === "tools.settings.modelLimits") {
+            continue
+        }
+
         if (obj[key] && typeof obj[key] === "object" && !Array.isArray(obj[key])) {
             keys.push(...getConfigKeyPaths(obj[key], fullKey))
         }
@@ -156,7 +164,7 @@ interface ValidationError {
     actual: string
 }
 
-function validateConfigTypes(config: Record<string, any>): ValidationError[] {
+export function validateConfigTypes(config: Record<string, any>): ValidationError[] {
     const errors: ValidationError[] = []
 
     // Top-level validators
@@ -303,9 +311,32 @@ function validateConfigTypes(config: Record<string, any>): ValidationError[] {
                     })
                 }
             }
-        }
-        if (tools.distill) {
-            if (tools.distill.permission !== undefined) {
+            if (tools.settings.modelLimits !== undefined) {
+                if (
+                    typeof tools.settings.modelLimits !== "object" ||
+                    Array.isArray(tools.settings.modelLimits)
+                ) {
+                    errors.push({
+                        key: "tools.settings.modelLimits",
+                        expected: "Record<string, number | ${number}%>",
+                        actual: typeof tools.settings.modelLimits,
+                    })
+                } else {
+                    for (const [modelId, limit] of Object.entries(tools.settings.modelLimits)) {
+                        const isValidNumber = typeof limit === "number"
+                        const isPercentString =
+                            typeof limit === "string" && /^\d+(?:\.\d+)?%$/.test(limit)
+                        if (!isValidNumber && !isPercentString) {
+                            errors.push({
+                                key: `tools.settings.modelLimits.${modelId}`,
+                                expected: 'number | "${number}%"',
+                                actual: JSON.stringify(limit),
+                            })
+                        }
+                    }
+                }
+            }
+            if (tools.distill?.permission !== undefined) {
                 const validValues = ["ask", "allow", "deny"]
                 if (!validValues.includes(tools.distill.permission)) {
                     errors.push({
@@ -316,7 +347,7 @@ function validateConfigTypes(config: Record<string, any>): ValidationError[] {
                 }
             }
             if (
-                tools.distill.showDistillation !== undefined &&
+                tools.distill?.showDistillation !== undefined &&
                 typeof tools.distill.showDistillation !== "boolean"
             ) {
                 errors.push({
@@ -684,6 +715,7 @@ function mergeTools(
                 ]),
             ],
             contextLimit: override.settings?.contextLimit ?? base.settings.contextLimit,
+            modelLimits: override.settings?.modelLimits ?? base.settings.modelLimits,
         },
         distill: {
             permission: override.distill?.permission ?? base.distill.permission,
@@ -724,6 +756,7 @@ function deepCloneConfig(config: PluginConfig): PluginConfig {
             settings: {
                 ...config.tools.settings,
                 protectedTools: [...config.tools.settings.protectedTools],
+                modelLimits: { ...config.tools.settings.modelLimits },
             },
             distill: { ...config.tools.distill },
             compress: { ...config.tools.compress },

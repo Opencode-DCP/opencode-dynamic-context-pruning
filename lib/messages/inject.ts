@@ -27,6 +27,48 @@ function parsePercentageString(value: string, total: number): number | undefined
     return Math.round((clampedPercent / 100) * total)
 }
 
+const escapeRegex = (value: string): string => {
+    return value.replace(/[.+?^${}()|[\]\\]/g, "\\$&")
+}
+
+const wildcardPatternToRegex = (pattern: string): RegExp => {
+    const escapedPattern = escapeRegex(pattern)
+    const regexPattern = escapedPattern.replace(/\*/g, ".*")
+    return new RegExp(`^${regexPattern}$`)
+}
+
+const wildcardSpecificity = (pattern: string): number => {
+    return pattern.replace(/\*/g, "").length
+}
+
+export const findModelLimit = (
+    modelId: string,
+    modelLimits: Record<string, number | `${number}%`>,
+): number | `${number}%` | undefined => {
+    const exactMatch = modelLimits[modelId]
+    if (exactMatch !== undefined) {
+        return exactMatch
+    }
+
+    const wildcardMatches = Object.entries(modelLimits)
+        .filter(([pattern]) => pattern.includes("*"))
+        .filter(([pattern]) => wildcardPatternToRegex(pattern).test(modelId))
+
+    if (wildcardMatches.length === 0) {
+        return undefined
+    }
+
+    wildcardMatches.sort(([leftPattern], [rightPattern]) => {
+        const specificityDiff = wildcardSpecificity(rightPattern) - wildcardSpecificity(leftPattern)
+        if (specificityDiff !== 0) {
+            return specificityDiff
+        }
+        return leftPattern.localeCompare(rightPattern)
+    })
+
+    return wildcardMatches[0][1]
+}
+
 // XML wrappers
 export const wrapPrunableTools = (content: string): string => {
     return `<prunable-tools>
@@ -66,21 +108,41 @@ Context management was just performed. Do NOT use the ${toolName} again. A fresh
 </context-info>`
 }
 
-const resolveContextLimit = (config: PluginConfig, state: SessionState): number | undefined => {
-    const configLimit = config.tools.settings.contextLimit
+const resolveContextLimit = (
+    config: PluginConfig,
+    state: SessionState,
+    messages: WithParts[],
+): number | undefined => {
+    const { settings } = config.tools
+    const { modelLimits, contextLimit } = settings
 
-    if (typeof configLimit === "string") {
-        if (configLimit.endsWith("%")) {
+    if (modelLimits) {
+        const userMsg = getLastUserMessage(messages)
+        const modelId = userMsg ? (userMsg.info as UserMessage).model.modelID : undefined
+        const limit = modelId !== undefined ? findModelLimit(modelId, modelLimits) : undefined
+
+        if (limit !== undefined) {
+            if (typeof limit === "string" && limit.endsWith("%")) {
+                if (state.modelContextLimit === undefined) {
+                    return undefined
+                }
+                return parsePercentageString(limit, state.modelContextLimit)
+            }
+            return typeof limit === "number" ? limit : undefined
+        }
+    }
+
+    if (typeof contextLimit === "string") {
+        if (contextLimit.endsWith("%")) {
             if (state.modelContextLimit === undefined) {
                 return undefined
             }
-            return parsePercentageString(configLimit, state.modelContextLimit)
+            return parsePercentageString(contextLimit, state.modelContextLimit)
         }
-
         return undefined
     }
 
-    return configLimit
+    return contextLimit
 }
 
 const shouldInjectCompressNudge = (
@@ -92,7 +154,7 @@ const shouldInjectCompressNudge = (
         return false
     }
 
-    const contextLimit = resolveContextLimit(config, state)
+    const contextLimit = resolveContextLimit(config, state, messages)
     if (contextLimit === undefined) {
         return false
     }
