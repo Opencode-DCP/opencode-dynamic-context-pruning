@@ -110,6 +110,11 @@ DCP uses its own config file:
 >             "contextLimit": 100000,
 >             // Additional tools to protect from pruning
 >             "protectedTools": [],
+>             // Model name patterns that should use text parts instead of tool parts
+>             // for DCP context injection. Prevents 400 errors with providers that use
+>             // strict tool call/result pairing (e.g., Antigravity Claude models).
+>             // Uses case-insensitive substring matching against the model ID.
+>             "textPartModels": ["antigravity-claude"],
 >         },
 >         // Distills key findings into preserved knowledge before removing raw content
 >         "distill": {

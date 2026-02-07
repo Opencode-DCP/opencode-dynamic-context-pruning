@@ -253,13 +253,19 @@ export const insertPruneToolContext = (
 
     // When following a user message, append a synthetic text part since models like Claude
     // expect assistant turns to start with reasoning parts which cannot be easily faked.
+    // For models listed in textPartModels, always use text parts to avoid tool pairing issues.
     // For all other cases, append a synthetic tool part to the last message which works
     // across all models without disrupting their behavior.
-    if (lastNonIgnoredMessage.info.role === "user") {
+    const modelID = userInfo.model?.modelID || ""
+    const lowerModelID = modelID.toLowerCase()
+    const useTextPart = config.tools.settings.textPartModels.some(
+        (pattern) => lowerModelID.includes(pattern.toLowerCase()),
+    )
+
+    if (lastNonIgnoredMessage.info.role === "user" || useTextPart) {
         const textPart = createSyntheticTextPart(lastNonIgnoredMessage, combinedContent)
         lastNonIgnoredMessage.parts.push(textPart)
     } else {
-        const modelID = userInfo.model?.modelID || ""
         const toolPart = createSyntheticToolPart(lastNonIgnoredMessage, combinedContent, modelID)
         lastNonIgnoredMessage.parts.push(toolPart)
     }

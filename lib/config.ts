@@ -28,6 +28,7 @@ export interface ToolSettings {
     nudgeFrequency: number
     protectedTools: string[]
     contextLimit: number | `${number}%`
+    textPartModels: string[]
 }
 
 export interface Tools {
@@ -107,6 +108,7 @@ export const VALID_CONFIG_KEYS = new Set([
     "tools.settings.nudgeFrequency",
     "tools.settings.protectedTools",
     "tools.settings.contextLimit",
+    "tools.settings.textPartModels",
     "tools.distill",
     "tools.distill.permission",
     "tools.distill.showDistillation",
@@ -302,6 +304,16 @@ function validateConfigTypes(config: Record<string, any>): ValidationError[] {
                         actual: JSON.stringify(tools.settings.contextLimit),
                     })
                 }
+            }
+            if (
+                tools.settings.textPartModels !== undefined &&
+                !Array.isArray(tools.settings.textPartModels)
+            ) {
+                errors.push({
+                    key: "tools.settings.textPartModels",
+                    expected: "string[]",
+                    actual: typeof tools.settings.textPartModels,
+                })
             }
         }
         if (tools.distill) {
@@ -505,6 +517,7 @@ const defaultConfig: PluginConfig = {
             nudgeFrequency: 10,
             protectedTools: [...DEFAULT_PROTECTED_TOOLS],
             contextLimit: 100000,
+            textPartModels: ["antigravity-claude"],
         },
         distill: {
             permission: "allow",
@@ -684,6 +697,7 @@ function mergeTools(
                 ]),
             ],
             contextLimit: override.settings?.contextLimit ?? base.settings.contextLimit,
+            textPartModels: override.settings?.textPartModels ?? base.settings.textPartModels,
         },
         distill: {
             permission: override.distill?.permission ?? base.distill.permission,
@@ -724,6 +738,7 @@ function deepCloneConfig(config: PluginConfig): PluginConfig {
             settings: {
                 ...config.tools.settings,
                 protectedTools: [...config.tools.settings.protectedTools],
+                textPartModels: [...config.tools.settings.textPartModels],
             },
             distill: { ...config.tools.distill },
             compress: { ...config.tools.compress },
