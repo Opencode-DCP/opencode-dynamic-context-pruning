@@ -44,6 +44,7 @@
     "dependencies": {
         "@anthropic-ai/tokenizer": "^0.0.4",
         "@opencode-ai/sdk": "^1.1.48",
+        "fuzzball": "^2.2.3",
         "jsonc-parser": "^3.3.1",
         "ulid": "^3.0.2",
         "zod": "^4.3.6"

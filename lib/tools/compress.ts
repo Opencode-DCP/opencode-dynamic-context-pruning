@@ -63,7 +63,7 @@ export function createCompressTool(ctx: PruneToolContext): ReturnType<typeof too
                 throw new Error("content.summary is required and must be a non-empty string")
             }
 
-            logger.info("Compress tool invoked")
+            // logger.info("Compress tool invoked")
             // logger.info(
             //     JSON.stringify({
             //         startString: startString?.substring(0, 50) + "...",
