@@ -27,6 +27,13 @@ function parsePercentageString(value: string, total: number): number | undefined
     return Math.round((clampedPercent / 100) * total)
 }
 
+export const findModelLimit = (
+    modelId: string,
+    modelLimits: Record<string, number | `${number}%`>,
+): number | `${number}%` | undefined => {
+    return modelLimits[modelId]
+}
+
 // XML wrappers
 export const wrapPrunableTools = (content: string): string => {
     return `<prunable-tools>
@@ -66,21 +73,41 @@ Context management was just performed. Do NOT use the ${toolName} again. A fresh
 </context-info>`
 }
 
-const resolveContextLimit = (config: PluginConfig, state: SessionState): number | undefined => {
-    const configLimit = config.tools.settings.contextLimit
+const resolveContextLimit = (
+    config: PluginConfig,
+    state: SessionState,
+    messages: WithParts[],
+): number | undefined => {
+    const { settings } = config.tools
+    const { modelLimits, contextLimit } = settings
 
-    if (typeof configLimit === "string") {
-        if (configLimit.endsWith("%")) {
+    if (modelLimits) {
+        const userMsg = getLastUserMessage(messages)
+        const modelId = userMsg ? (userMsg.info as UserMessage).model.modelID : undefined
+        const limit = modelId !== undefined ? findModelLimit(modelId, modelLimits) : undefined
+
+        if (limit !== undefined) {
+            if (typeof limit === "string" && limit.endsWith("%")) {
+                if (state.modelContextLimit === undefined) {
+                    return undefined
+                }
+                return parsePercentageString(limit, state.modelContextLimit)
+            }
+            return typeof limit === "number" ? limit : undefined
+        }
+    }
+
+    if (typeof contextLimit === "string") {
+        if (contextLimit.endsWith("%")) {
             if (state.modelContextLimit === undefined) {
                 return undefined
             }
-            return parsePercentageString(configLimit, state.modelContextLimit)
+            return parsePercentageString(contextLimit, state.modelContextLimit)
         }
-
         return undefined
     }
 
-    return configLimit
+    return contextLimit
 }
 
 const shouldInjectCompressNudge = (
@@ -92,7 +119,7 @@ const shouldInjectCompressNudge = (
         return false
     }
 
-    const contextLimit = resolveContextLimit(config, state)
+    const contextLimit = resolveContextLimit(config, state, messages)
     if (contextLimit === undefined) {
         return false
     }

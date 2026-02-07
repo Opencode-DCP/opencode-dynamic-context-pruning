@@ -121,6 +121,21 @@
                                     "pattern": "^\\d+(?:\\.\\d+)?%$"
                                 }
                             ]
+                        },
+                        "modelLimits": {
+                            "description": "Model-specific context limits with optional wildcard patterns (exact match first, then most specific wildcard). Examples: \"openai/gpt-5\", \"*/zen-1\", \"ollama/*\", \"*sonnet*\"",
+                            "type": "object",
+                            "additionalProperties": {
+                                "oneOf": [
+                                    {
+                                        "type": "number"
+                                    },
+                                    {
+                                        "type": "string",
+                                        "pattern": "^\\d+(?:\\.\\d+)?%$"
+                                    }
+                                ]
+                            }
                         }
                     }
                 },
