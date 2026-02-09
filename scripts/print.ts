@@ -1,117 +1,78 @@
 #!/usr/bin/env npx tsx
 
-import { renderSystemPrompt, renderNudge, type ToolFlags } from "../lib/prompts/index.js"
+import { renderSystemPrompt, renderNudge } from "../lib/prompts"
 import {
-    wrapPrunableTools,
+    wrapContextPressureTools,
     wrapCompressContext,
     wrapCooldownMessage,
-} from "../lib/messages/inject.js"
+} from "../lib/messages/inject"
 
 const args = process.argv.slice(2)
 
-const flags: ToolFlags = {
-    distill: args.includes("-d") || args.includes("--distill"),
-    compress: args.includes("-c") || args.includes("--compress"),
-    prune: args.includes("-p") || args.includes("--prune"),
-}
-
-// Default to all enabled if none specified
-if (!flags.prune && !flags.distill && !flags.compress) {
-    flags.prune = true
-    flags.distill = true
-    flags.compress = true
-}
-
-const showSystem = args.includes("--system")
-const showNudge = args.includes("--nudge")
-const showPruneList = args.includes("--prune-list")
-const showCompressContext = args.includes("--compress-context")
-const showCooldown = args.includes("--cooldown")
-const showHelp = args.includes("--help") || args.includes("-h")
-
-if (
-    showHelp ||
-    (!showSystem && !showNudge && !showPruneList && !showCompressContext && !showCooldown)
-) {
+if (args.includes("-h") || args.includes("--help")) {
     console.log(`
-Usage: bun run dcp [TYPE] [-d] [-c] [-p]
+DCP Prompt Preview CLI
+
+Usage:
+  bun run dcp [TYPE]
 
 Types:
-  --system            System prompt
-  --nudge             Nudge prompt
-  --prune-list        Example prunable tools list
-  --compress-context  Example compress context
-  --cooldown          Cooldown message after pruning
-
-Tool flags (for --system and --nudge):
-  -d, --distill       Enable distill tool
-  -c, --compress      Enable compress tool
-  -p, --prune         Enable prune tool
-
-If no tool flags specified, all are enabled.
+  --system            Print system prompt
+  --nudge             Print standard nudge prompt
+  --compress-nudge    Print context-limit compress nudge
+  --context-tools     Print example <context-pressure-tools> block
+  --compress-context  Print example <compress-context> block
+  --cooldown          Print cooldown context-info block
 
 Examples:
-  bun run dcp --system -d -c -p   # System prompt with all tools
-  bun run dcp --system -p         # System prompt with prune only
-  bun run dcp --nudge -d -c       # Nudge with distill and compress
-  bun run dcp --prune-list        # Example prunable tools list
+  bun run dcp --system
+  bun run dcp --nudge
+  bun run dcp --context-tools
 `)
     process.exit(0)
 }
 
-const header = (title: string) => {
-    console.log()
-    console.log("─".repeat(60))
-    console.log(title)
-    console.log("─".repeat(60))
+const isSystem = args.includes("--system") || args.length === 0
+const isNudge = args.includes("--nudge")
+const isCompressNudge = args.includes("--compress-nudge")
+const isContextTools = args.includes("--context-tools") || args.includes("--prune-list")
+const isCompressContext = args.includes("--compress-context")
+const isCooldown = args.includes("--cooldown")
+
+if (isSystem) {
+    console.log("=== SYSTEM ===\n")
+    console.log(renderSystemPrompt())
 }
 
-if (showSystem) {
-    const enabled = [
-        flags.distill && "distill",
-        flags.compress && "compress",
-        flags.prune && "prune",
-    ]
-        .filter(Boolean)
-        .join(", ")
-    header(`SYSTEM PROMPT (tools: ${enabled})`)
-    console.log(renderSystemPrompt(flags))
+if (isNudge) {
+    console.log("=== NUDGE ===\n")
+    console.log(renderNudge("frequency"))
 }
 
-if (showNudge) {
-    const enabled = [
-        flags.distill && "distill",
-        flags.compress && "compress",
-        flags.prune && "prune",
-    ]
-        .filter(Boolean)
-        .join(", ")
-    header(`NUDGE (tools: ${enabled})`)
-    console.log(renderNudge(flags))
+if (isCompressNudge) {
+    console.log("=== COMPRESS NUDGE ===\n")
+    console.log(renderNudge("context-limit"))
 }
 
-if (showPruneList) {
-    header("PRUNABLE TOOLS LIST (mock example)")
-    const mockList = `5: read, /path/to/file.ts
-8: bash, npm run build
-12: glob, src/**/*.ts
-15: read, /path/to/another-file.ts`
-    console.log(wrapPrunableTools(mockList))
+if (isContextTools) {
+    console.log("=== CONTEXT TOOLS ===\n")
+    console.log(
+        wrapContextPressureTools(
+            [
+                "- read, /repo/src/app.ts (~1540 tokens)",
+                '- grep, "compress" in /repo/lib (~260 tokens)',
+                "- bash, Shows git status (~100 tokens)",
+            ].join("\n"),
+        ),
+    )
 }
 
-if (showCompressContext) {
-    header("COMPRESS CONTEXT (mock example)")
-    console.log(wrapCompressContext(45))
+if (isCompressContext) {
+    console.log("=== COMPRESS CONTEXT ===\n")
+    console.log(wrapCompressContext(128))
 }
 
-if (showCooldown) {
-    const enabled = [
-        flags.distill && "distill",
-        flags.compress && "compress",
-        flags.prune && "prune",
-    ]
-        .filter(Boolean)
-        .join(", ")
-    header(`COOLDOWN MESSAGE (tools: ${enabled})`)
-    console.log(wrapCooldownMessage(flags))
+if (isCooldown) {
+    console.log("=== COOLDOWN ===\n")
+    console.log(wrapCooldownMessage())
 }

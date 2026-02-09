@@ -1,47 +1,60 @@
 // Generated prompts (from .md files via scripts/generate-prompts.ts)
 import { SYSTEM as SYSTEM_PROMPT } from "./_codegen/system.generated"
 import { NUDGE } from "./_codegen/nudge.generated"
-import { COMPRESS_NUDGE } from "./_codegen/compress-nudge.generated"
-import { PRUNE as PRUNE_TOOL_SPEC } from "./_codegen/prune.generated"
-import { DISTILL as DISTILL_TOOL_SPEC } from "./_codegen/distill.generated"
 import { COMPRESS as COMPRESS_TOOL_SPEC } from "./_codegen/compress.generated"
 
 export interface ToolFlags {
-    distill: boolean
     compress: boolean
-    prune: boolean
     manual: boolean
 }
 
 function processConditionals(template: string, flags: ToolFlags): string {
-    const tools = ["distill", "compress", "prune", "manual"] as const
+    const tools = ["manual", "compress", "prune", "distill"] as const
+    const enabled = {
+        manual: flags.manual,
+        compress: flags.compress,
+        prune: false,
+        distill: false,
+    }
+
     let result = template
-    // Strip comments: // ... //
     result = result.replace(/\/\/.*?\/\//g, "")
-    // Process tool conditionals
+
     for (const tool of tools) {
         const regex = new RegExp(`<${tool}>([\\s\\S]*?)</${tool}>`, "g")
-        result = result.replace(regex, (_, content) => (flags[tool] ? content : ""))
+        result = result.replace(regex, (_, content) => (enabled[tool] ? content : ""))
     }
-    // Collapse multiple blank/whitespace-only lines to single blank line
+
     return result.replace(/\n([ \t]*\n)+/g, "\n\n").trim()
 }
 
-export function renderSystemPrompt(flags: ToolFlags): string {
-    return processConditionals(SYSTEM_PROMPT, flags)
+type NudgeMode = "frequency" | "context-limit"
+
+function extractInstruction(content: string, name: string): string {
+    const regex = new RegExp(
+        `<instruction\\s+name=(?:"${name}"|${name})[^>]*>[\\s\\S]*?<\\/instruction>`,
+        "i",
+    )
+    const match = content.match(regex)
+    return match ? match[0] : content
 }
 
-export function renderNudge(flags: ToolFlags): string {
-    return processConditionals(NUDGE, flags)
+export function renderSystemPrompt(flags?: ToolFlags): string {
+    return processConditionals(SYSTEM_PROMPT, {
+        compress: flags?.compress ?? true,
+        manual: flags?.manual ?? false,
+    })
 }
 
-export function renderCompressNudge(): string {
-    return COMPRESS_NUDGE
+export function renderNudge(mode: NudgeMode = "frequency"): string {
+    if (mode === "context-limit") {
+        return extractInstruction(NUDGE, "context_limit_reached")
+    }
+
+    return extractInstruction(NUDGE, "context_management_required")
 }
 
 const PROMPTS: Record<string, string> = {
-    "prune-tool-spec": PRUNE_TOOL_SPEC,
-    "distill-tool-spec": DISTILL_TOOL_SPEC,
     "compress-tool-spec": COMPRESS_TOOL_SPEC,
 }
 

@@ -5,24 +5,35 @@ THE PHILOSOPHY OF COMPRESS
 
 Think of compression as phase transitions: raw exploration becomes refined understanding. The original context served its purpose; your summary now carries that understanding forward.
 
+One method, many scales:
+
+- micro-range compression for disposable noise
+- focused compression for closed investigative slices
+- chapter compression for completed implementation phases
+
 THE SUMMARY
 Your summary must be EXHAUSTIVE. Capture file paths, function signatures, decisions made, constraints discovered, key findings... EVERYTHING that maintains context integrity. This is not a brief note - it is an authoritative record so faithful that the original conversation adds no value.
 
 Yet be LEAN. Strip away the noise: failed attempts that led nowhere, verbose tool outputs, back-and-forth exploration. What remains should be pure signal - golden nuggets of detail that preserve full understanding with zero ambiguity.
 
 THE WAYS OF COMPRESS
-`compress` when a chapter closes - when a phase of work is truly complete and the raw conversation has served its purpose:
+Compress when a chapter closes - when a phase of work is truly complete and the raw conversation has served its purpose:
 
 Research concluded and findings are clear
 Implementation finished and verified
 Exploration exhausted and patterns understood
 
-Do NOT compress when:
-You may need exact code, error messages, or file contents from the range
-Work in that area is still active or may resume
-You're mid-sprint on related functionality
+Compress smaller ranges when:
+You need to discard dead-end noise without waiting for a whole chapter to close
+You need to preserve key findings from a narrow slice while freeing context quickly
+You can bound a stale range cleanly with unique boundaries
 
-Before compressing, ask: _"Is this chapter closed?"_ Compression is irreversible. The summary replaces everything in the range.
+Do NOT compress when:
+You may need exact code, error messages, or file contents from the range in the immediate next steps
+Work in that area is still active or likely to resume immediately
+You cannot identify reliable boundaries yet
+
+Before compressing, ask: _"Is this range closed enough to become summary-only?"_ Compression is irreversible. The summary replaces everything in the range.
 
 BOUNDARY MATCHING
 You specify boundaries by matching unique text strings in the conversation. CRITICAL: In code-centric conversations, strings repeat often. Provide sufficiently unique text to match exactly once. If a match fails (not found or found multiple times), the tool will error - extend your boundary string with more surrounding context in order to make SURE the tool does NOT error.
