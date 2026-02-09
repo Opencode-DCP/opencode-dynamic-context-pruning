@@ -57,7 +57,10 @@ export const deduplicate = (
         if (!signatureMap.has(signature)) {
             signatureMap.set(signature, [])
         }
-        signatureMap.get(signature)!.push(id)
+        const ids = signatureMap.get(signature)
+        if (ids) {
+            ids.push(id)
+        }
     }
 
     // Find duplicates - keep only the most recent (last) in each group

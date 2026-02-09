@@ -61,12 +61,18 @@ export const supersedeWrites = (
             if (!writesByFile.has(filePath)) {
                 writesByFile.set(filePath, [])
             }
-            writesByFile.get(filePath)!.push({ id, index: i })
+            const writes = writesByFile.get(filePath)
+            if (writes) {
+                writes.push({ id, index: i })
+            }
         } else if (metadata.tool === "read") {
             if (!readsByFile.has(filePath)) {
                 readsByFile.set(filePath, [])
             }
-            readsByFile.get(filePath)!.push(i)
+            const reads = readsByFile.get(filePath)
+            if (reads) {
+                reads.push(i)
+            }
         }
     }
 
