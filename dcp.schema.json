@@ -24,13 +24,13 @@
             "type": "string",
             "enum": ["off", "minimal", "detailed"],
             "default": "detailed",
-            "description": "Level of notification shown when pruning occurs"
+            "description": "Level of notification shown when context management occurs"
         },
         "pruneNotificationType": {
             "type": "string",
             "enum": ["chat", "toast"],
             "default": "chat",
-            "description": "Where to display prune notifications (chat message or toast notification)"
+            "description": "Where to display notifications (chat message or toast notification)"
         },
         "commands": {
             "type": "object",
@@ -104,7 +104,7 @@
         },
         "tools": {
             "type": "object",
-            "description": "Configuration for pruning tools",
+            "description": "Configuration for context-management tools",
             "additionalProperties": false,
             "properties": {
                 "settings": {
@@ -115,7 +115,7 @@
                         "nudgeEnabled": {
                             "type": "boolean",
                             "default": true,
-                            "description": "Enable nudge reminders to prune context"
+                            "description": "Enable nudge reminders to manage context"
                         },
                         "nudgeFrequency": {
                             "type": "number",
@@ -160,52 +160,21 @@
                         }
                     }
                 },
-                "distill": {
+                "compress": {
                     "type": "object",
-                    "description": "Configuration for the distill tool",
+                    "description": "Configuration for the unified compress tool",
                     "additionalProperties": false,
                     "properties": {
                         "permission": {
                             "type": "string",
                             "enum": ["ask", "allow", "deny"],
                             "default": "allow",
-                            "description": "Permission mode (deny disables the tool)"
-                        },
-                        "showDistillation": {
-                            "type": "boolean",
-                            "default": false,
-                            "description": "Show distillation output in the UI"
-                        }
-                    }
-                },
-                "compress": {
-                    "type": "object",
-                    "description": "Configuration for the compress tool",
-                    "additionalProperties": false,
-                    "properties": {
-                        "permission": {
-                            "type": "string",
-                            "enum": ["ask", "allow", "deny"],
-                            "default": "ask",
                             "description": "Permission mode (deny disables the tool)"
                         },
                         "showCompression": {
                             "type": "boolean",
                             "default": false,
-                            "description": "Show summary output in the UI"
-                        }
-                    }
-                },
-                "prune": {
-                    "type": "object",
-                    "description": "Configuration for the prune tool",
-                    "additionalProperties": false,
-                    "properties": {
-                        "permission": {
-                            "type": "string",
-                            "enum": ["ask", "allow", "deny"],
-                            "default": "allow",
-                            "description": "Permission mode (deny disables the tool)"
+                            "description": "Show compression summaries in notifications"
                         }
                     }
                 }

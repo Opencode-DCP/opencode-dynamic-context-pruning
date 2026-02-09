@@ -44,7 +44,7 @@ export function syncToolCache(
                     turnProtectionTurns > 0 &&
                     state.currentTurn - turnCounter < turnProtectionTurns
 
-                if (part.tool === "distill" || part.tool === "compress" || part.tool === "prune") {
+                if (part.tool === "compress") {
                     state.nudgeCounter = 0
                     state.lastToolPrune = true
                 } else {

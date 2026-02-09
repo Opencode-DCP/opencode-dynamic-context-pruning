@@ -1,6 +1,6 @@
 import { tool } from "@opencode-ai/plugin"
 import type { WithParts, CompressSummary } from "../state"
-import type { PruneToolContext } from "./types"
+import type { ToolContext } from "./types"
 import { ensureSessionInitialized } from "../state"
 import { saveSessionState } from "../state/persistence"
 import { loadPrompt } from "../prompts"
@@ -12,7 +12,7 @@ import { prune as applyPruneTransforms } from "../messages/prune"
 const COMPRESS_TOOL_DESCRIPTION = loadPrompt("compress-tool-spec")
 const COMPRESS_SUMMARY_PREFIX = "[Compressed conversation block]\n\n"
 
-export function createCompressTool(ctx: PruneToolContext): ReturnType<typeof tool> {
+export function createCompressTool(ctx: ToolContext): ReturnType<typeof tool> {
     return tool({
         description: COMPRESS_TOOL_DESCRIPTION,
         args: {
@@ -31,12 +31,9 @@ export function createCompressTool(ctx: PruneToolContext): ReturnType<typeof too
                         .string()
                         .describe("Complete technical summary replacing all content in range"),
                 })
-                .describe("The compression details: boundaries and replacement summary"),
+                .describe("Compression details: boundaries and replacement summary"),
         },
         async execute(args, toolCtx) {
-            const { client, state, logger } = ctx
-            const sessionId = toolCtx.sessionID
-
             await toolCtx.ask({
                 permission: "compress",
                 patterns: ["*"],
@@ -60,15 +57,8 @@ export function createCompressTool(ctx: PruneToolContext): ReturnType<typeof too
                 throw new Error("content.summary is required and must be a non-empty string")
             }
 
-            // logger.info("Compress tool invoked")
-            // logger.info(
-            //     JSON.stringify({
-            //         startString: startString?.substring(0, 50) + "...",
-            //         endString: endString?.substring(0, 50) + "...",
-            //         topic: topic,
-            //         summaryLength: summary?.length,
-            //     }),
-            // )
+            const { client, state, logger } = ctx
+            const sessionId = toolCtx.sessionID
 
             const messagesResponse = await client.session.messages({
                 path: { id: sessionId },
@@ -124,7 +114,7 @@ export function createCompressTool(ctx: PruneToolContext): ReturnType<typeof too
 
             if (rawStartIndex > rawEndIndex) {
                 throw new Error(
-                    `startString appears after endString in the conversation. Start must come before end.`,
+                    "startString appears after endString in the conversation. Start must come before end.",
                 )
             }
 
@@ -199,14 +189,6 @@ export function createCompressTool(ctx: PruneToolContext): ReturnType<typeof too
             state.stats.totalPruneTokens += state.stats.pruneTokenCounter
             state.stats.pruneTokenCounter = 0
             state.nudgeCounter = 0
-
-            // logger.info("Compress range created", {
-            //     startMessageId: startResult.messageId,
-            //     endMessageId: endResult.messageId,
-            //     toolIdsRemoved: containedToolIds.length,
-            //     messagesInRange: containedMessageIds.length,
-            //     estimatedTokens: estimatedCompressedTokens,
-            // })
 
             saveSessionState(state, logger).catch((err) =>
                 logger.error("Failed to persist state", { error: err.message }),

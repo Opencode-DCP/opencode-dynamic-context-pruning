@@ -30,6 +30,16 @@ for (const file of oldGeneratedFiles) {
 // Find all .md files in the prompts directory
 const mdFiles = readdirSync(PROMPTS_DIR).filter((f) => f.endsWith(".md"))
 
+// Remove stale generated files in _codegen that no longer have a source markdown file
+const expectedGenerated = new Set(mdFiles.map((f) => `${basename(f, ".md")}.generated.ts`))
+const existingGenerated = readdirSync(CODEGEN_DIR).filter((f) => f.endsWith(".generated.ts"))
+for (const file of existingGenerated) {
+    if (!expectedGenerated.has(file)) {
+        unlinkSync(join(CODEGEN_DIR, file))
+        console.log(`Removed stale: ${file}`)
+    }
+}
+
 for (const mdFile of mdFiles) {
     const mdPath = join(PROMPTS_DIR, mdFile)
     const baseName = basename(mdFile, ".md")

@@ -26,18 +26,16 @@ const BASE_COMMANDS: [string, string][] = [
 ]
 
 const TOOL_COMMANDS: Record<string, [string, string]> = {
-    prune: ["/dcp prune [focus]", "Trigger manual prune tool execution"],
-    distill: ["/dcp distill [focus]", "Trigger manual distill tool execution"],
     compress: ["/dcp compress [focus]", "Trigger manual compress tool execution"],
 }
 
 function getVisibleCommands(config: PluginConfig): [string, string][] {
     const commands = [...BASE_COMMANDS]
-    for (const tool of ["prune", "distill", "compress"] as const) {
-        if (config.tools[tool].permission !== "deny") {
-            commands.push(TOOL_COMMANDS[tool])
-        }
+
+    if (config.tools.compress.permission !== "deny") {
+        commands.push(TOOL_COMMANDS.compress)
     }
+
     return commands
 }
 

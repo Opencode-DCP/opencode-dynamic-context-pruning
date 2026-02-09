@@ -13,10 +13,10 @@ from datetime import datetime
 from collections import defaultdict
 from typing import Optional
 
-# DCP tool names (across different plugin versions)
+# DCP tool names across versions (compress is canonical; others are legacy aliases)
 DCP_TOOLS = {
-    "prune", "discard", "extract", "context_pruning",
-    "squash", "compress", "consolidate", "distill"
+    "compress", "prune", "distill",
+    "discard", "extract", "context_pruning", "squash", "consolidate"
 }
 
 # Anthropic pricing: cache read is ~10% of input cost
