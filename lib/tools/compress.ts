@@ -60,6 +60,13 @@ export function createCompressTool(ctx: ToolContext): ReturnType<typeof tool> {
             const { client, state, logger } = ctx
             const sessionId = toolCtx.sessionID
 
+            logger.info("Compress tool invoked", {
+                topic,
+                startString: startString.substring(0, 80),
+                endString: endString.substring(0, 80),
+                summaryLength: summary.length,
+            })
+
             const messagesResponse = await client.session.messages({
                 path: { id: sessionId },
             })
@@ -189,6 +196,15 @@ export function createCompressTool(ctx: ToolContext): ReturnType<typeof tool> {
             state.stats.totalPruneTokens += state.stats.pruneTokenCounter
             state.stats.pruneTokenCounter = 0
             state.nudgeCounter = 0
+
+            logger.info("Compress range created", {
+                topic,
+                startMessageId: startResult.messageId,
+                endMessageId: endResult.messageId,
+                toolIdsRemoved: containedToolIds.length,
+                messagesInRange: containedMessageIds.length,
+                estimatedTokens: estimatedCompressedTokens,
+            })
 
             saveSessionState(state, logger).catch((err) =>
                 logger.error("Failed to persist state", { error: err.message }),

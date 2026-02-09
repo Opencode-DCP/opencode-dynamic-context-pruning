@@ -143,6 +143,16 @@
                                 }
                             ]
                         },
+                        "contextPressureEnabled": {
+                            "type": "boolean",
+                            "default": true,
+                            "description": "Inject a <context-pressure-tools> list of token-heavy tool outputs to guide compress decisions"
+                        },
+                        "compressContextEnabled": {
+                            "type": "boolean",
+                            "default": true,
+                            "description": "Inject a <compress-context> block with message count and compress usage hints"
+                        },
                         "modelLimits": {
                             "description": "Model-specific context limits by exact provider/model key. Examples: \"openai/gpt-5\", \"anthropic/claude-3-7-sonnet\", \"ollama/llama3.1\"",
                             "type": "object",

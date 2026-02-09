@@ -346,17 +346,6 @@ export function validateConfigTypes(config: Record<string, any>): ValidationErro
                 })
             }
 
-            if (
-                tools.settings.compressContextEnabled !== undefined &&
-                typeof tools.settings.compressContextEnabled !== "boolean"
-            ) {
-                errors.push({
-                    key: "tools.settings.compressContextEnabled",
-                    expected: "boolean",
-                    actual: typeof tools.settings.compressContextEnabled,
-                })
-            }
-
             if (tools.settings.modelLimits !== undefined) {
                 if (
                     typeof tools.settings.modelLimits !== "object" ||

@@ -54,6 +54,9 @@ WHERE TO NEVER PICK STRINGS FROM:
 - Strings that span across message or part boundaries
 - Entire serialized JSON objects (key ordering may differ - pick a distinctive substring within instead)
 
+PARALLEL COMPRESS EXECUTION
+When multiple independent ranges are ready and their boundaries do not overlap, launch MULTIPLE `compress` calls in parallel in a single response. Run compression sequentially only when ranges overlap or when a later range depends on the result of an earlier compression.
+
 THE FORMAT OF COMPRESS
 `topic`: Short label (3-5 words) for display - e.g., "Auth System Exploration"
 `content`: Object containing:

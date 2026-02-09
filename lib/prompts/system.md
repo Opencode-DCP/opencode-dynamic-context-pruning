@@ -45,6 +45,8 @@ Prefer managing context at the START of a new loop (after receiving a user messa
 
 EVALUATE YOUR CONTEXT AND MANAGE REGULARLY TO AVOID CONTEXT ROT. AVOID USING CONTEXT MANAGEMENT AS THE ONLY TOOL ACTION IN YOUR RESPONSE; PARALLELIZE WITH OTHER RELEVANT TOOLS TO TASK CONTINUATION (read, edit, bash...).
 
+When multiple non-overlapping stale ranges are ready, issue MULTIPLE `compress` calls in parallel in the same response. Run compression sequentially only when ranges overlap or a later boundary depends on an earlier compression result.
+
 The session is your responsibility. Be PROACTIVE, DELIBERATE, and STRATEGIC. Keep context clean, relevant, and high-quality.
 </instruction>
 
