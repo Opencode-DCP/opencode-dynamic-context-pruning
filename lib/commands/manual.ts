@@ -25,8 +25,6 @@ const MANUAL_MODE_ON =
 
 const MANUAL_MODE_OFF = "Manual mode is now OFF. Automatic context injection is enabled again."
 
-const MANUAL_MODE_REQUIRED = "Manual mode is OFF. Run /dcp manual on to use manual tool triggers."
-
 const NO_PRUNABLE_TOOLS = "No prunable tool outputs are currently available for manual triggering."
 
 function toolDisabledMessage(tool: string): string {
@@ -132,11 +130,6 @@ export async function handleManualTriggerCommand(
 ): Promise<ManualTriggerResult | null> {
     const { client, state, config, logger, sessionId, messages } = ctx
     const params = getCurrentParams(state, messages, logger)
-
-    if (!state.manualMode) {
-        await sendIgnoredMessage(client, sessionId, MANUAL_MODE_REQUIRED, params, logger)
-        return null
-    }
 
     const toolPermission = config.tools[tool].permission
     if (toolPermission === "deny") {
