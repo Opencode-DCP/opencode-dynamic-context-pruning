@@ -42,7 +42,7 @@ Manual mode is enabled. Do NOT use distill, compress, or prune unless the user h
 <distill>Only use the distill tool after seeing `<distill triggered manually>` in the current user instruction context.</distill>
 <compress>Only use the compress tool after seeing `<compress triggered manually>` in the current user instruction context.</compress>
 
-After completing a manually triggered context-management action, return to normal task execution and wait for the next manual trigger before using context-management tools again.
+After completing a manually triggered context-management action, STOP IMMEDIATELY. Do NOT continue with any task execution. End your response right after the tool use completes and wait for the next user input.
 </instruction></manual>
 
 <instruction name=injected_context_handling policy_level=critical>
