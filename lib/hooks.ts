@@ -68,7 +68,7 @@ export function createChatMessageTransformHandler(
     config: PluginConfig,
 ) {
     return async (input: {}, output: { messages: WithParts[] }) => {
-        await checkSession(client, state, logger, output.messages)
+        await checkSession(client, state, logger, output.messages, config.manualMode.enabled)
 
         if (state.isSubAgent) {
             return
@@ -162,7 +162,14 @@ export function createCommandExecuteHandler(
             })
             const messages = (messagesResponse.data || messagesResponse) as WithParts[]
 
-            await ensureSessionInitialized(client, state, input.sessionID, logger, messages)
+            await ensureSessionInitialized(
+                client,
+                state,
+                input.sessionID,
+                logger,
+                messages,
+                config.manualMode.enabled,
+            )
 
             const args = (input.arguments || "").trim().split(/\s+/).filter(Boolean)
             const subcommand = args[0]?.toLowerCase() || ""

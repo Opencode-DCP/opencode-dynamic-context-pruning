@@ -18,7 +18,7 @@ const plugin: Plugin = (async (ctx) => {
     }
 
     const logger = new Logger(config.debug)
-    const state = createSessionState(config.manualMode.enabled)
+    const state = createSessionState()
 
     if (isSecureMode()) {
         configureClientAuth(ctx.client)

@@ -50,7 +50,14 @@ export async function executePruneOperation(
 
     // These 3 are probably not needed as they should always be set in the message
     // transform handler, but in case something causes state to reset, this is a safety net
-    await ensureSessionInitialized(ctx.client, state, sessionId, logger, messages)
+    await ensureSessionInitialized(
+        ctx.client,
+        state,
+        sessionId,
+        logger,
+        messages,
+        config.manualMode.enabled,
+    )
     syncToolCache(state, config, logger, messages)
     buildToolIdList(state, messages, logger)
 

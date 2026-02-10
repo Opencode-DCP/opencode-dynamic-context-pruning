@@ -35,7 +35,6 @@ export interface SessionState {
     sessionId: string | null
     isSubAgent: boolean
     manualMode: boolean
-    manualModeDefault: boolean
     prune: Prune
     compressSummaries: CompressSummary[]
     stats: SessionStats

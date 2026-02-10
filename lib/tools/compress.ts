@@ -73,7 +73,14 @@ export function createCompressTool(ctx: PruneToolContext): ReturnType<typeof too
             })
             const messages: WithParts[] = messagesResponse.data || messagesResponse
 
-            await ensureSessionInitialized(client, state, sessionId, logger, messages)
+            await ensureSessionInitialized(
+                client,
+                state,
+                sessionId,
+                logger,
+                messages,
+                ctx.config.manualMode.enabled,
+            )
 
             const startResult = findStringInMessages(
                 messages,
