@@ -7,6 +7,7 @@ import { loadPrompt } from "../prompts"
 import { getCurrentParams, getTotalToolTokens, countMessageTextTokens } from "../strategies/utils"
 import { findStringInMessages, collectToolIdsInRange, collectMessageIdsInRange } from "./utils"
 import { sendCompressNotification } from "../ui/notification"
+import { prune as applyPruneTransforms } from "../messages/prune"
 
 const COMPRESS_TOOL_DESCRIPTION = loadPrompt("compress-tool-spec")
 
@@ -82,37 +83,56 @@ export function createCompressTool(ctx: PruneToolContext): ReturnType<typeof too
                 ctx.config.manualMode.enabled,
             )
 
+            const transformedMessages = structuredClone(messages) as WithParts[]
+            applyPruneTransforms(state, logger, ctx.config, transformedMessages)
+
             const startResult = findStringInMessages(
-                messages,
+                transformedMessages,
                 startString,
                 logger,
-                state.compressSummaries,
                 "startString",
             )
             const endResult = findStringInMessages(
-                messages,
+                transformedMessages,
                 endString,
                 logger,
-                state.compressSummaries,
                 "endString",
             )
 
-            if (startResult.messageIndex > endResult.messageIndex) {
+            let rawStartIndex = messages.findIndex((m) => m.info.id === startResult.messageId)
+            let rawEndIndex = messages.findIndex((m) => m.info.id === endResult.messageId)
+
+            // If a boundary matched inside a synthetic compress summary message,
+            // resolve it back to the summary's anchor message in the raw messages
+            if (rawStartIndex === -1) {
+                const summary = state.compressSummaries.find((s) => s.summary.includes(startString))
+                if (summary) {
+                    rawStartIndex = messages.findIndex((m) => m.info.id === summary.anchorMessageId)
+                }
+            }
+            if (rawEndIndex === -1) {
+                const summary = state.compressSummaries.find((s) => s.summary.includes(endString))
+                if (summary) {
+                    rawEndIndex = messages.findIndex((m) => m.info.id === summary.anchorMessageId)
+                }
+            }
+
+            if (rawStartIndex === -1 || rawEndIndex === -1) {
+                throw new Error(`Failed to map boundary matches back to raw messages`)
+            }
+
+            if (rawStartIndex > rawEndIndex) {
                 throw new Error(
                     `startString appears after endString in the conversation. Start must come before end.`,
                 )
             }
 
-            const containedToolIds = collectToolIdsInRange(
-                messages,
-                startResult.messageIndex,
-                endResult.messageIndex,
-            )
+            const containedToolIds = collectToolIdsInRange(messages, rawStartIndex, rawEndIndex)
 
             const containedMessageIds = collectMessageIdsInRange(
                 messages,
-                startResult.messageIndex,
-                endResult.messageIndex,
+                rawStartIndex,
+                rawEndIndex,
             )
 
             // Remove any existing summaries whose anchors are now inside this range
@@ -132,24 +152,31 @@ export function createCompressTool(ctx: PruneToolContext): ReturnType<typeof too
             }
             state.compressSummaries.push(compressSummary)
 
+            const compressedMessageIds = containedMessageIds.filter(
+                (id) => !state.prune.messages.has(id),
+            )
+            const compressedToolIds = containedToolIds.filter((id) => !state.prune.tools.has(id))
+
             let textTokens = 0
-            for (let i = startResult.messageIndex; i <= endResult.messageIndex; i++) {
-                const msgId = messages[i].info.id
-                if (!state.prune.messages.has(msgId)) {
-                    const tokens = countMessageTextTokens(messages[i])
+            for (const msgId of compressedMessageIds) {
+                const msg = messages.find((m) => m.info.id === msgId)
+                if (msg) {
+                    const tokens = countMessageTextTokens(msg)
                     textTokens += tokens
                     state.prune.messages.set(msgId, tokens)
                 }
             }
-            const newToolIds = containedToolIds.filter((id) => !state.prune.tools.has(id))
-            const toolTokens = getTotalToolTokens(state, newToolIds)
-            for (const id of newToolIds) {
+            const toolTokens = getTotalToolTokens(state, compressedToolIds)
+            for (const id of compressedToolIds) {
                 const entry = state.toolParameters.get(id)
                 state.prune.tools.set(id, entry?.tokenCount ?? 0)
             }
             const estimatedCompressedTokens = textTokens + toolTokens
 
             state.stats.pruneTokenCounter += estimatedCompressedTokens
+
+            const rawStartResult = { messageId: startResult.messageId, messageIndex: rawStartIndex }
+            const rawEndResult = { messageId: endResult.messageId, messageIndex: rawEndIndex }
 
             const currentParams = getCurrentParams(state, messages, logger)
             await sendCompressNotification(
@@ -158,12 +185,12 @@ export function createCompressTool(ctx: PruneToolContext): ReturnType<typeof too
                 ctx.config,
                 state,
                 sessionId,
-                containedToolIds,
-                containedMessageIds,
+                compressedToolIds,
+                compressedMessageIds,
                 topic,
                 summary,
-                startResult,
-                endResult,
+                rawStartResult,
+                rawEndResult,
                 messages.length,
                 currentParams,
             )
@@ -184,8 +211,7 @@ export function createCompressTool(ctx: PruneToolContext): ReturnType<typeof too
                 logger.error("Failed to persist state", { error: err.message }),
             )
 
-            const messagesCompressed = endResult.messageIndex - startResult.messageIndex + 1
-            return `Compressed ${messagesCompressed} messages (${containedToolIds.length} tool calls) into summary. The content will be replaced with your summary.`
+            return `Compressed ${compressedMessageIds.length} messages (${compressedToolIds.length} tool calls) into summary. The content will be replaced with your summary.`
         },
     })
 }

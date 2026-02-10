@@ -38,6 +38,12 @@ const pruneFullTool = (state: SessionState, logger: Logger, messages: WithParts[
             if (part.type !== "tool") {
                 continue
             }
+
+            if (part.tool === "compress" && part.state.status === "completed") {
+                partsToRemove.push(part.callID)
+                continue
+            }
+
             if (!state.prune.tools.has(part.callID)) {
                 continue
             }
