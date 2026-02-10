@@ -48,7 +48,7 @@ export function renderSystemPrompt(flags?: ToolFlags): string {
 
 export function renderNudge(mode: NudgeMode = "frequency"): string {
     if (mode === "context-limit") {
-        return extractInstruction(NUDGE, "context_limit_reached")
+        return extractInstruction(NUDGE, "context_buildup_warning")
     }
 
     return extractInstruction(NUDGE, "context_management_required")

@@ -1,4 +1,4 @@
-Use this tool to collapse a contiguous range of conversation into a preserved summary.
+Your only tool for context management, use it to collapse a range in the conversation into a detailed summary
 
 THE PHILOSOPHY OF COMPRESS
 `compress` transforms verbose conversation sequences into dense, high-fidelity summaries. This is not cleanup - it is crystallization. Your summary becomes the authoritative record of what transpired.
@@ -39,7 +39,7 @@ BOUNDARY MATCHING
 You specify boundaries by matching unique text strings in the conversation. CRITICAL: In code-centric conversations, strings repeat often. Provide sufficiently unique text to match exactly once. If a match fails (not found or found multiple times), the tool will error - extend your boundary string with more surrounding context in order to make SURE the tool does NOT error.
 
 WHERE TO PICK STRINGS FROM (important for reliable matching):
-
+- `muid` and `uid` strings in message and tool output annotations (MOST RELIABLE - guaranteed unique)
 - Your own assistant text responses (MOST RELIABLE - always stored verbatim)
 - The user's own words in their messages
 - Tool result output text (distinctive substrings within the output)
