@@ -215,7 +215,7 @@ export const insertPruneToolContext = (
     logger: Logger,
     messages: WithParts[],
 ): void => {
-    if (state.manualMode) {
+    if (state.manualMode || state.pendingManualTrigger) {
         return
     }
 
