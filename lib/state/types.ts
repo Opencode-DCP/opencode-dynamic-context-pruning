@@ -31,10 +31,16 @@ export interface Prune {
     messages: Map<string, number>
 }
 
+export interface PendingManualTrigger {
+    sessionId: string
+    prompt: string
+}
+
 export interface SessionState {
     sessionId: string | null
     isSubAgent: boolean
     manualMode: boolean
+    pendingManualTrigger: PendingManualTrigger | null
     prune: Prune
     compressSummaries: CompressSummary[]
     stats: SessionStats

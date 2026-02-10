@@ -57,6 +57,7 @@ export function createSessionState(): SessionState {
         sessionId: null,
         isSubAgent: false,
         manualMode: false,
+        pendingManualTrigger: null,
         prune: {
             tools: new Map<string, number>(),
             messages: new Map<string, number>(),
@@ -81,6 +82,7 @@ export function resetSessionState(state: SessionState): void {
     state.sessionId = null
     state.isSubAgent = false
     state.manualMode = false
+    state.pendingManualTrigger = null
     state.prune = {
         tools: new Map<string, number>(),
         messages: new Map<string, number>(),

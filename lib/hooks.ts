@@ -4,16 +4,15 @@ import type { PluginConfig } from "./config"
 import { syncToolCache } from "./state/tool-cache"
 import { deduplicate, supersedeWrites, purgeErrors } from "./strategies"
 import { prune, insertPruneToolContext } from "./messages"
-import { buildToolIdList } from "./messages/utils"
-import { buildPrunableToolsList } from "./messages/inject"
+import { buildToolIdList, isIgnoredUserMessage } from "./messages/utils"
 import { checkSession } from "./state"
 import { renderSystemPrompt } from "./prompts"
 import { handleStatsCommand } from "./commands/stats"
 import { handleContextCommand } from "./commands/context"
 import { handleHelpCommand } from "./commands/help"
 import { handleSweepCommand } from "./commands/sweep"
+import { handleManualToggleCommand, handleManualTriggerCommand } from "./commands/manual"
 import { ensureSessionInitialized } from "./state/state"
-import { sendIgnoredMessage } from "./ui/notification"
 import { getCurrentParams } from "./strategies/utils"
 
 const INTERNAL_AGENT_SIGNATURES = [
@@ -21,6 +20,42 @@ const INTERNAL_AGENT_SIGNATURES = [
     "You are a helpful AI assistant tasked with summarizing conversations",
     "Summarize what was done in this conversation",
 ]
+
+function applyPendingManualTriggerPrompt(
+    state: SessionState,
+    messages: WithParts[],
+    logger: Logger,
+): void {
+    const pending = state.pendingManualTrigger
+    if (!pending) {
+        return
+    }
+
+    if (!state.sessionId || pending.sessionId !== state.sessionId) {
+        state.pendingManualTrigger = null
+        return
+    }
+
+    for (let i = messages.length - 1; i >= 0; i--) {
+        const msg = messages[i]
+        if (msg.info.role !== "user" || isIgnoredUserMessage(msg)) {
+            continue
+        }
+
+        for (const part of msg.parts) {
+            if (part.type !== "text" || part.ignored || part.synthetic) {
+                continue
+            }
+
+            part.text = pending.prompt
+            state.pendingManualTrigger = null
+            logger.debug("Applied pending manual trigger prompt", { sessionId: pending.sessionId })
+            return
+        }
+    }
+
+    state.pendingManualTrigger = null
+}
 
 export function createSystemPromptHandler(
     state: SessionState,
@@ -90,6 +125,8 @@ export function createChatMessageTransformHandler(
             insertPruneToolContext(state, config, logger, output.messages)
         }
 
+        applyPendingManualTriggerPrompt(state, output.messages, logger)
+
         if (state.sessionId) {
             await logger.saveContext(state.sessionId, output.messages)
         }
@@ -103,51 +140,6 @@ export function createCommandExecuteHandler(
     config: PluginConfig,
     workingDirectory: string,
 ) {
-    const getManualCommandMessage = (manualMode: boolean): string => {
-        return manualMode
-            ? "Manual mode is now ON. Automatic context injection is disabled; use /dcp prune, /dcp distill, or /dcp compress to trigger context tools manually."
-            : "Manual mode is now OFF. Automatic context injection is enabled again."
-    }
-
-    const getManualTriggerPrompt = (
-        tool: "prune" | "distill" | "compress",
-        context?: string,
-    ): string => {
-        if (tool === "prune") {
-            return [
-                "<prune triggered manually>",
-                "Manual mode trigger received. You must now use the prune tool exactly once.",
-                "Find the most significant set of prunable tool outputs to remove safely.",
-                "Follow prune policy and avoid pruning outputs that may be needed later.",
-                "Return after prune with a brief explanation of what you pruned and why.",
-                context,
-            ]
-                .filter(Boolean)
-                .join("\n\n")
-        }
-
-        if (tool === "distill") {
-            return [
-                "<distill triggered manually>",
-                "Manual mode trigger received. You must now use the distill tool.",
-                "Select the most information-dense prunable outputs and distill them into complete technical substitutes.",
-                "Be exhaustive and preserve all critical technical details.",
-                "Return after distill with a brief explanation of what was distilled and why.",
-                context,
-            ]
-                .filter(Boolean)
-                .join("\n\n")
-        }
-
-        return [
-            "<compress triggered manually>",
-            "Manual mode trigger received. You must now use the compress tool.",
-            "Find the most significant completed section of the conversation that can be compressed into a high-fidelity technical summary.",
-            "Choose safe boundaries and preserve all critical implementation details.",
-            "Return after compress with a brief explanation of what range was compressed.",
-        ].join("\n\n")
-    }
-
     return async (
         input: { command: string; sessionID: string; arguments: string },
         output: { parts: any[] },
@@ -174,38 +166,29 @@ export function createCommandExecuteHandler(
             const args = (input.arguments || "").trim().split(/\s+/).filter(Boolean)
             const subcommand = args[0]?.toLowerCase() || ""
             const subArgs = args.slice(1)
-            const params = getCurrentParams(state, messages, logger)
+
+            const commandCtx = {
+                client,
+                state,
+                config,
+                logger,
+                sessionId: input.sessionID,
+                messages,
+            }
 
             if (subcommand === "context") {
-                await handleContextCommand({
-                    client,
-                    state,
-                    logger,
-                    sessionId: input.sessionID,
-                    messages,
-                })
+                await handleContextCommand(commandCtx)
                 throw new Error("__DCP_CONTEXT_HANDLED__")
             }
 
             if (subcommand === "stats") {
-                await handleStatsCommand({
-                    client,
-                    state,
-                    logger,
-                    sessionId: input.sessionID,
-                    messages,
-                })
+                await handleStatsCommand(commandCtx)
                 throw new Error("__DCP_STATS_HANDLED__")
             }
 
             if (subcommand === "sweep") {
                 await handleSweepCommand({
-                    client,
-                    state,
-                    config,
-                    logger,
-                    sessionId: input.sessionID,
-                    messages,
+                    ...commandCtx,
                     args: subArgs,
                     workingDirectory,
                 })
@@ -213,89 +196,31 @@ export function createCommandExecuteHandler(
             }
 
             if (subcommand === "manual") {
-                const modeArg = subArgs[0]?.toLowerCase()
-                if (modeArg === "on") {
-                    state.manualMode = true
-                } else if (modeArg === "off") {
-                    state.manualMode = false
-                } else {
-                    state.manualMode = !state.manualMode
-                }
-
-                await sendIgnoredMessage(
-                    client,
-                    input.sessionID,
-                    getManualCommandMessage(state.manualMode),
-                    params,
-                    logger,
-                )
+                await handleManualToggleCommand(commandCtx, subArgs[0]?.toLowerCase())
                 throw new Error("__DCP_MANUAL_HANDLED__")
             }
 
             if (subcommand === "prune" || subcommand === "distill" || subcommand === "compress") {
-                if (!state.manualMode) {
-                    await sendIgnoredMessage(
-                        client,
-                        input.sessionID,
-                        "Manual mode is OFF. Run /dcp manual on to use manual tool triggers.",
-                        params,
-                        logger,
-                    )
-                    throw new Error("__DCP_MANUAL_OFF__")
+                const userFocus = subArgs.join(" ").trim()
+                const result = await handleManualTriggerCommand(commandCtx, subcommand, userFocus)
+                if (!result) {
+                    throw new Error("__DCP_MANUAL_TRIGGER_BLOCKED__")
                 }
 
-                const toolPermission = config.tools[subcommand].permission
-                if (toolPermission === "deny") {
-                    await sendIgnoredMessage(
-                        client,
-                        input.sessionID,
-                        `The ${subcommand} tool is disabled by config (permission=deny).`,
-                        params,
-                        logger,
-                    )
-                    throw new Error("__DCP_TOOL_DISABLED__")
+                state.pendingManualTrigger = {
+                    sessionId: input.sessionID,
+                    prompt: result.prompt,
                 }
-
-                if (subcommand === "prune" || subcommand === "distill") {
-                    syncToolCache(state, config, logger, messages)
-                    buildToolIdList(state, messages, logger)
-                    const prunableToolsList = buildPrunableToolsList(state, config, logger)
-                    if (!prunableToolsList) {
-                        await sendIgnoredMessage(
-                            client,
-                            input.sessionID,
-                            "No prunable tool outputs are currently available for manual triggering.",
-                            params,
-                            logger,
-                        )
-                        throw new Error("__DCP_NO_PRUNABLE_TOOLS__")
-                    }
-
-                    output.parts = [
-                        {
-                            type: "text",
-                            text: getManualTriggerPrompt(subcommand, prunableToolsList),
-                        },
-                    ]
-                    return
-                }
-
-                output.parts = [
-                    {
-                        type: "text",
-                        text: getManualTriggerPrompt("compress"),
-                    },
-                ]
+                const rawArgs = (input.arguments || "").trim()
+                output.parts.length = 0
+                output.parts.push({
+                    type: "text",
+                    text: rawArgs ? `/dcp ${rawArgs}` : `/dcp ${subcommand}`,
+                })
                 return
             }
 
-            await handleHelpCommand({
-                client,
-                state,
-                logger,
-                sessionId: input.sessionID,
-                messages,
-            })
+            await handleHelpCommand(commandCtx)
             throw new Error("__DCP_HELP_HANDLED__")
         }
     }
