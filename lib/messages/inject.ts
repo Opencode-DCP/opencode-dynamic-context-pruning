@@ -1,5 +1,4 @@
 import type { SessionState, WithParts } from "../state"
-import type { Logger } from "../logger"
 import type { PluginConfig } from "../config"
 import type { UserMessage } from "@opencode-ai/sdk/v2"
 import { renderNudge } from "../prompts"
@@ -12,6 +11,7 @@ import {
 import { getFilePathsFromParameters, isProtected } from "../protected-file-patterns"
 import { getLastUserMessage, isMessageCompacted } from "../shared-utils"
 import { getCurrentTokenUsage } from "../strategies/utils"
+import { clog, C } from "../compress-logger"
 
 function parsePercentageString(value: string, total: number): number | undefined {
     if (!value.endsWith("%")) return undefined
@@ -162,14 +162,15 @@ const buildContextPressureTools = (state: SessionState, config: PluginConfig): s
 export const insertCompressToolContext = (
     state: SessionState,
     config: PluginConfig,
-    logger: Logger,
     messages: WithParts[],
 ): void => {
     if (state.manualMode || state.pendingManualTrigger) {
+        clog.debug(C.INJECT, "Skipping compress context injection (manual mode or pending trigger)")
         return
     }
 
     if (config.tools.compress.permission === "deny") {
+        clog.debug(C.INJECT, "Skipping compress context injection (compress denied)")
         return
     }
 
@@ -183,38 +184,48 @@ export const insertCompressToolContext = (
         : undefined
 
     if (state.lastToolPrune) {
-        logger.debug("Last context operation was compress - injecting cooldown")
+        clog.info(C.INJECT, "Injecting cooldown (lastToolPrune=true)")
         contentParts.push(wrapCooldownMessage())
     } else {
         if (config.tools.settings.contextPressureEnabled) {
             const contextPressureTools = buildContextPressureTools(state, config)
             if (contextPressureTools) {
                 contentParts.push(contextPressureTools)
+                clog.debug(C.INJECT, "Added context pressure tools list")
             }
         }
 
         if (config.tools.settings.compressContextEnabled) {
             contentParts.push(buildCompressContext(state, messages))
+            clog.debug(C.INJECT, "Added compress context block")
         }
 
         if (shouldInjectLimitNudge(config, state, messages, providerId, modelId)) {
-            logger.info("Injecting context-limit nudge")
+            clog.info(C.INJECT, "Injecting context-limit nudge", {
+                nudgeCounter: state.nudgeCounter,
+                currentTokens: getCurrentTokenUsage(messages),
+            })
             contentParts.push(renderNudge("context-limit"))
         } else if (
             config.tools.settings.nudgeEnabled &&
             state.nudgeCounter >= config.tools.settings.nudgeFrequency
         ) {
-            logger.info("Injecting frequency nudge")
+            clog.info(C.INJECT, "Injecting frequency nudge", {
+                nudgeCounter: state.nudgeCounter,
+                nudgeFrequency: config.tools.settings.nudgeFrequency,
+            })
             contentParts.push(renderNudge("frequency"))
         }
     }
 
     if (contentParts.length === 0) {
+        clog.debug(C.INJECT, "No content parts to inject")
         return
     }
 
     const combinedContent = contentParts.join("\n")
     if (!lastUserMessage) {
+        clog.warn(C.INJECT, "No last user message found, cannot inject")
         return
     }
 
@@ -223,16 +234,25 @@ export const insertCompressToolContext = (
         (message) => !(message.info.role === "user" && isIgnoredUserMessage(message)),
     )
     if (!lastNonIgnoredMessage) {
+        clog.warn(C.INJECT, "No non-ignored message found, cannot inject")
         return
     }
 
     if (lastNonIgnoredMessage.info.role === "user") {
         const textPart = createSyntheticTextPart(lastNonIgnoredMessage, combinedContent)
         lastNonIgnoredMessage.parts.push(textPart)
+        clog.debug(C.INJECT, "Injected as synthetic text part on user message", {
+            msgId: lastNonIgnoredMessage.info.id,
+            contentLen: combinedContent.length,
+        })
         return
     }
 
     const modelID = userInfo.model?.modelID || ""
     const toolPart = createSyntheticToolPart(lastNonIgnoredMessage, combinedContent, modelID)
     lastNonIgnoredMessage.parts.push(toolPart)
+    clog.debug(C.INJECT, "Injected as synthetic tool part on assistant message", {
+        msgId: lastNonIgnoredMessage.info.id,
+        contentLen: combinedContent.length,
+    })
 }

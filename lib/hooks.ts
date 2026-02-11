@@ -14,6 +14,7 @@ import { handleSweepCommand } from "./commands/sweep"
 import { handleManualToggleCommand, handleManualTriggerCommand } from "./commands/manual"
 import { ensureSessionInitialized } from "./state/state"
 import { getCurrentParams } from "./strategies/utils"
+import { clog, C } from "./compress-logger"
 
 const INTERNAL_AGENT_SIGNATURES = [
     "You are a title generator",
@@ -101,9 +102,15 @@ export function createChatMessageTransformHandler(
     config: PluginConfig,
 ) {
     return async (input: {}, output: { messages: WithParts[] }) => {
+        clog.debug(
+            C.HOOK,
+            `messages.transform: ${output.messages.length} messages, session=${state.sessionId}`,
+        )
+
         await checkSession(client, state, logger, output.messages, config.manualMode.enabled)
 
         if (state.isSubAgent) {
+            clog.debug(C.HOOK, "Skipping DCP transforms for sub-agent session")
             return
         }
 
@@ -114,12 +121,19 @@ export function createChatMessageTransformHandler(
         supersedeWrites(state, logger, config, output.messages)
         purgeErrors(state, logger, config, output.messages)
 
+        clog.debug(
+            C.HOOK,
+            `Before prune: ${output.messages.length} messages, prune.tools=${state.prune.tools.size}, prune.messages=${state.prune.messages.size}, summaries=${state.compressSummaries.length}`,
+        )
+
         prune(state, logger, config, output.messages)
+
+        clog.debug(C.HOOK, `After prune: ${output.messages.length} messages`)
 
         insertCompressToolContext(state, config, logger, output.messages)
 
-        annotateContext(output.messages)
         applyPendingManualTriggerPrompt(state, output.messages, logger)
+        annotateContext(output.messages)
 
         if (state.sessionId) {
             await logger.saveContext(state.sessionId, output.messages)

@@ -275,17 +275,31 @@ function formatTokenCount(n: number): string {
 }
 
 export function annotateContext(messages: WithParts[]): void {
+    let uid = 0
+    let muid = 0
     for (const msg of messages) {
         const parts = Array.isArray(msg.parts) ? msg.parts : []
+
+        if (msg.info.role === "user" && !isIgnoredUserMessage(msg)) {
+            muid++
+            const text = parts.find(
+                (p) => p.type === "text" && !(p as any).ignored && !(p as any).synthetic,
+            )
+            if (text && text.type === "text") {
+                text.text = `[muid_${muid}]\n${text.text}`
+            }
+        }
+
         for (const part of parts) {
             if (part.type !== "tool") continue
+            uid++
             const tokens = countToolTokens(part)
-            if (tokens <= 0) continue
-            const tag = `[${formatTokenCount(tokens)}]`
+            const uidTag = `[uid_${uid}]`
+            const tokenTag = tokens > 0 ? ` [${formatTokenCount(tokens)}]` : ""
+            const tag = `${uidTag}${tokenTag}`
             if (part.state?.status === "completed" && typeof part.state.output === "string") {
                 part.state.output = `${tag}\n${part.state.output}`
-            }
-            if (part.state?.status === "error" && typeof part.state.error === "string") {
+            } else if (part.state?.status === "error" && typeof part.state.error === "string") {
                 part.state.error = `${tag}\n${part.state.error}`
             }
         }

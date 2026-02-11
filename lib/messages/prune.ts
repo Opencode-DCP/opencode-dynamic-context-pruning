@@ -4,6 +4,7 @@ import type { PluginConfig } from "../config"
 import { isMessageCompacted, getLastUserMessage } from "../shared-utils"
 import { createSyntheticUserMessage, COMPRESS_SUMMARY_PREFIX } from "./utils"
 import type { UserMessage } from "@opencode-ai/sdk/v2"
+import { clog, C } from "../compress-logger"
 
 const PRUNED_TOOL_OUTPUT_REPLACEMENT =
     "[Output removed to save context - information superseded or no longer needed]"
@@ -169,10 +170,20 @@ const filterCompressedRanges = (
     messages: WithParts[],
 ): void => {
     if (!state.prune.messages?.size) {
+        clog.debug(C.PRUNE, "filterCompressedRanges: no pruned messages, skipping")
         return
     }
 
+    clog.info(C.PRUNE, "filterCompressedRanges entry", {
+        totalMessages: messages.length,
+        prunedMessagesCount: state.prune.messages.size,
+        compressSummariesCount: state.compressSummaries.length,
+        summaryAnchors: state.compressSummaries.map((s) => s.anchorMessageId),
+    })
+
     const result: WithParts[] = []
+    let injected = 0
+    let pruned = 0
 
     for (const msg of messages) {
         const msgId = msg.info.id
@@ -190,26 +201,41 @@ const filterCompressedRanges = (
                 result.push(
                     createSyntheticUserMessage(userMessage, summaryContent, userInfo.variant),
                 )
+                injected++
 
-                logger.info("Injected compress summary", {
+                clog.info(C.PRUNE, `Injected compress summary at anchor`, {
                     anchorMessageId: msgId,
                     summaryLength: summary.summary.length,
+                    summaryPreview: summary.summary.substring(0, 80),
+                    baseUserMsgId: userMessage.info.id,
                 })
             } else {
-                logger.warn("No user message found for compress summary", {
+                clog.error(C.PRUNE, `No user message found for compress summary injection`, {
                     anchorMessageId: msgId,
+                    msgIndex,
+                    messageRoles: messages
+                        .slice(0, msgIndex + 1)
+                        .map((m, i) => `${i}:${m.info.role}`),
                 })
             }
         }
 
         // Skip messages that are in the prune list
         if (state.prune.messages.has(msgId)) {
+            pruned++
             continue
         }
 
         // Normal message, include it
         result.push(msg)
     }
+
+    clog.info(C.PRUNE, "filterCompressedRanges complete", {
+        inputMessages: messages.length,
+        outputMessages: result.length,
+        summariesInjected: injected,
+        messagesPruned: pruned,
+    })
 
     // Replace messages array contents
     messages.length = 0

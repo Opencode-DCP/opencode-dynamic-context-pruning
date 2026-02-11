@@ -20,5 +20,5 @@ Avoid unnecessary context build-up with targeted uses of the `compress` tool. St
 
 If you are performing a critical atomic operation, do not interrupt it, but make sure to perform context management rapidly
 
-Be mindful of the startString and endString you use for compression and prefer using `muid` and `uid` strings for reliable boundary matching. Ensure your summaries are inclusive of all parts of the range.
+Be mindful of the startString and endString you use for compression. Use `muid` and `uid` strings AS THE DEFAULT boundary anchors whenever available (do NOT rely on generic prose snippets that can repeat). Ensure your summaries are inclusive of all parts of the range.
 </instruction>
