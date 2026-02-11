@@ -141,7 +141,7 @@ const buildContextPressureTools = (state: SessionState, config: PluginConfig): s
         const paramKey = extractParameterKey(entry.tool, entry.parameters)
         const description = paramKey ? `${entry.tool}, ${paramKey}` : entry.tool
         const tokens = entry.tokenCount ?? 0
-        const tokenSuffix = entry.tokenCount !== undefined ? ` (~${entry.tokenCount} tokens)` : ""
+        const tokenSuffix = entry.tokenCount !== undefined ? ` (${entry.tokenCount} tokens)` : ""
         lines.push({ tokens, text: `- ${description}${tokenSuffix}` })
     })
 

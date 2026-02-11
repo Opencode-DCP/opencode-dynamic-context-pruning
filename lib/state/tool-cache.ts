@@ -76,7 +76,7 @@ export function syncToolCache(
                     tokenCount,
                 })
                 logger.info(
-                    `Cached tool id: ${part.callID} (turn ${turnCounter}${tokenCount !== undefined ? `, ~${tokenCount} tokens` : ""})`,
+                    `Cached tool id: ${part.callID} (turn ${turnCounter}${tokenCount !== undefined ? `, ${tokenCount} tokens` : ""})`,
                 )
             }
         }

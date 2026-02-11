@@ -269,11 +269,6 @@ export const findMessageIndex = (messages: WithParts[], messageId: string): numb
     return messages.findIndex((msg) => msg.info.id === messageId)
 }
 
-function formatTokenCount(n: number): string {
-    if (n >= 1000) return `${(n / 1000).toFixed(1)}k tokens`
-    return `${n} tokens`
-}
-
 export function annotateContext(messages: WithParts[]): void {
     for (const msg of messages) {
         const parts = Array.isArray(msg.parts) ? msg.parts : []
@@ -281,12 +276,12 @@ export function annotateContext(messages: WithParts[]): void {
             if (part.type !== "tool") continue
             const tokens = countToolTokens(part)
             if (tokens <= 0) continue
-            const tag = `[${formatTokenCount(tokens)}]`
+            const tag = `[This tool added ${tokens} tokens to the context]\n---\n`
             if (part.state?.status === "completed" && typeof part.state.output === "string") {
-                part.state.output = `${tag}\n${part.state.output}`
+                part.state.output = `${tag}${part.state.output}`
             }
             if (part.state?.status === "error" && typeof part.state.error === "string") {
-                part.state.error = `${tag}\n${part.state.error}`
+                part.state.error = `${tag}${part.state.error}`
             }
         }
     }
