@@ -58,8 +58,14 @@ PARALLEL COMPRESS EXECUTION
 When multiple independent ranges are ready and their boundaries do not overlap, launch MULTIPLE `compress` calls in parallel in a single response. Run compression sequentially only when ranges overlap or when a later range depends on the result of an earlier compression.
 
 THE FORMAT OF COMPRESS
-`topic`: Short label (3-5 words) for display - e.g., "Auth System Exploration"
-`content`: Object containing:
-`startString`: Unique text string marking the beginning of the range
-`endString`: Unique text string marking the end of the range
-`summary`: Complete technical summary replacing all content in the range
+
+```
+{
+  topic: string,           // Short label (3-5 words) - e.g., "Auth System Exploration"
+  content: {
+    startString: string,   // Unique text string marking the beginning of the range
+    endString: string,     // Unique text string marking the end of the range
+    summary: string        // Complete technical summary replacing all content in the range
+  }
+}
+```
