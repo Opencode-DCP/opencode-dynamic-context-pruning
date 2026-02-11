@@ -1,6 +1,7 @@
 import { partial_ratio } from "fuzzball"
 import type { WithParts } from "../state"
 import type { Logger } from "../logger"
+import { isIgnoredUserMessage } from "../messages/utils"
 
 export interface FuzzyConfig {
     minScore: number
@@ -25,6 +26,9 @@ function extractMessageContent(msg: WithParts): string {
 
     for (const part of parts) {
         const p = part as Record<string, unknown>
+        if ((part as any).ignored) {
+            continue
+        }
 
         switch (part.type) {
             case "text":
@@ -81,6 +85,9 @@ function findExactMatches(messages: WithParts[], searchString: string): MatchRes
 
     for (let i = 0; i < messages.length; i++) {
         const msg = messages[i]
+        if (isIgnoredUserMessage(msg)) {
+            continue
+        }
         const content = extractMessageContent(msg)
         if (content.includes(searchString)) {
             matches.push({
@@ -104,6 +111,9 @@ function findFuzzyMatches(
 
     for (let i = 0; i < messages.length; i++) {
         const msg = messages[i]
+        if (isIgnoredUserMessage(msg)) {
+            continue
+        }
         const content = extractMessageContent(msg)
         const score = partial_ratio(searchString, content)
         if (score >= minScore) {
@@ -145,7 +155,7 @@ export function findStringInMessages(
     const fuzzyMatches = findFuzzyMatches(searchableMessages, searchString, fuzzyConfig.minScore)
 
     if (fuzzyMatches.length === 0) {
-        if (lastMessage) {
+        if (lastMessage && !isIgnoredUserMessage(lastMessage)) {
             const lastMsgContent = extractMessageContent(lastMessage)
             const lastMsgIndex = messages.length - 1
             if (lastMsgContent.includes(searchString)) {
