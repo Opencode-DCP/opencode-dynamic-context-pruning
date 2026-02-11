@@ -243,6 +243,17 @@ export function validateConfigTypes(config: Record<string, any>): ValidationErro
                 actual: typeof config.turnProtection.turns,
             })
         }
+        // Warn if turns is 0 or negative
+        if (
+            typeof config.turnProtection.turns === "number" &&
+            config.turnProtection.turns < 1
+        ) {
+            errors.push({
+                key: "turnProtection.turns",
+                expected: "positive number (>= 1)",
+                actual: `${config.turnProtection.turns}`,
+            })
+        }
     }
 
     // Commands validator
@@ -495,6 +506,17 @@ export function validateConfigTypes(config: Record<string, any>): ValidationErro
                     key: "strategies.purgeErrors.turns",
                     expected: "number",
                     actual: typeof strategies.purgeErrors.turns,
+                })
+            }
+            // Warn if turns is 0 or negative - will be clamped to 1
+            if (
+                typeof strategies.purgeErrors.turns === "number" &&
+                strategies.purgeErrors.turns < 1
+            ) {
+                errors.push({
+                    key: "strategies.purgeErrors.turns",
+                    expected: "positive number (>= 1)",
+                    actual: `${strategies.purgeErrors.turns} (will be clamped to 1)`,
                 })
             }
             if (

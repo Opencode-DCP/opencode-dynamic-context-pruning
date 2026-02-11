@@ -39,7 +39,8 @@ export const purgeErrors = (
     }
 
     const protectedTools = config.strategies.purgeErrors.protectedTools
-    const turnThreshold = config.strategies.purgeErrors.turns
+    // Ensure turnThreshold is at least 1 to prevent immediate pruning of all errors
+    const turnThreshold = Math.max(1, config.strategies.purgeErrors.turns)
 
     const newPruneIds: string[] = []
 

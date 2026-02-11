@@ -14,6 +14,14 @@ import { handleSweepCommand } from "./commands/sweep"
 import { handleManualToggleCommand, handleManualTriggerCommand } from "./commands/manual"
 import { ensureSessionInitialized } from "./state/state"
 import { getCurrentParams } from "./strategies/utils"
+import {
+    DCPContextHandledError,
+    DCPStatsHandledError,
+    DCPSweepHandledError,
+    DCPManualHandledError,
+    DCPManualTriggerBlockedError,
+    DCPHelpHandledError,
+} from "./errors"
 
 const INTERNAL_AGENT_SIGNATURES = [
     "You are a title generator",
@@ -172,12 +180,12 @@ export function createCommandExecuteHandler(
 
             if (subcommand === "context") {
                 await handleContextCommand(commandCtx)
-                throw new Error("__DCP_CONTEXT_HANDLED__")
+                throw new DCPContextHandledError()
             }
 
             if (subcommand === "stats") {
                 await handleStatsCommand(commandCtx)
-                throw new Error("__DCP_STATS_HANDLED__")
+                throw new DCPStatsHandledError()
             }
 
             if (subcommand === "sweep") {
@@ -186,12 +194,12 @@ export function createCommandExecuteHandler(
                     args: subArgs,
                     workingDirectory,
                 })
-                throw new Error("__DCP_SWEEP_HANDLED__")
+                throw new DCPSweepHandledError()
             }
 
             if (subcommand === "manual") {
                 await handleManualToggleCommand(commandCtx, subArgs[0]?.toLowerCase())
-                throw new Error("__DCP_MANUAL_HANDLED__")
+                throw new DCPManualHandledError()
             }
 
             if (
@@ -201,7 +209,7 @@ export function createCommandExecuteHandler(
                 const userFocus = subArgs.join(" ").trim()
                 const prompt = await handleManualTriggerCommand(commandCtx, subcommand, userFocus)
                 if (!prompt) {
-                    throw new Error("__DCP_MANUAL_TRIGGER_BLOCKED__")
+                    throw new DCPManualTriggerBlockedError()
                 }
 
                 state.pendingManualTrigger = {
@@ -218,7 +226,7 @@ export function createCommandExecuteHandler(
             }
 
             await handleHelpCommand(commandCtx)
-            throw new Error("__DCP_HELP_HANDLED__")
+            throw new DCPHelpHandledError()
         }
     }
 }
