@@ -92,7 +92,15 @@ export function createSystemPromptHandler(
             return
         }
 
-        output.system.push(renderSystemPrompt(flags))
+        // Concatenate to system[0] instead of push() to avoid creating
+        // multiple {role: "system"} messages. OpenCode maps each system[]
+        // element to a separate system message, and providers typically
+        // only respect the last one — which drops the agent prompt.
+        if (output.system.length > 0) {
+            output.system[0] += "\n\n" + renderSystemPrompt(flags)
+        } else {
+            output.system.push(renderSystemPrompt(flags))
+        }
     }
 }
 
