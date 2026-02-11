@@ -3,6 +3,7 @@ import { isMessageCompacted } from "../shared-utils"
 import { Logger } from "../logger"
 import type { SessionState, WithParts } from "../state"
 import type { UserMessage } from "@opencode-ai/sdk/v2"
+import { countToolTokens } from "../strategies/utils"
 
 export const COMPRESS_SUMMARY_PREFIX = "[Compressed conversation block]\n\n"
 
@@ -266,4 +267,27 @@ export const isIgnoredUserMessage = (message: WithParts): boolean => {
 
 export const findMessageIndex = (messages: WithParts[], messageId: string): number => {
     return messages.findIndex((msg) => msg.info.id === messageId)
+}
+
+function formatTokenCount(n: number): string {
+    if (n >= 1000) return `${(n / 1000).toFixed(1)}k tokens`
+    return `${n} tokens`
+}
+
+export function annotateContext(messages: WithParts[]): void {
+    for (const msg of messages) {
+        const parts = Array.isArray(msg.parts) ? msg.parts : []
+        for (const part of parts) {
+            if (part.type !== "tool") continue
+            const tokens = countToolTokens(part)
+            if (tokens <= 0) continue
+            const tag = `[${formatTokenCount(tokens)}]`
+            if (part.state?.status === "completed" && typeof part.state.output === "string") {
+                part.state.output = `${tag}\n${part.state.output}`
+            }
+            if (part.state?.status === "error" && typeof part.state.error === "string") {
+                part.state.error = `${tag}\n${part.state.error}`
+            }
+        }
+    }
 }
