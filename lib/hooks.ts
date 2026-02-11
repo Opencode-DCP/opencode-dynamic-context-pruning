@@ -4,7 +4,7 @@ import type { PluginConfig } from "./config"
 import { syncToolCache } from "./state/tool-cache"
 import { deduplicate, supersedeWrites, purgeErrors } from "./strategies"
 import { prune, insertCompressToolContext } from "./messages"
-import { buildToolIdList, isIgnoredUserMessage } from "./messages/utils"
+import { buildToolIdList, isIgnoredUserMessage, annotateContext } from "./messages/utils"
 import { checkSession } from "./state"
 import { renderSystemPrompt } from "./prompts"
 import { handleStatsCommand } from "./commands/stats"
@@ -115,8 +115,10 @@ export function createChatMessageTransformHandler(
         purgeErrors(state, logger, config, output.messages)
 
         prune(state, logger, config, output.messages)
+
         insertCompressToolContext(state, config, logger, output.messages)
 
+        annotateContext(output.messages)
         applyPendingManualTriggerPrompt(state, output.messages, logger)
 
         if (state.sessionId) {
