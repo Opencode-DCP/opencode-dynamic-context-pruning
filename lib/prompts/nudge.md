@@ -18,6 +18,13 @@ The context window is filling-up. You've reached a point where performance may i
 
 Avoid unnecessary context build-up with targeted uses of the `compress` tool. Start with low hanging fruits and clearly identified ranges that can be compressed with minimal risk of losing critical information. Look BACK on the conversation history and avoid compressing the newest ranges until you have exhausted older ones
 
+SCALE PRIORITY (MANDATORY)
+Use MICRO first.
+Escalate to MESO when MICRO is insufficient.
+Use MACRO only as a last resort when a larger chapter is truly closed and bounded.
+Do not jump directly to MACRO when independent MICRO/MESO ranges are available.
+When multiple independent stale ranges are ready, batch MICRO/MESO compressions in parallel.
+
 If you are performing a critical atomic operation, do not interrupt it, but make sure to perform context management rapidly
 
 Be mindful of the startString and endString you use for compression and prefer using `muid` and `uid` strings for reliable boundary matching. Ensure your summaries are inclusive of all parts of the range.
