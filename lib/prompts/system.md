@@ -14,7 +14,7 @@ MACRO: for completed phases, distilling entire chapters of conversation
 A strategic and regular use of the `compress` tool is encouraged to maintain a focused context. Be proactive and deliberate in managing your context.
 
 BOUNDARY MATCHING
-`compress` uses inclusive string boundaries, matching a string at the start of a message or tool output will consume the entire item. User messages are annotated with `muid`, tool outputs with `uid`, and are intended for you to use as startString and endString anchors to avoid any potential mismatch errors. You can also use unique text from your own reasoning or text outputs, but be sure to provide more than enough surrounding context to ensure a unique match. The preferred way to match is still to use `muid` and `uid` strings.
+`compress` uses inclusive string boundaries, matching a string at the start of a message or tool output will consume the entire item. You can use unique text from your own reasoning or text outputs, but be sure to provide more than enough surrounding context to ensure a unique match.
 
 THE SUMMARY STANDARD
 Your summary MUST be technical and specific enough to preserve FULL understanding of what transpired, such that NO ambiguity remains about what asked, found, planned, done, or decided - yet noise free

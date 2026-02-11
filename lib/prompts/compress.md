@@ -39,7 +39,7 @@ BOUNDARY MATCHING
 You specify boundaries by matching unique text strings in the conversation. CRITICAL: In code-centric conversations, strings repeat often. Provide sufficiently unique text to match exactly once. If a match fails (not found or found multiple times), the tool will error - extend your boundary string with more surrounding context in order to make SURE the tool does NOT error.
 
 WHERE TO PICK STRINGS FROM (important for reliable matching):
-- `muid` and `uid` strings in message and tool output annotations (MOST RELIABLE - guaranteed unique)
+
 - Your own assistant text responses (MOST RELIABLE - always stored verbatim)
 - The user's own words in their messages
 - Tool result output text (distinctive substrings within the output)
