@@ -29,6 +29,8 @@ BOUNDARY MATCHING
 THE SUMMARY STANDARD
 Your summary MUST be technical and specific enough to preserve FULL understanding of what transpired, such that NO ambiguity remains about what asked, found, planned, done, or decided - yet noise free
 
+When compressing ranges that include user messages, preserve user intent faithfully. Do not reinterpret or redirect the request. Directly quote short user messages when that is the most reliable way to preserve exact meaning.
+
 Preserve key details: file paths, symbols, signatures, constraints, decisions, outcomes, commands, etc.. in order to produce a high fidelity, authoritative technical record
 
 DO NOT COMPRESS IF

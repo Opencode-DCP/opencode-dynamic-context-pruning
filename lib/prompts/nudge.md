@@ -28,4 +28,6 @@ When multiple independent stale ranges are ready, batch MICRO/MESO compressions 
 If you are performing a critical atomic operation, do not interrupt it, but make sure to perform context management rapidly
 
 Be mindful of the startString and endString you use for compression and prefer using `muid` and `uid` strings for reliable boundary matching. Ensure your summaries are inclusive of all parts of the range.
+
+If the compressed range includes user messages, preserve user intent exactly. Prefer direct quotes for short user messages to avoid semantic drift.
 </instruction>
