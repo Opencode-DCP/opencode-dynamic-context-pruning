@@ -8,7 +8,7 @@ import * as fs from "fs/promises"
 import { existsSync } from "fs"
 import { homedir } from "os"
 import { join } from "path"
-import type { SessionState, SessionStats, CompressSummary } from "./types"
+import type { SessionState, SessionStats, CompressSummary, ContextLimitAnchor } from "./types"
 import type { Logger } from "../logger"
 
 /** Prune state as stored on disk */
@@ -25,6 +25,8 @@ export interface PersistedSessionState {
     sessionName?: string
     prune: PersistedPrune
     compressSummaries: CompressSummary[]
+    contextLimitAnchors: ContextLimitAnchor[]
+    limitNudgeInjections?: ContextLimitAnchor[]
     stats: SessionStats
     lastUpdated: string
 }
@@ -66,6 +68,7 @@ export async function saveSessionState(
                 messages: Object.fromEntries(sessionState.prune.messages),
             },
             compressSummaries: sessionState.compressSummaries,
+            contextLimitAnchors: sessionState.contextLimitAnchors,
             stats: sessionState.stats,
             lastUpdated: new Date().toISOString(),
         }
@@ -128,6 +131,26 @@ export async function loadSessionState(
         } else {
             state.compressSummaries = []
         }
+
+        const rawContextLimitAnchors = Array.isArray(state.contextLimitAnchors)
+            ? state.contextLimitAnchors
+            : Array.isArray(state.limitNudgeInjections)
+              ? state.limitNudgeInjections
+              : []
+        const validAnchors = rawContextLimitAnchors.filter(
+            (entry): entry is ContextLimitAnchor =>
+                entry !== null &&
+                typeof entry === "object" &&
+                typeof entry.anchorMessageId === "string",
+        )
+        if (validAnchors.length !== rawContextLimitAnchors.length) {
+            logger.warn("Filtered out malformed contextLimitAnchors entries", {
+                sessionId: sessionId,
+                original: rawContextLimitAnchors.length,
+                valid: validAnchors.length,
+            })
+        }
+        state.contextLimitAnchors = validAnchors
 
         logger.info("Loaded session state from disk", {
             sessionId: sessionId,

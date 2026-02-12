@@ -26,6 +26,10 @@ export interface CompressSummary {
     summary: string
 }
 
+export interface ContextLimitAnchor {
+    anchorMessageId: string
+}
+
 export interface Prune {
     tools: Map<string, number>
     messages: Map<string, number>
@@ -43,6 +47,7 @@ export interface SessionState {
     pendingManualTrigger: PendingManualTrigger | null
     prune: Prune
     compressSummaries: CompressSummary[]
+    contextLimitAnchors: ContextLimitAnchor[]
     stats: SessionStats
     toolParameters: Map<string, ToolParameterEntry>
     toolIdList: string[]

@@ -63,6 +63,7 @@ export function createSessionState(): SessionState {
             messages: new Map<string, number>(),
         },
         compressSummaries: [],
+        contextLimitAnchors: [],
         stats: {
             pruneTokenCounter: 0,
             totalPruneTokens: 0,
@@ -89,6 +90,7 @@ export function resetSessionState(state: SessionState): void {
         messages: new Map<string, number>(),
     }
     state.compressSummaries = []
+    state.contextLimitAnchors = []
     state.stats = {
         pruneTokenCounter: 0,
         totalPruneTokens: 0,
@@ -138,6 +140,7 @@ export async function ensureSessionInitialized(
     state.prune.tools = loadPruneMap(persisted.prune.tools, persisted.prune.toolIds)
     state.prune.messages = loadPruneMap(persisted.prune.messages, persisted.prune.messageIds)
     state.compressSummaries = persisted.compressSummaries || []
+    state.contextLimitAnchors = persisted.contextLimitAnchors || []
     state.stats = {
         pruneTokenCounter: persisted.stats?.pruneTokenCounter || 0,
         totalPruneTokens: persisted.stats?.totalPruneTokens || 0,
