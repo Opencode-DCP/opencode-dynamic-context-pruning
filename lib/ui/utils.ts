@@ -59,32 +59,27 @@ export function formatProgressBar(
     return `│${bar}│`
 }
 
-export function formatCompressBar(
-    sessionContext: number,
-    compressedAmount: number,
-    width: number = 20,
+export function formatSessionMap(
+    messageIds: string[],
+    prunedMessages: Map<string, number>,
+    width: number = 50,
 ): string {
-    if (sessionContext <= 0) return `│${"░".repeat(width)}│ 0%`
+    const total = messageIds.length
+    if (total === 0) return `│${"░".repeat(width)}│`
 
-    // sessionContext already includes compressedAmount (it's the full session total)
-    const remainingRatio = (sessionContext - compressedAmount) / sessionContext
-    const remainingWidth = Math.round(remainingRatio * width)
-    const compressedWidth = width - remainingWidth
-    const reductionPercent = -Math.round((compressedAmount / sessionContext) * 100)
+    const bar = new Array(width).fill("█")
 
-    clog.info(C.COMPRESS, `formatCompressBar`, {
-        sessionContext,
-        compressedAmount,
-        remainingRatio: remainingRatio.toFixed(4),
-        remainingWidth,
-        compressedWidth,
-        reductionPercent,
-    })
+    for (let m = 0; m < total; m++) {
+        if (prunedMessages.has(messageIds[m])) {
+            const start = Math.floor((m / total) * width)
+            const end = Math.floor(((m + 1) / total) * width)
+            for (let i = start; i < end; i++) {
+                bar[i] = "░"
+            }
+        }
+    }
 
-    const remainingBar = "█".repeat(Math.max(0, remainingWidth))
-    const compressedBar = "░".repeat(Math.max(0, compressedWidth))
-
-    return `│${remainingBar}${compressedBar}│`
+    return `│${bar.join("")}│`
 }
 
 export function shortenPath(input: string, workingDirectory?: string): string {

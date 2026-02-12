@@ -362,6 +362,11 @@ export function createCompressTool(ctx: ToolContext): ReturnType<typeof tool> {
                     }
                 }
 
+                // Cap estimate — countAllMessageTokens can inflate beyond API count
+                if (totalSessionTokens > 0 && estimatedCompressedTokens > totalSessionTokens) {
+                    estimatedCompressedTokens = Math.round(totalSessionTokens * 0.95)
+                }
+
                 clog.info(C.COMPRESS, `Token Accounting`, {
                     totalSessionTokens,
                     estimatedCompressedTokens,
@@ -414,8 +419,7 @@ export function createCompressTool(ctx: ToolContext): ReturnType<typeof tool> {
                     summaryTokens,
                     totalSessionTokens,
                     estimatedCompressedTokens,
-                    rawStartResult,
-                    rawEndResult,
+                    messages.map((m) => m.info.id),
                     messages.length,
                     currentParams,
                 )

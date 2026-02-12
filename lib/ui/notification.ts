@@ -4,7 +4,7 @@ import {
     formatPrunedItemsList,
     formatStatsHeader,
     formatTokenCount,
-    formatCompressBar,
+    formatSessionMap,
 } from "./utils"
 import { ToolParameterEntry } from "../state"
 import { PluginConfig } from "../config"
@@ -141,8 +141,7 @@ export async function sendCompressNotification(
     summaryTokens: number,
     totalSessionTokens: number,
     compressedTokens: number,
-    startResult: any,
-    endResult: any,
+    sessionMessageIds: string[],
     totalMessages: number,
     params: any,
 ): Promise<boolean> {
@@ -168,10 +167,11 @@ export async function sendCompressNotification(
                 totalSessionTokens > 0 ? (compressedTokens / totalSessionTokens).toFixed(4) : "N/A",
         })
 
-        const progressBar = formatCompressBar(totalSessionTokens, compressedTokens, 25)
+        const progressBar = formatSessionMap(sessionMessageIds, state.prune.messages, 50)
         const reduction =
             totalSessionTokens > 0 ? Math.round((compressedTokens / totalSessionTokens) * 100) : 0
-        message += `\n\n▣ Compressing (${pruneTokenCounterStr} removed, ${reduction}% reduction) ${progressBar}`
+        message += `\n\n▣ Compressing (${pruneTokenCounterStr} removed, ${reduction}% reduction)`
+        message += `\n${progressBar}`
         message += `\n→ Topic: ${topic}`
         message += `\n→ Items: ${messageIds.length} messages`
         if (toolIds.length > 0) {
