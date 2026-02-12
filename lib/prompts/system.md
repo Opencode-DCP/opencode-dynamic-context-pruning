@@ -9,9 +9,9 @@ Compression can operate at various scales. The method is the same regardless of 
 
 You will default to micro and meso compressions
 
-MICRO: ideal for low-latency noise disposal
-MESO: good to filter signal from noise of heavy tool outputs or decluttering the session from closed/resolved investigation paths
-MACRO: more occasional, for truly closed chapters when smaller ranges are not sufficient
+MICRO: ideal for low-latency operations, should aim to compress a range of AT LEAST 5000 tokens to justify the tool call.
+MESO: good to filter signal from noise of heavy tool outputs or decluttering the session from closed/resolved investigation paths, aim for AT LEAST 10000 tokens
+MACRO: more occasional, for truly closed chapters when smaller ranges are not sufficient, aim for 20000+ tokens
 
 Use `compress` as steady housekeeping while you work.
 
