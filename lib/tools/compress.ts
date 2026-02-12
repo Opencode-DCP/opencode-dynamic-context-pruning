@@ -434,6 +434,7 @@ export function createCompressTool(ctx: ToolContext): ReturnType<typeof tool> {
                 state.stats.totalPruneTokens += state.stats.pruneTokenCounter
                 state.stats.pruneTokenCounter = 0
                 state.nudgeCounter = 0
+                state.contextLimitAnchors = new Set<string>()
 
                 clog.info(C.COMPRESS, `Final Stats`, {
                     totalPruneTokens: state.stats.totalPruneTokens,
