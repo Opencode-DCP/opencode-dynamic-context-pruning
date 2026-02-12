@@ -9,7 +9,7 @@ import {
     findLatestAnchorMessageIndex,
     getLastUserModelContext,
     isContextOverLimit,
-    messageHasCompletedCompress,
+    messageHasCompress,
     shouldAddAnchor,
 } from "./utils"
 
@@ -42,7 +42,7 @@ export const insertCompressToolContext = (
         return
     }
 
-    if (messageHasCompletedCompress(lastNonIgnoredMessage.message)) {
+    if (messageHasCompress(lastNonIgnoredMessage.message)) {
         logger.debug("Skipping context-limit hint injection after compress tool output")
         return
     }
