@@ -1,6 +1,8 @@
 import type { SessionState, WithParts } from "../../state"
 import type { PluginConfig } from "../../config"
+import type { Logger } from "../../logger"
 import type { UserMessage } from "@opencode-ai/sdk/v2"
+import { saveSessionState } from "../../state/persistence"
 import { createSyntheticTextPart, createSyntheticToolPart, isIgnoredUserMessage } from "../utils"
 import { getLastUserMessage } from "../../shared-utils"
 import { getCurrentTokenUsage } from "../../strategies/utils"
@@ -13,6 +15,18 @@ export interface LastUserModelContext {
 export interface LastNonIgnoredMessage {
     message: WithParts
     index: number
+}
+
+export function getLimitNudgeInterval(config: PluginConfig): number {
+    return Math.max(1, Math.floor(config.tools.settings.limitNudgeInterval || 1))
+}
+
+export function persistAnchors(state: SessionState, logger: Logger): void {
+    saveSessionState(state, logger).catch((error) => {
+        logger.warn("Failed to persist context-limit anchors", {
+            error: error instanceof Error ? error.message : String(error),
+        })
+    })
 }
 
 function parsePercentageString(value: string, total: number): number | undefined {

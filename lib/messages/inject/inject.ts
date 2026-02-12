@@ -1,31 +1,20 @@
 import type { SessionState, WithParts } from "../../state"
 import type { Logger } from "../../logger"
 import type { PluginConfig } from "../../config"
-import { saveSessionState } from "../../state/persistence"
 import {
     addAnchor,
     applyAnchoredHints,
     findLastNonIgnoredMessage,
     findLatestAnchorMessageIndex,
+    getLimitNudgeInterval,
     getLastUserModelContext,
     isContextOverLimit,
-    messageHasCompress,
+    messageHasCompletedCompress,
+    persistAnchors,
     shouldAddAnchor,
 } from "./utils"
 
 const CONTEXT_LIMIT_HINT_TEXT = "your context exceeds the context limit, you must use compress soon"
-
-function getLimitNudgeInterval(config: PluginConfig): number {
-    return Math.max(1, Math.floor(config.tools.settings.limitNudgeInterval || 1))
-}
-
-function persistAnchors(state: SessionState, logger: Logger): void {
-    saveSessionState(state, logger).catch((error) => {
-        logger.warn("Failed to persist context-limit anchors", {
-            error: error instanceof Error ? error.message : String(error),
-        })
-    })
-}
 
 export const insertCompressToolContext = (
     state: SessionState,
@@ -42,7 +31,7 @@ export const insertCompressToolContext = (
         return
     }
 
-    if (messageHasCompress(lastNonIgnoredMessage.message)) {
+    if (messageHasCompletedCompress(lastNonIgnoredMessage.message)) {
         logger.debug("Skipping context-limit hint injection after compress tool output")
         return
     }
