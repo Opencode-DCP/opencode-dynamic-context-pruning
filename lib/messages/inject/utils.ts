@@ -81,7 +81,7 @@ function resolveContextLimit(
     return contextLimit
 }
 
-export function getLastUserModelContext(messages: WithParts[]): LastUserModelContext {
+export function getModelInfo(messages: WithParts[]): LastUserModelContext {
     const lastUserMessage = getLastUserMessage(messages)
     if (!lastUserMessage) {
         return {

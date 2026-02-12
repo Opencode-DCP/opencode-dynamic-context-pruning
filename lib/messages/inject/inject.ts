@@ -7,7 +7,7 @@ import {
     findLastNonIgnoredMessage,
     findLatestAnchorMessageIndex,
     getLimitNudgeInterval,
-    getLastUserModelContext,
+    getModelInfo,
     isContextOverLimit,
     messageHasCompletedCompress,
     persistAnchors,
@@ -36,7 +36,7 @@ export const insertCompressToolContext = (
         return
     }
 
-    const { providerId, modelId } = getLastUserModelContext(messages)
+    const { providerId, modelId } = getModelInfo(messages)
     let anchorsChanged = false
 
     if (isContextOverLimit(config, state, providerId, modelId, messages)) {
