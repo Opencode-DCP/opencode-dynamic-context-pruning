@@ -35,6 +35,9 @@ If you are performing a critical atomic operation, do not interrupt it, but make
 
 BE VERY MINDFUL of the startString and endString you use for compression for RELIABLE boundary matching. NEVER use generic tool outputs like "Edit applied successfully." or generic status message as boundaries. Use unique assistant text or distinctive content instead with enough surrounding context to ensure uniqueness.
 
+CRITICAL: AVOID USING TOOL INPUT VALUES AS BOUNDARIES
+NEVER use tool input schema keys or field names. The ONLY acceptable use of tool input strings is a SINGLE concrete field VALUE (not the key), and even then, prefer assistant text, user messages, or tool result outputs instead.
+
 Ensure your summaries are inclusive of all parts of the range.
 If the compressed range includes user messages, preserve user intent exactly. Prefer direct quotes for short user messages to avoid semantic drift.
 </instruction>

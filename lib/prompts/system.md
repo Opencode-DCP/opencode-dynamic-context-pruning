@@ -31,6 +31,7 @@ NEVER use generic tool status messages as boundaries (e.g. "Edit applied success
 RESPECT THE CHRONOLOGY OF THE RANGE
 STARTSTRING MUST ALWAYS BE ABOVE ENDSTRING
 ENDSTRING MUST ALWAYS BE BELOW STARTSTRING
+DO NOT USE A TOOL SCHEMA FIELD FOR START OR END STRING.
 
 THE SUMMARY STANDARD
 Your summary MUST be technical and specific enough to preserve FULL understanding of what transpired, such that NO ambiguity remains about what asked, found, planned, done, or decided - yet noise free

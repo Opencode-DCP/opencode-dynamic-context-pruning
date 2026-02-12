@@ -61,7 +61,7 @@ WHERE TO PICK STRINGS FROM (important for reliable matching):
 - The user's own words in their messages
 - Tool result output text (distinctive substrings within the output)
 - Previous compress summaries
-- Tool input string values (individual values, not whole serialized objects)
+- Tool input string values (LEAST RELIABLE - only single concrete field values, not keys or schema fields, may be transformed by AI SDK)
 
 NEVER USE GENERIC OR REPEATING STRINGS:
 
@@ -82,6 +82,9 @@ WHERE TO NEVER PICK STRINGS FROM:
 - File/directory listing framing text (e.g. "Called the Read tool with the following input...")
 - Strings that span across message or part boundaries
 - Entire serialized JSON objects (key ordering may differ - pick a distinctive substring within instead)
+
+CRITICAL: AVOID USING TOOL INPUT VALUES
+NEVER use tool input schema keys or field names as boundary strings (e.g., "startString", "endString", "filePath", "content"). These may be transformed by the AI SDK and are not reliable. The ONLY acceptable use of tool input strings is a SINGLE concrete field VALUE (not the key), and even then, prefer using assistant text, user messages, or tool result outputs instead. When in doubt, choose boundaries from your own assistant responses or distinctive user message content.
 
 PARALLEL COMPRESS EXECUTION
 When multiple independent ranges are ready and their boundaries do not overlap, launch MULTIPLE `compress` calls in parallel in a single response. Run compression sequentially only when ranges overlap or when a later range depends on the result of an earlier compression.
