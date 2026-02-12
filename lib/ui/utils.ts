@@ -213,9 +213,17 @@ export function formatSessionMap(
     const bar = new Array(width).fill("█")
 
     for (let m = 0; m < total; m++) {
+        const start = Math.floor((cum[m] / totalWeight) * width)
+        const end = Math.floor((cum[m + 1] / totalWeight) * width)
+
+        if (messageIds[m] === "__system__") {
+            for (let i = start; i < end; i++) {
+                bar[i] = "▌"
+            }
+            continue
+        }
+
         if (prunedMessages.has(messageIds[m])) {
-            const start = Math.floor((cum[m] / totalWeight) * width)
-            const end = Math.floor((cum[m + 1] / totalWeight) * width)
             const char = newPrunedIds.has(messageIds[m]) ? "⣿" : "░"
             for (let i = start; i < end; i++) {
                 bar[i] = char
