@@ -1,13 +1,18 @@
 import type { SessionState, WithParts } from "../../state"
 import type { PluginConfig } from "../../config"
 import type { UserMessage } from "@opencode-ai/sdk/v2"
-import { createSyntheticTextPart, createSyntheticToolPart } from "../utils"
+import { createSyntheticTextPart, createSyntheticToolPart, isIgnoredUserMessage } from "../utils"
 import { getLastUserMessage } from "../../shared-utils"
 import { getCurrentTokenUsage } from "../../strategies/utils"
 
 export interface LastUserModelContext {
     providerId: string | undefined
     modelId: string | undefined
+}
+
+export interface LastNonIgnoredMessage {
+    message: WithParts
+    index: number
 }
 
 function parsePercentageString(value: string, total: number): number | undefined {
@@ -62,19 +67,6 @@ function resolveContextLimit(
     return contextLimit
 }
 
-export function lastMessageHasCompress(messages: WithParts[]): boolean {
-    const lastAssistant = messages.findLast((message) => message.info.role === "assistant")
-    if (!lastAssistant) {
-        return false
-    }
-
-    const parts = Array.isArray(lastAssistant.parts) ? lastAssistant.parts : []
-    return parts.some(
-        (part) =>
-            part.type === "tool" && part.state.status === "completed" && part.tool === "compress",
-    )
-}
-
 export function getLastUserModelContext(messages: WithParts[]): LastUserModelContext {
     const lastUserMessage = getLastUserMessage(messages)
     if (!lastUserMessage) {
@@ -89,6 +81,26 @@ export function getLastUserModelContext(messages: WithParts[]): LastUserModelCon
         providerId: userInfo.model.providerID,
         modelId: userInfo.model.modelID,
     }
+}
+
+export function findLastNonIgnoredMessage(messages: WithParts[]): LastNonIgnoredMessage | null {
+    for (let i = messages.length - 1; i >= 0; i--) {
+        const message = messages[i]
+        if (message.info.role === "user" && isIgnoredUserMessage(message)) {
+            continue
+        }
+        return { message, index: i }
+    }
+
+    return null
+}
+
+export function messageHasCompletedCompress(message: WithParts): boolean {
+    const parts = Array.isArray(message.parts) ? message.parts : []
+    return parts.some(
+        (part) =>
+            part.type === "tool" && part.state.status === "completed" && part.tool === "compress",
+    )
 }
 
 export function isContextOverLimit(
@@ -107,24 +119,33 @@ export function isContextOverLimit(
     return currentTokens > contextLimit
 }
 
-function getModelIdForMessage(
+function findMessageIndexById(messages: WithParts[], messageId: string): number {
+    return messages.findIndex((message) => message.info.id === messageId)
+}
+
+function getAssistantModelIdForMessageId(
     messages: WithParts[],
-    messageIndex: number,
-    modelId: string | undefined,
+    messageId: string,
+    fallbackModelId: string | undefined,
 ): string {
+    const messageIndex = findMessageIndexById(messages, messageId)
+    if (messageIndex === -1) {
+        return fallbackModelId || ""
+    }
+
     const userMessage = getLastUserMessage(messages, messageIndex)
     if (!userMessage) {
-        return modelId || ""
+        return fallbackModelId || ""
     }
 
     const userInfo = userMessage.info as UserMessage
-    return userInfo.model?.modelID || modelId || ""
+    return userInfo.model?.modelID || fallbackModelId || ""
 }
 
-export function injectContextLimitHint(
+function injectContextLimitHintAtIndex(
     messages: WithParts[],
     messageIndex: number,
-    modelId: string | undefined,
+    fallbackModelId: string | undefined,
     hintText: string,
 ): boolean {
     const message = messages[messageIndex]
@@ -138,7 +159,11 @@ export function injectContextLimitHint(
     }
 
     if (message.info.role === "assistant") {
-        const toolModelId = getModelIdForMessage(messages, messageIndex, modelId)
+        const toolModelId = getAssistantModelIdForMessageId(
+            messages,
+            message.info.id,
+            fallbackModelId,
+        )
         message.parts.push(createSyntheticToolPart(message, hintText, toolModelId))
         return true
     }
@@ -146,24 +171,70 @@ export function injectContextLimitHint(
     return false
 }
 
-export function applyAnchoredHints(
-    state: SessionState,
+export function injectContextLimitHint(
     messages: WithParts[],
-    modelId: string | undefined,
+    messageId: string,
+    fallbackModelId: string | undefined,
+    hintText: string,
+): boolean {
+    const messageIndex = findMessageIndexById(messages, messageId)
+    if (messageIndex === -1) {
+        return false
+    }
+
+    return injectContextLimitHintAtIndex(messages, messageIndex, fallbackModelId, hintText)
+}
+
+export function findLatestAnchorMessageIndex(
+    messages: WithParts[],
+    anchorMessageIds: Set<string>,
+): number {
+    if (anchorMessageIds.size === 0) {
+        return -1
+    }
+
+    for (let i = messages.length - 1; i >= 0; i--) {
+        if (anchorMessageIds.has(messages[i].info.id)) {
+            return i
+        }
+    }
+
+    return -1
+}
+
+export function shouldAddAnchor(
+    lastMessageIndex: number,
+    latestAnchorMessageIndex: number,
+    interval: number,
+): boolean {
+    if (lastMessageIndex < 0) {
+        return false
+    }
+
+    if (latestAnchorMessageIndex < 0) {
+        return true
+    }
+
+    return lastMessageIndex - latestAnchorMessageIndex >= interval
+}
+
+export function addAnchor(anchorMessageIds: Set<string>, anchorMessageId: string): boolean {
+    const previousSize = anchorMessageIds.size
+    anchorMessageIds.add(anchorMessageId)
+    return anchorMessageIds.size !== previousSize
+}
+
+export function applyAnchoredHints(
+    anchorMessageIds: Set<string>,
+    messages: WithParts[],
+    fallbackModelId: string | undefined,
     hintText: string,
 ): void {
-    if (state.contextLimitAnchors.length === 0) {
+    if (anchorMessageIds.size === 0) {
         return
     }
 
-    for (const anchor of state.contextLimitAnchors) {
-        const messageIndex = messages.findIndex(
-            (message) => message.info.id === anchor.anchorMessageId,
-        )
-        if (messageIndex === -1) {
-            continue
-        }
-
-        injectContextLimitHint(messages, messageIndex, modelId, hintText)
+    for (const anchorMessageId of anchorMessageIds) {
+        injectContextLimitHint(messages, anchorMessageId, fallbackModelId, hintText)
     }
 }

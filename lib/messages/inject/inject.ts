@@ -2,16 +2,30 @@ import type { SessionState, WithParts } from "../../state"
 import type { Logger } from "../../logger"
 import type { PluginConfig } from "../../config"
 import { saveSessionState } from "../../state/persistence"
-import { isIgnoredUserMessage } from "../utils"
 import {
-    getLastUserModelContext,
-    lastMessageHasCompress,
-    injectContextLimitHint,
-    isContextOverLimit,
+    addAnchor,
     applyAnchoredHints,
+    findLastNonIgnoredMessage,
+    findLatestAnchorMessageIndex,
+    getLastUserModelContext,
+    isContextOverLimit,
+    messageHasCompletedCompress,
+    shouldAddAnchor,
 } from "./utils"
 
 const CONTEXT_LIMIT_HINT_TEXT = "your context exceeds the context limit, you must use compress soon"
+
+function getLimitNudgeInterval(config: PluginConfig): number {
+    return Math.max(1, Math.floor(config.tools.settings.limitNudgeInterval || 1))
+}
+
+function persistAnchors(state: SessionState, logger: Logger): void {
+    saveSessionState(state, logger).catch((error) => {
+        logger.warn("Failed to persist context-limit anchors", {
+            error: error instanceof Error ? error.message : String(error),
+        })
+    })
+}
 
 export const insertCompressToolContext = (
     state: SessionState,
@@ -23,48 +37,42 @@ export const insertCompressToolContext = (
         return
     }
 
-    if (lastMessageHasCompress(messages)) {
+    const lastNonIgnoredMessage = findLastNonIgnoredMessage(messages)
+    if (!lastNonIgnoredMessage) {
+        return
+    }
+
+    if (messageHasCompletedCompress(lastNonIgnoredMessage.message)) {
         logger.debug("Skipping context-limit hint injection after compress tool output")
         return
     }
 
     const { providerId, modelId } = getLastUserModelContext(messages)
+    let anchorsChanged = false
 
-    applyAnchoredHints(state, messages, modelId, CONTEXT_LIMIT_HINT_TEXT)
-
-    if (!isContextOverLimit(config, state, providerId, modelId, messages)) {
-        return
-    }
-
-    if (state.limitNudgeCounter === 0) {
-        const lastNonIgnoredMessageIndex = messages.findLastIndex(
-            (message) => !(message.info.role === "user" && isIgnoredUserMessage(message)),
+    if (isContextOverLimit(config, state, providerId, modelId, messages)) {
+        const interval = getLimitNudgeInterval(config)
+        const latestAnchorMessageIndex = findLatestAnchorMessageIndex(
+            messages,
+            state.contextLimitAnchors,
         )
 
-        if (lastNonIgnoredMessageIndex !== -1) {
-            const anchorMessageId = messages[lastNonIgnoredMessageIndex].info.id
-            const injected = injectContextLimitHint(
-                messages,
-                lastNonIgnoredMessageIndex,
-                modelId,
-                CONTEXT_LIMIT_HINT_TEXT,
-            )
-
-            if (injected) {
-                state.contextLimitAnchors.push({ anchorMessageId })
-                logger.info("Injected context-limit hint", {
+        if (shouldAddAnchor(lastNonIgnoredMessage.index, latestAnchorMessageIndex, interval)) {
+            const anchorMessageId = lastNonIgnoredMessage.message.info.id
+            const added = addAnchor(state.contextLimitAnchors, anchorMessageId)
+            if (added) {
+                anchorsChanged = true
+                logger.info("Added context-limit anchor", {
                     anchorMessageId,
-                    totalAnchors: state.contextLimitAnchors.length,
-                })
-                saveSessionState(state, logger).catch((error) => {
-                    logger.warn("Failed to persist context-limit anchors", {
-                        error: error instanceof Error ? error.message : String(error),
-                    })
+                    totalAnchors: state.contextLimitAnchors.size,
                 })
             }
         }
     }
 
-    const interval = Math.max(1, Math.floor(config.tools.settings.limitNudgeInterval || 1))
-    state.limitNudgeCounter = (state.limitNudgeCounter + 1) % interval
+    applyAnchoredHints(state.contextLimitAnchors, messages, modelId, CONTEXT_LIMIT_HINT_TEXT)
+
+    if (anchorsChanged) {
+        persistAnchors(state, logger)
+    }
 }
