@@ -408,9 +408,17 @@ export function createCompressTool(ctx: ToolContext): ReturnType<typeof tool> {
 
                 // Build token weight map for all messages (for proportional bar graph)
                 const weights = new Map<string, number>()
+                let contentWeight = 0
                 for (const msg of messages) {
-                    weights.set(msg.info.id, countAllMessageTokens(msg))
+                    const w = countAllMessageTokens(msg)
+                    weights.set(msg.info.id, w)
+                    contentWeight += w
                 }
+
+                // System prompt = API total minus message content
+                const systemWeight = Math.max(0, totalSessionTokens - contentWeight)
+                const sessionIds = ["__system__", ...messages.map((m) => m.info.id)]
+                weights.set("__system__", systemWeight)
 
                 await sendCompressNotification(
                     client,
@@ -425,7 +433,7 @@ export function createCompressTool(ctx: ToolContext): ReturnType<typeof tool> {
                     summaryTokens,
                     totalSessionTokens,
                     estimatedCompressedTokens,
-                    messages.map((m) => m.info.id),
+                    sessionIds,
                     weights,
                     messages.length,
                     currentParams,

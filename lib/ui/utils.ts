@@ -216,7 +216,7 @@ export function formatSessionMap(
         if (prunedMessages.has(messageIds[m])) {
             const start = Math.floor((cum[m] / totalWeight) * width)
             const end = Math.floor((cum[m + 1] / totalWeight) * width)
-            const char = newPrunedIds.has(messageIds[m]) ? "▓" : "░"
+            const char = newPrunedIds.has(messageIds[m]) ? "⣿" : "░"
             for (let i = start; i < end; i++) {
                 bar[i] = char
             }
