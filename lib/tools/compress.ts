@@ -4,7 +4,8 @@ import type { ToolContext } from "./types"
 import { ensureSessionInitialized } from "../state"
 import { saveSessionState } from "../state/persistence"
 import { loadPrompt } from "../prompts"
-import { getCurrentParams, getTotalToolTokens, countMessageTextTokens } from "../strategies/utils"
+import { getCurrentParams, countAllMessageTokens, countTokens } from "../strategies/utils"
+import type { AssistantMessage } from "@opencode-ai/sdk/v2"
 import { findStringInMessages, collectToolIdsInRange, collectMessageIdsInRange } from "./utils"
 import { sendCompressNotification } from "../ui/notification"
 import { prune as applyPruneTransforms } from "../messages/prune"
@@ -330,26 +331,42 @@ export function createCompressTool(ctx: ToolContext): ReturnType<typeof tool> {
                     },
                 })
 
-                let textTokens = 0
+                let estimatedCompressedTokens = 0
                 for (const msgId of compressedMessageIds) {
                     const msg = messages.find((m) => m.info.id === msgId)
                     if (msg) {
-                        const tokens = countMessageTextTokens(msg)
-                        textTokens += tokens
+                        const tokens = countAllMessageTokens(msg)
+                        estimatedCompressedTokens += tokens
                         state.prune.messages.set(msgId, tokens)
                     }
                 }
-                const toolTokens = getTotalToolTokens(state, compressedToolIds)
                 for (const id of compressedToolIds) {
                     const entry = state.toolParameters.get(id)
                     state.prune.tools.set(id, entry?.tokenCount ?? 0)
                 }
-                const estimatedCompressedTokens = textTokens + toolTokens
+
+                // Use API-reported tokens from last assistant message (matches OpenCode UI)
+                let totalSessionTokens = 0
+                for (let i = messages.length - 1; i >= 0; i--) {
+                    if (messages[i].info.role === "assistant") {
+                        const info = messages[i].info as AssistantMessage
+                        if (info.tokens?.output > 0) {
+                            totalSessionTokens =
+                                (info.tokens?.input || 0) +
+                                (info.tokens?.output || 0) +
+                                (info.tokens?.reasoning || 0) +
+                                (info.tokens?.cache?.read || 0) +
+                                (info.tokens?.cache?.write || 0)
+                            break
+                        }
+                    }
+                }
 
                 clog.info(C.COMPRESS, `Token Accounting`, {
-                    text: textTokens,
-                    tools: toolTokens,
-                    total: estimatedCompressedTokens,
+                    totalSessionTokens,
+                    estimatedCompressedTokens,
+                    compressedMessages: compressedMessageIds.length,
+                    compressedTools: compressedToolIds.length,
                     pruneState: {
                         tools: state.prune.tools.size,
                         messages: state.prune.messages.size,
@@ -369,6 +386,21 @@ export function createCompressTool(ctx: ToolContext): ReturnType<typeof tool> {
                 }
 
                 const currentParams = getCurrentParams(state, messages, logger)
+                const summaryTokens = countTokens(args.content.summary)
+
+                clog.info(C.COMPRESS, `Notification Values`, {
+                    totalSessionTokens,
+                    estimatedCompressedTokens,
+                    summaryTokens,
+                    reductionPercent:
+                        totalSessionTokens > 0
+                            ? `-${Math.round((estimatedCompressedTokens / totalSessionTokens) * 100)}%`
+                            : "N/A",
+                    messageCount: messages.length,
+                    compressedMessageIds: compressedMessageIds.length,
+                    compressedToolIds: compressedToolIds.length,
+                })
+
                 await sendCompressNotification(
                     client,
                     logger,
@@ -379,6 +411,9 @@ export function createCompressTool(ctx: ToolContext): ReturnType<typeof tool> {
                     compressedMessageIds,
                     topic,
                     summary,
+                    summaryTokens,
+                    totalSessionTokens,
+                    estimatedCompressedTokens,
                     rawStartResult,
                     rawEndResult,
                     messages.length,
@@ -398,7 +433,7 @@ export function createCompressTool(ctx: ToolContext): ReturnType<typeof tool> {
                     clog.error(C.STATE, `✗ State Persistence Failed`, { error: err.message })
                 })
 
-                const result = `Compressed ${compressedMessageIds.length} messages (${compressedToolIds.length} tool calls) into summary. The content will be replaced with your summary.`
+                const result = `Compressed ${compressedMessageIds.length} messages (${compressedToolIds.length} tool calls) into summary (${summaryTokens} tokens). The content will be replaced with your summary.`
                 clog.info(
                     C.COMPRESS,
                     `${separator}\n✓ COMPRESS INVOCATION SUCCESS\nID: ${invocationId}\n\n${result}\n${separator}`,

@@ -1,6 +1,7 @@
 import { ToolParameterEntry } from "../state"
 import { extractParameterKey } from "../messages/utils"
 import { countTokens } from "../strategies/utils"
+import { clog, C } from "../compress-logger"
 
 export function countDistillationTokens(distillation?: string[]): number {
     if (!distillation || distillation.length === 0) return 0
@@ -56,6 +57,34 @@ export function formatProgressBar(
     }
 
     return `│${bar}│`
+}
+
+export function formatCompressBar(
+    sessionContext: number,
+    compressedAmount: number,
+    width: number = 20,
+): string {
+    if (sessionContext <= 0) return `│${"░".repeat(width)}│ 0%`
+
+    // sessionContext already includes compressedAmount (it's the full session total)
+    const remainingRatio = (sessionContext - compressedAmount) / sessionContext
+    const remainingWidth = Math.round(remainingRatio * width)
+    const compressedWidth = width - remainingWidth
+    const reductionPercent = -Math.round((compressedAmount / sessionContext) * 100)
+
+    clog.info(C.COMPRESS, `formatCompressBar`, {
+        sessionContext,
+        compressedAmount,
+        remainingRatio: remainingRatio.toFixed(4),
+        remainingWidth,
+        compressedWidth,
+        reductionPercent,
+    })
+
+    const remainingBar = "█".repeat(Math.max(0, remainingWidth))
+    const compressedBar = "░".repeat(Math.max(0, compressedWidth))
+
+    return `│${remainingBar}${compressedBar}│`
 }
 
 export function shortenPath(input: string, workingDirectory?: string): string {

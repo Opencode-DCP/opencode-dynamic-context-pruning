@@ -4,10 +4,11 @@ import {
     formatPrunedItemsList,
     formatStatsHeader,
     formatTokenCount,
-    formatProgressBar,
+    formatCompressBar,
 } from "./utils"
 import { ToolParameterEntry } from "../state"
 import { PluginConfig } from "../config"
+import { clog, C } from "../compress-logger"
 
 export type PruneReason = "completion" | "noise" | "extraction"
 export const PRUNE_REASON_LABELS: Record<PruneReason, string> = {
@@ -137,6 +138,9 @@ export async function sendCompressNotification(
     messageIds: string[],
     topic: string,
     summary: string,
+    summaryTokens: number,
+    totalSessionTokens: number,
+    compressedTokens: number,
     startResult: any,
     endResult: any,
     totalMessages: number,
@@ -147,20 +151,27 @@ export async function sendCompressNotification(
     }
 
     let message: string
+    const summaryTokensStr = formatTokenCount(summaryTokens)
 
     if (config.pruneNotification === "minimal") {
         message = formatStatsHeader(state.stats.totalPruneTokens, state.stats.pruneTokenCounter)
     } else {
         message = formatStatsHeader(state.stats.totalPruneTokens, state.stats.pruneTokenCounter)
 
-        const pruneTokenCounterStr = `~${formatTokenCount(state.stats.pruneTokenCounter)}`
-        const progressBar = formatProgressBar(
-            totalMessages,
-            startResult.messageIndex,
-            endResult.messageIndex,
-            25,
-        )
-        message += `\n\n▣ Compressing (${pruneTokenCounterStr}) ${progressBar}`
+        const pruneTokenCounterStr = `~${formatTokenCount(compressedTokens)}`
+
+        clog.info(C.COMPRESS, `sendCompressNotification inputs`, {
+            totalSessionTokens,
+            compressedTokens,
+            summaryTokens,
+            ratio:
+                totalSessionTokens > 0 ? (compressedTokens / totalSessionTokens).toFixed(4) : "N/A",
+        })
+
+        const progressBar = formatCompressBar(totalSessionTokens, compressedTokens, 25)
+        const reduction =
+            totalSessionTokens > 0 ? Math.round((compressedTokens / totalSessionTokens) * 100) : 0
+        message += `\n\n▣ Compressing (${pruneTokenCounterStr} removed, ${reduction}% reduction) ${progressBar}`
         message += `\n→ Topic: ${topic}`
         message += `\n→ Items: ${messageIds.length} messages`
         if (toolIds.length > 0) {
@@ -169,7 +180,7 @@ export async function sendCompressNotification(
             message += ` condensed`
         }
         if (config.tools.compress.showCompression) {
-            message += `\n→ Compression: ${summary}`
+            message += `\n→ Compression (~${summaryTokensStr}): ${summary}`
         }
     }
 
@@ -179,8 +190,8 @@ export async function sendCompressNotification(
             const truncatedSummary = truncateToastSummary(summary)
             if (truncatedSummary !== summary) {
                 toastMessage = toastMessage.replace(
-                    `\n→ Compression: ${summary}`,
-                    `\n→ Compression: ${truncatedSummary}`,
+                    `\n→ Compression (~${summaryTokensStr}): ${summary}`,
+                    `\n→ Compression (~${summaryTokensStr}): ${truncatedSummary}`,
                 )
             }
         }
