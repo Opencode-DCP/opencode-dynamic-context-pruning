@@ -2,7 +2,7 @@ import type { SessionState, WithParts } from "../../state"
 import type { Logger } from "../../logger"
 import type { PluginConfig } from "../../config"
 import {
-    addAnchorIfIntervalElapsed,
+    addAnchor,
     applyAnchoredHints,
     findLastNonIgnoredMessage,
     getLimitNudgeInterval,
@@ -36,7 +36,7 @@ export const insertCompressToolContext = (
         const lastNonIgnoredMessage = findLastNonIgnoredMessage(messages)
         if (lastNonIgnoredMessage) {
             const interval = getLimitNudgeInterval(config)
-            const added = addAnchorIfIntervalElapsed(
+            const added = addAnchor(
                 state.contextLimitAnchors,
                 lastNonIgnoredMessage.message.info.id,
                 lastNonIgnoredMessage.index,
