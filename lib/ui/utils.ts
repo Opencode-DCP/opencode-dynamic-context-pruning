@@ -63,17 +63,25 @@ export function formatSessionMap(
     messageIds: string[],
     prunedMessages: Map<string, number>,
     newPrunedIds: Set<string>,
+    weights: Map<string, number>,
     width: number = 50,
 ): string {
     const total = messageIds.length
     if (total === 0) return `│${"░".repeat(width)}│`
 
+    // Build cumulative token weights for proportional positioning
+    const cum = [0]
+    for (const id of messageIds) {
+        cum.push(cum[cum.length - 1] + (weights.get(id) || 1))
+    }
+    const totalWeight = cum[cum.length - 1]
+
     const bar = new Array(width).fill("█")
 
     for (let m = 0; m < total; m++) {
         if (prunedMessages.has(messageIds[m])) {
-            const start = Math.floor((m / total) * width)
-            const end = Math.floor(((m + 1) / total) * width)
+            const start = Math.floor((cum[m] / totalWeight) * width)
+            const end = Math.floor((cum[m + 1] / totalWeight) * width)
             const char = newPrunedIds.has(messageIds[m]) ? "▓" : "░"
             for (let i = start; i < end; i++) {
                 bar[i] = char

@@ -142,6 +142,7 @@ export async function sendCompressNotification(
     totalSessionTokens: number,
     compressedTokens: number,
     sessionMessageIds: string[],
+    weights: Map<string, number>,
     totalMessages: number,
     params: any,
 ): Promise<boolean> {
@@ -168,7 +169,13 @@ export async function sendCompressNotification(
         })
 
         const newIds = new Set(messageIds)
-        const progressBar = formatSessionMap(sessionMessageIds, state.prune.messages, newIds, 50)
+        const progressBar = formatSessionMap(
+            sessionMessageIds,
+            state.prune.messages,
+            newIds,
+            weights,
+            50,
+        )
         const reduction =
             totalSessionTokens > 0 ? Math.round((compressedTokens / totalSessionTokens) * 100) : 0
         message += `\n\n${progressBar}`
