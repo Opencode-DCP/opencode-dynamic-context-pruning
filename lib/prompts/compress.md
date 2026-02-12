@@ -63,6 +63,18 @@ WHERE TO PICK STRINGS FROM (important for reliable matching):
 - Previous compress summaries
 - Tool input string values (individual values, not whole serialized objects)
 
+NEVER USE GENERIC OR REPEATING STRINGS:
+
+Tool status messages repeat identically across every invocation. These are ALWAYS ambiguous:
+
+- "Edit applied successfully." (appears in EVERY successful edit)
+- "File written successfully" or any tool success/error boilerplate
+- Common tool output patterns that are identical across calls
+
+Instead, combine the generic output with surrounding unique context (a file path, a specific code snippet, or your own unique assistant text).
+
+Each boundary string you choose MUST be unique to ONE specific message. Before using a string, ask: "Could this exact text appear in any other place in this conversation?" If yes, extend it or pick a different string.
+
 WHERE TO NEVER PICK STRINGS FROM:
 
 - `<system-reminder>` tags or any XML wrapper/meta-commentary around messages

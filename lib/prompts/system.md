@@ -26,6 +26,8 @@ Treat token counts and context growth as soft signals, not hard triggers.
 BOUNDARY MATCHING
 `compress` uses inclusive string boundaries, matching a string at the start of a message or tool output will consume the entire item. Be conservative and precise: choose unique strings with enough surrounding context to avoid ambiguous matches or accidental range capture
 
+NEVER use generic tool status messages as boundaries (e.g. "Edit applied successfully.", "File written successfully"). These repeat across every tool call and will always fail with multiple matches.
+
 THE SUMMARY STANDARD
 Your summary MUST be technical and specific enough to preserve FULL understanding of what transpired, such that NO ambiguity remains about what asked, found, planned, done, or decided - yet noise free
 
