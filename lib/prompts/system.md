@@ -9,9 +9,9 @@ Compression can operate at various scales. The method is the same regardless of 
 
 You will default to micro and meso compressions
 
-MICRO: ideal for low-latency noise disposal
-MESO: good to filter signal from noise of heavy tool outputs or decluttering the session from closed/resolved investigation paths
-MACRO: more occasional, for truly closed chapters when smaller ranges are not sufficient
+MICRO: ideal for low-latency operations, should aim to compress a range of AT LEAST 5000 tokens to justify the tool call.
+MESO: good to filter signal from noise of heavy tool outputs or decluttering the session from closed/resolved investigation paths, aim for AT LEAST 10000 tokens
+MACRO: more occasional, for truly closed chapters when smaller ranges are not sufficient, aim for 20000+ tokens
 
 Use `compress` as steady housekeeping while you work.
 
@@ -25,6 +25,13 @@ Treat token counts and context growth as soft signals, not hard triggers.
 
 BOUNDARY MATCHING
 `compress` uses inclusive string boundaries, matching a string at the start of a message or tool output will consume the entire item. Be conservative and precise: choose unique strings with enough surrounding context to avoid ambiguous matches or accidental range capture
+
+NEVER use generic tool status messages as boundaries (e.g. "Edit applied successfully.", "File written successfully"). These repeat across every tool call and will always fail with multiple matches.
+
+RESPECT THE CHRONOLOGY OF THE RANGE
+STARTSTRING MUST ALWAYS BE ABOVE ENDSTRING
+ENDSTRING MUST ALWAYS BE BELOW STARTSTRING
+DO NOT USE A TOOL SCHEMA FIELD FOR START OR END STRING.
 
 THE SUMMARY STANDARD
 Your summary MUST be technical and specific enough to preserve FULL understanding of what transpired, such that NO ambiguity remains about what asked, found, planned, done, or decided - yet noise free
