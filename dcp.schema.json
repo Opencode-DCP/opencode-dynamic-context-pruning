@@ -122,6 +122,12 @@
                             "default": 10,
                             "description": "Frequency of nudge reminders (in turns)"
                         },
+                        "limitNudgeInterval": {
+                            "type": "number",
+                            "default": 1,
+                            "minimum": 1,
+                            "description": "How often the context-limit nudge fires when above contextLimit (1 = every fetch, 5 = every 5th fetch)"
+                        },
                         "protectedTools": {
                             "type": "array",
                             "items": {

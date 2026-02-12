@@ -47,6 +47,7 @@ export interface SessionState {
     toolParameters: Map<string, ToolParameterEntry>
     toolIdList: string[]
     nudgeCounter: number
+    limitNudgeCounter: number
     lastToolPrune: boolean
     lastCompaction: number
     currentTurn: number

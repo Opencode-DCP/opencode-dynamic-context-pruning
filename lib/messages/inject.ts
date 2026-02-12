@@ -199,9 +199,16 @@ export const insertCompressToolContext = (
         }
 
         if (shouldInjectLimitNudge(config, state, messages, providerId, modelId)) {
-            logger.info("Injecting context-limit nudge")
-            contentParts.push(renderNudge("context-limit"))
-        } else if (
+            if (state.limitNudgeCounter === 0) {
+                logger.info("Injecting context-limit nudge")
+                contentParts.push(renderNudge("context-limit"))
+            }
+            state.limitNudgeCounter =
+                (state.limitNudgeCounter + 1) % config.tools.settings.limitNudgeInterval
+        }
+
+        if (
+            contentParts.length === 0 &&
             config.tools.settings.nudgeEnabled &&
             state.nudgeCounter >= config.tools.settings.nudgeFrequency
         ) {

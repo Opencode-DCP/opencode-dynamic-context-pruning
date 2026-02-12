@@ -19,6 +19,7 @@ export interface CompressTool {
 export interface ToolSettings {
     nudgeEnabled: boolean
     nudgeFrequency: number
+    limitNudgeInterval: number
     protectedTools: string[]
     contextLimit: number | `${number}%`
     contextPressureEnabled: boolean
@@ -106,6 +107,7 @@ export const VALID_CONFIG_KEYS = new Set([
     "tools.settings",
     "tools.settings.nudgeEnabled",
     "tools.settings.nudgeFrequency",
+    "tools.settings.limitNudgeInterval",
     "tools.settings.protectedTools",
     "tools.settings.contextLimit",
     "tools.settings.contextPressureEnabled",
@@ -306,6 +308,17 @@ export function validateConfigTypes(config: Record<string, any>): ValidationErro
                     key: "tools.settings.nudgeFrequency",
                     expected: "number",
                     actual: typeof tools.settings.nudgeFrequency,
+                })
+            }
+
+            if (
+                tools.settings.limitNudgeInterval !== undefined &&
+                typeof tools.settings.limitNudgeInterval !== "number"
+            ) {
+                errors.push({
+                    key: "tools.settings.limitNudgeInterval",
+                    expected: "number",
+                    actual: typeof tools.settings.limitNudgeInterval,
                 })
             }
 
@@ -545,6 +558,7 @@ const defaultConfig: PluginConfig = {
         settings: {
             nudgeEnabled: true,
             nudgeFrequency: 10,
+            limitNudgeInterval: 1,
             protectedTools: [...DEFAULT_PROTECTED_TOOLS],
             contextLimit: 100000,
             contextPressureEnabled: true,
@@ -712,6 +726,8 @@ function mergeTools(base: PluginConfig["tools"], override?: ToolOverride): Plugi
         settings: {
             nudgeEnabled: override.settings?.nudgeEnabled ?? base.settings.nudgeEnabled,
             nudgeFrequency: override.settings?.nudgeFrequency ?? base.settings.nudgeFrequency,
+            limitNudgeInterval:
+                override.settings?.limitNudgeInterval ?? base.settings.limitNudgeInterval,
             protectedTools: [
                 ...new Set([
                     ...base.settings.protectedTools,

@@ -70,6 +70,7 @@ export function createSessionState(): SessionState {
         toolParameters: new Map<string, ToolParameterEntry>(),
         toolIdList: [],
         nudgeCounter: 0,
+        limitNudgeCounter: 0,
         lastToolPrune: false,
         lastCompaction: 0,
         currentTurn: 0,
@@ -95,6 +96,7 @@ export function resetSessionState(state: SessionState): void {
     state.toolParameters.clear()
     state.toolIdList = []
     state.nudgeCounter = 0
+    state.limitNudgeCounter = 0
     state.lastToolPrune = false
     state.lastCompaction = 0
     state.currentTurn = 0
