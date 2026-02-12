@@ -28,6 +28,10 @@ BOUNDARY MATCHING
 
 NEVER use generic tool status messages as boundaries (e.g. "Edit applied successfully.", "File written successfully"). These repeat across every tool call and will always fail with multiple matches.
 
+RESPECT THE CHRONOLOGY OF THE RANGE
+STARTSTRING MUST ALWAYS BE ABOVE ENDSTRING
+ENDSTRING MUST ALWAYS BE BELOW STARTSTRING
+
 THE SUMMARY STANDARD
 Your summary MUST be technical and specific enough to preserve FULL understanding of what transpired, such that NO ambiguity remains about what asked, found, planned, done, or decided - yet noise free
 
