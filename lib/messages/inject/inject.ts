@@ -9,7 +9,7 @@ import {
     getLimitNudgeInterval,
     getModelInfo,
     isContextOverLimit,
-    messageHasCompletedCompress,
+    messageHasCompress,
     persistAnchors,
     shouldAddAnchor,
 } from "./utils"
@@ -31,7 +31,7 @@ export const insertCompressToolContext = (
         return
     }
 
-    if (messageHasCompletedCompress(lastNonIgnoredMessage.message)) {
+    if (messageHasCompress(lastNonIgnoredMessage.message)) {
         logger.debug("Skipping context-limit hint injection after compress tool output")
         return
     }

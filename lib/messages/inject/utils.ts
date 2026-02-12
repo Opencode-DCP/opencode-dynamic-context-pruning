@@ -109,7 +109,7 @@ export function findLastNonIgnoredMessage(messages: WithParts[]): LastNonIgnored
     return null
 }
 
-export function messageHasCompletedCompress(message: WithParts): boolean {
+export function messageHasCompress(message: WithParts): boolean {
     const parts = Array.isArray(message.parts) ? message.parts : []
     return parts.some(
         (part) =>
