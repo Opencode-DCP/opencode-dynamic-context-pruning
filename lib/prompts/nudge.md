@@ -14,7 +14,13 @@ PHASE COMPLETION: If a chapter is complete, compress the entire sequence into a 
 </instruction>
 
 <instruction name=context_buildup_warning>
+CRITICAL WARNING: CONTEXT BUILD-UP
+
 The context window is filling-up. You've reached a point where performance may increasingly degrade. Active context management is now strategically relevant. Mind your context footprint as the conversation grows
+
+YOU MUST COMPRESS NOW TO AVOID CONTEXT ROT. THIS IS CRITICAL. Do not delay context management any further.
+
+DOOOOO IT!!!
 
 Avoid unnecessary context build-up with targeted uses of the `compress` tool. Start with low hanging fruits and clearly identified ranges that can be compressed with minimal risk of losing critical information. Look BACK on the conversation history and avoid compressing the newest ranges until you have exhausted older ones
 
