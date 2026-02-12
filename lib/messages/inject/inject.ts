@@ -11,8 +11,9 @@ import {
     messageHasCompress,
     persistAnchors,
 } from "./utils"
+import { renderNudge } from "../../prompts"
 
-const CONTEXT_LIMIT_HINT_TEXT = "your context exceeds the context limit, you must compress"
+const CONTEXT_LIMIT_HINT_TEXT = renderNudge("context-limit")
 
 export const insertCompressToolContext = (
     state: SessionState,
