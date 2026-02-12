@@ -29,74 +29,6 @@ export function persistAnchors(state: SessionState, logger: Logger): void {
     })
 }
 
-function parsePercentageString(value: string, total: number): number | undefined {
-    if (!value.endsWith("%")) return undefined
-    const percent = parseFloat(value.slice(0, -1))
-    if (isNaN(percent)) {
-        return undefined
-    }
-
-    const roundedPercent = Math.round(percent)
-    const clampedPercent = Math.max(0, Math.min(100, roundedPercent))
-    return Math.round((clampedPercent / 100) * total)
-}
-
-function resolveContextLimit(
-    config: PluginConfig,
-    state: SessionState,
-    providerId: string | undefined,
-    modelId: string | undefined,
-): number | undefined {
-    const modelLimits = config.tools.settings.modelLimits
-    const contextLimit = config.tools.settings.contextLimit
-
-    if (modelLimits) {
-        const providerModelId =
-            providerId !== undefined && modelId !== undefined
-                ? `${providerId}/${modelId}`
-                : undefined
-        const limit = providerModelId !== undefined ? modelLimits[providerModelId] : undefined
-
-        if (limit !== undefined) {
-            if (typeof limit === "string" && limit.endsWith("%")) {
-                if (state.modelContextLimit === undefined) {
-                    return undefined
-                }
-                return parsePercentageString(limit, state.modelContextLimit)
-            }
-            return typeof limit === "number" ? limit : undefined
-        }
-    }
-
-    if (typeof contextLimit === "string") {
-        if (contextLimit.endsWith("%")) {
-            if (state.modelContextLimit === undefined) {
-                return undefined
-            }
-            return parsePercentageString(contextLimit, state.modelContextLimit)
-        }
-        return undefined
-    }
-
-    return contextLimit
-}
-
-export function getModelInfo(messages: WithParts[]): LastUserModelContext {
-    const lastUserMessage = getLastUserMessage(messages)
-    if (!lastUserMessage) {
-        return {
-            providerId: undefined,
-            modelId: undefined,
-        }
-    }
-
-    const userInfo = lastUserMessage.info as UserMessage
-    return {
-        providerId: userInfo.model.providerID,
-        modelId: userInfo.model.modelID,
-    }
-}
-
 export function findLastNonIgnoredMessage(messages: WithParts[]): LastNonIgnoredMessage | null {
     for (let i = messages.length - 1; i >= 0; i--) {
         const message = messages[i]
@@ -117,6 +49,63 @@ export function messageHasCompress(message: WithParts): boolean {
     )
 }
 
+export function getModelInfo(messages: WithParts[]): LastUserModelContext {
+    const lastUserMessage = getLastUserMessage(messages)
+    if (!lastUserMessage) {
+        return {
+            providerId: undefined,
+            modelId: undefined,
+        }
+    }
+
+    const userInfo = lastUserMessage.info as UserMessage
+    return {
+        providerId: userInfo.model.providerID,
+        modelId: userInfo.model.modelID,
+    }
+}
+
+function resolveContextLimit(
+    config: PluginConfig,
+    state: SessionState,
+    providerId: string | undefined,
+    modelId: string | undefined,
+): number | undefined {
+    const parseLimitValue = (limit: number | `${number}%` | undefined): number | undefined => {
+        if (limit === undefined) {
+            return undefined
+        }
+
+        if (typeof limit === "number") {
+            return limit
+        }
+
+        if (!limit.endsWith("%") || state.modelContextLimit === undefined) {
+            return undefined
+        }
+
+        const parsedPercent = parseFloat(limit.slice(0, -1))
+        if (isNaN(parsedPercent)) {
+            return undefined
+        }
+
+        const roundedPercent = Math.round(parsedPercent)
+        const clampedPercent = Math.max(0, Math.min(100, roundedPercent))
+        return Math.round((clampedPercent / 100) * state.modelContextLimit)
+    }
+
+    const modelLimits = config.tools.settings.modelLimits
+    if (modelLimits && providerId !== undefined && modelId !== undefined) {
+        const providerModelId = `${providerId}/${modelId}`
+        const modelLimit = modelLimits[providerModelId]
+        if (modelLimit !== undefined) {
+            return parseLimitValue(modelLimit)
+        }
+    }
+
+    return parseLimitValue(config.tools.settings.contextLimit)
+}
+
 export function isContextOverLimit(
     config: PluginConfig,
     state: SessionState,
@@ -133,106 +122,31 @@ export function isContextOverLimit(
     return currentTokens > contextLimit
 }
 
-function findMessageIndexById(messages: WithParts[], messageId: string): number {
-    return messages.findIndex((message) => message.info.id === messageId)
-}
-
-function getAssistantModelIdForMessageId(
-    messages: WithParts[],
-    messageId: string,
-    fallbackModelId: string | undefined,
-): string {
-    const messageIndex = findMessageIndexById(messages, messageId)
-    if (messageIndex === -1) {
-        return fallbackModelId || ""
-    }
-
-    const userMessage = getLastUserMessage(messages, messageIndex)
-    if (!userMessage) {
-        return fallbackModelId || ""
-    }
-
-    const userInfo = userMessage.info as UserMessage
-    return userInfo.model?.modelID || fallbackModelId || ""
-}
-
-function injectContextLimitHintAtIndex(
-    messages: WithParts[],
-    messageIndex: number,
-    fallbackModelId: string | undefined,
-    hintText: string,
-): boolean {
-    const message = messages[messageIndex]
-    if (!message) {
-        return false
-    }
-
-    if (message.info.role === "user") {
-        message.parts.push(createSyntheticTextPart(message, hintText))
-        return true
-    }
-
-    if (message.info.role === "assistant") {
-        const toolModelId = getAssistantModelIdForMessageId(
-            messages,
-            message.info.id,
-            fallbackModelId,
-        )
-        message.parts.push(createSyntheticToolPart(message, hintText, toolModelId))
-        return true
-    }
-
-    return false
-}
-
-export function injectContextLimitHint(
-    messages: WithParts[],
-    messageId: string,
-    fallbackModelId: string | undefined,
-    hintText: string,
-): boolean {
-    const messageIndex = findMessageIndexById(messages, messageId)
-    if (messageIndex === -1) {
-        return false
-    }
-
-    return injectContextLimitHintAtIndex(messages, messageIndex, fallbackModelId, hintText)
-}
-
-export function findLatestAnchorMessageIndex(
-    messages: WithParts[],
+export function addAnchor(
     anchorMessageIds: Set<string>,
-): number {
-    if (anchorMessageIds.size === 0) {
-        return -1
+    anchorMessageId: string,
+    anchorMessageIndex: number,
+    messages: WithParts[],
+    interval: number,
+): boolean {
+    if (anchorMessageIndex < 0) {
+        return false
     }
 
+    let latestAnchorMessageIndex = -1
     for (let i = messages.length - 1; i >= 0; i--) {
         if (anchorMessageIds.has(messages[i].info.id)) {
-            return i
+            latestAnchorMessageIndex = i
+            break
         }
     }
 
-    return -1
-}
-
-export function shouldAddAnchor(
-    lastMessageIndex: number,
-    latestAnchorMessageIndex: number,
-    interval: number,
-): boolean {
-    if (lastMessageIndex < 0) {
+    const shouldAdd =
+        latestAnchorMessageIndex < 0 || anchorMessageIndex - latestAnchorMessageIndex >= interval
+    if (!shouldAdd) {
         return false
     }
 
-    if (latestAnchorMessageIndex < 0) {
-        return true
-    }
-
-    return lastMessageIndex - latestAnchorMessageIndex >= interval
-}
-
-export function addAnchor(anchorMessageIds: Set<string>, anchorMessageId: string): boolean {
     const previousSize = anchorMessageIds.size
     anchorMessageIds.add(anchorMessageId)
     return anchorMessageIds.size !== previousSize
@@ -241,7 +155,7 @@ export function addAnchor(anchorMessageIds: Set<string>, anchorMessageId: string
 export function applyAnchoredHints(
     anchorMessageIds: Set<string>,
     messages: WithParts[],
-    fallbackModelId: string | undefined,
+    modelId: string | undefined,
     hintText: string,
 ): void {
     if (anchorMessageIds.size === 0) {
@@ -249,6 +163,22 @@ export function applyAnchoredHints(
     }
 
     for (const anchorMessageId of anchorMessageIds) {
-        injectContextLimitHint(messages, anchorMessageId, fallbackModelId, hintText)
+        const messageIndex = messages.findIndex((message) => message.info.id === anchorMessageId)
+        if (messageIndex === -1) {
+            continue
+        }
+
+        const message = messages[messageIndex]
+        if (message.info.role === "user") {
+            message.parts.push(createSyntheticTextPart(message, hintText))
+            continue
+        }
+
+        if (message.info.role !== "assistant") {
+            continue
+        }
+
+        const toolModelId = modelId || ""
+        message.parts.push(createSyntheticToolPart(message, hintText, toolModelId))
     }
 }

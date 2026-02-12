@@ -2,16 +2,14 @@ import type { SessionState, WithParts } from "../../state"
 import type { Logger } from "../../logger"
 import type { PluginConfig } from "../../config"
 import {
-    addAnchor,
+    addAnchorIfIntervalElapsed,
     applyAnchoredHints,
     findLastNonIgnoredMessage,
-    findLatestAnchorMessageIndex,
     getLimitNudgeInterval,
     getModelInfo,
     isContextOverLimit,
     messageHasCompress,
     persistAnchors,
-    shouldAddAnchor,
 } from "./utils"
 
 const CONTEXT_LIMIT_HINT_TEXT = "your context exceeds the context limit, you must use compress soon"
@@ -26,13 +24,8 @@ export const insertCompressToolContext = (
         return
     }
 
-    const lastNonIgnoredMessage = findLastNonIgnoredMessage(messages)
-    if (!lastNonIgnoredMessage) {
-        return
-    }
-
-    if (messageHasCompress(lastNonIgnoredMessage.message)) {
-        logger.debug("Skipping context-limit hint injection after compress tool output")
+    const lastAssistantMessage = messages.findLast((message) => message.info.role === "assistant")
+    if (lastAssistantMessage && messageHasCompress(lastAssistantMessage)) {
         return
     }
 
@@ -40,21 +33,18 @@ export const insertCompressToolContext = (
     let anchorsChanged = false
 
     if (isContextOverLimit(config, state, providerId, modelId, messages)) {
-        const interval = getLimitNudgeInterval(config)
-        const latestAnchorMessageIndex = findLatestAnchorMessageIndex(
-            messages,
-            state.contextLimitAnchors,
-        )
-
-        if (shouldAddAnchor(lastNonIgnoredMessage.index, latestAnchorMessageIndex, interval)) {
-            const anchorMessageId = lastNonIgnoredMessage.message.info.id
-            const added = addAnchor(state.contextLimitAnchors, anchorMessageId)
+        const lastNonIgnoredMessage = findLastNonIgnoredMessage(messages)
+        if (lastNonIgnoredMessage) {
+            const interval = getLimitNudgeInterval(config)
+            const added = addAnchorIfIntervalElapsed(
+                state.contextLimitAnchors,
+                lastNonIgnoredMessage.message.info.id,
+                lastNonIgnoredMessage.index,
+                messages,
+                interval,
+            )
             if (added) {
                 anchorsChanged = true
-                logger.info("Added context-limit anchor", {
-                    anchorMessageId,
-                    totalAnchors: state.contextLimitAnchors.size,
-                })
             }
         }
     }
