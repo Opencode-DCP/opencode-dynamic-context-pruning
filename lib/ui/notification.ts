@@ -167,11 +167,12 @@ export async function sendCompressNotification(
                 totalSessionTokens > 0 ? (compressedTokens / totalSessionTokens).toFixed(4) : "N/A",
         })
 
-        const progressBar = formatSessionMap(sessionMessageIds, state.prune.messages, 50)
+        const newIds = new Set(messageIds)
+        const progressBar = formatSessionMap(sessionMessageIds, state.prune.messages, newIds, 50)
         const reduction =
             totalSessionTokens > 0 ? Math.round((compressedTokens / totalSessionTokens) * 100) : 0
-        message += `\n\n▣ Compressing (${pruneTokenCounterStr} removed, ${reduction}% reduction)`
-        message += `\n${progressBar}`
+        message += `\n\n${progressBar}`
+        message += `\n▣ Compressing (${pruneTokenCounterStr} removed, ${reduction}% reduction)`
         message += `\n→ Topic: ${topic}`
         message += `\n→ Items: ${messageIds.length} messages`
         if (toolIds.length > 0) {

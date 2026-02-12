@@ -62,6 +62,7 @@ export function formatProgressBar(
 export function formatSessionMap(
     messageIds: string[],
     prunedMessages: Map<string, number>,
+    newPrunedIds: Set<string>,
     width: number = 50,
 ): string {
     const total = messageIds.length
@@ -73,8 +74,9 @@ export function formatSessionMap(
         if (prunedMessages.has(messageIds[m])) {
             const start = Math.floor((m / total) * width)
             const end = Math.floor(((m + 1) / total) * width)
+            const char = newPrunedIds.has(messageIds[m]) ? "▓" : "░"
             for (let i = start; i < end; i++) {
-                bar[i] = "░"
+                bar[i] = char
             }
         }
     }
