@@ -12,7 +12,7 @@ import {
     persistAnchors,
 } from "./utils"
 
-const CONTEXT_LIMIT_HINT_TEXT = "your context exceeds the context limit, you must use compress soon"
+const CONTEXT_LIMIT_HINT_TEXT = "your context exceeds the context limit, you must compress"
 
 export const insertCompressToolContext = (
     state: SessionState,
