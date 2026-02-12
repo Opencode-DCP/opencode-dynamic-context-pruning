@@ -180,6 +180,8 @@ export function createCompressTool(ctx: ToolContext): ReturnType<typeof tool> {
                             summaries: state.compressSummaries.length,
                         },
                     )
+                    // TODO: This takes the first summary text match and does not error on
+                    // multiple matching summaries (ambiguous fallback).
                     const s = state.compressSummaries.find((s) => s.summary.includes(startString))
                     if (s) {
                         rawStartIndex = messages.findIndex((m) => m.info.id === s.anchorMessageId)
@@ -203,6 +205,8 @@ export function createCompressTool(ctx: ToolContext): ReturnType<typeof tool> {
                             summaries: state.compressSummaries.length,
                         },
                     )
+                    // TODO: This takes the first summary text match and does not error on
+                    // multiple matching summaries (ambiguous fallback).
                     const s = state.compressSummaries.find((s) => s.summary.includes(endString))
                     if (s) {
                         rawEndIndex = messages.findIndex((m) => m.info.id === s.anchorMessageId)
