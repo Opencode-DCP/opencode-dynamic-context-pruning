@@ -9,12 +9,10 @@ export interface ToolFlags {
 }
 
 function processConditionals(template: string, flags: ToolFlags): string {
-    const tools = ["manual", "compress", "prune", "distill"] as const
+    const tools = ["manual", "compress"] as const
     const enabled = {
         manual: flags.manual,
         compress: flags.compress,
-        prune: false,
-        distill: false,
     }
 
     let result = template
