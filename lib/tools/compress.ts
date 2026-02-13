@@ -8,7 +8,7 @@ import { getCurrentParams, countAllMessageTokens, countTokens } from "../strateg
 import type { AssistantMessage } from "@opencode-ai/sdk/v2"
 import { findStringInMessages, collectToolIdsInRange, collectMessageIdsInRange } from "./utils"
 import { sendCompressNotification } from "../ui/notification"
-import { cacheSystemPromptTokens } from "../ui/utils"
+import { buildCompressionGraphData, cacheSystemPromptTokens } from "../ui/utils"
 import { prune as applyPruneTransforms } from "../messages/prune"
 import { clog, C } from "../compress-logger"
 
@@ -350,19 +350,35 @@ export function createCompressTool(ctx: ToolContext): ReturnType<typeof tool> {
 
                 // Use API-reported tokens from last assistant message (matches OpenCode UI)
                 let totalSessionTokens = 0
+                let hasApiTokenMetadata = false
                 for (let i = messages.length - 1; i >= 0; i--) {
                     if (messages[i].info.role === "assistant") {
                         const info = messages[i].info as AssistantMessage
-                        if (info.tokens?.output > 0) {
-                            totalSessionTokens =
-                                (info.tokens?.input || 0) +
-                                (info.tokens?.output || 0) +
-                                (info.tokens?.reasoning || 0) +
-                                (info.tokens?.cache?.read || 0) +
-                                (info.tokens?.cache?.write || 0)
+                        const input = info.tokens?.input || 0
+                        const output = info.tokens?.output || 0
+                        const reasoning = info.tokens?.reasoning || 0
+                        const cacheRead = info.tokens?.cache?.read || 0
+                        const cacheWrite = info.tokens?.cache?.write || 0
+                        const total = input + output + reasoning + cacheRead + cacheWrite
+                        if (total > 0) {
+                            totalSessionTokens = total
+                            hasApiTokenMetadata = true
                             break
                         }
                     }
+                }
+
+                if (!hasApiTokenMetadata) {
+                    const estimated = buildCompressionGraphData(
+                        state,
+                        messages,
+                        new Set<string>(),
+                        new Set<string>(),
+                    )
+                    totalSessionTokens = estimated.totalSessionTokens
+                    clog.info(C.COMPRESS, `Token Accounting Fallback`, {
+                        totalSessionTokens,
+                    })
                 }
 
                 // Cap estimate — countAllMessageTokens can inflate beyond API count
