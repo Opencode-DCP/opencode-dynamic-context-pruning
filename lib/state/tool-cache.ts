@@ -18,7 +18,6 @@ export function syncToolCache(
     try {
         logger.info("Syncing tool parameters from OpenCode messages")
 
-        state.nudgeCounter = 0
         let turnCounter = 0
 
         for (const msg of messages) {
@@ -45,14 +44,9 @@ export function syncToolCache(
                     state.currentTurn - turnCounter < turnProtectionTurns
 
                 if (part.tool === "compress") {
-                    state.nudgeCounter = 0
                     state.lastToolPrune = true
                 } else {
                     state.lastToolPrune = false
-                    const allProtectedTools = config.tools.settings.protectedTools
-                    if (!allProtectedTools.includes(part.tool) && !isProtectedByTurn) {
-                        state.nudgeCounter++
-                    }
                 }
 
                 if (state.toolParameters.has(part.callID)) {
@@ -82,7 +76,7 @@ export function syncToolCache(
         }
 
         logger.info(
-            `Synced cache - size: ${state.toolParameters.size}, currentTurn: ${state.currentTurn}, nudgeCounter: ${state.nudgeCounter}`,
+            `Synced cache - size: ${state.toolParameters.size}, currentTurn: ${state.currentTurn}`,
         )
         trimToolParametersCache(state)
     } catch (error) {

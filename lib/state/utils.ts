@@ -51,6 +51,5 @@ export function resetOnCompaction(state: SessionState): void {
     state.prune.messages = new Map<string, number>()
     state.compressSummaries = []
     state.contextLimitAnchors = new Set<string>()
-    state.nudgeCounter = 0
     state.lastToolPrune = false
 }
