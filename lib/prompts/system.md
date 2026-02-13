@@ -54,7 +54,7 @@ It is of your responsibility to keep a sharp, high-quality context window for op
 <manual><instruction name=manual_mode policy_level=critical>
 Manual mode is enabled. Do NOT use compress unless the user has explicitly triggered it through a manual marker.
 
-<compress>Only use the compress tool after seeing `<compress triggered manually>` in the current user instruction context.</compress>
+Only use the compress tool after seeing `<compress triggered manually>` in the current user instruction context.
 
 After completing a manually triggered context-management action, STOP IMMEDIATELY. Do NOT continue with any task execution. End your response right after the tool use completes and wait for the next user input.
 </instruction></manual>

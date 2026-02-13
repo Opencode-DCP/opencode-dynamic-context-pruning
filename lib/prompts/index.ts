@@ -4,23 +4,16 @@ import { NUDGE } from "./_codegen/nudge.generated"
 import { COMPRESS as COMPRESS_TOOL_SPEC } from "./_codegen/compress.generated"
 
 export interface ToolFlags {
-    compress: boolean
     manual: boolean
 }
 
-function processConditionals(template: string, flags: ToolFlags): string {
-    const tools = ["manual", "compress"] as const
-    const enabled = {
-        manual: flags.manual,
-        compress: flags.compress,
-    }
-
-    let result = template
+function renderSystemPromptInternal(manual: boolean): string {
+    let result = SYSTEM_PROMPT
     result = result.replace(/\/\/.*?\/\//g, "")
 
-    for (const tool of tools) {
-        const regex = new RegExp(`<${tool}>([\\s\\S]*?)</${tool}>`, "g")
-        result = result.replace(regex, (_, content) => (enabled[tool] ? content : ""))
+    if (!manual) {
+        const regex = new RegExp(`<manual>[\\s\\S]*?</manual>`, "g")
+        result = result.replace(regex, "")
     }
 
     return result.replace(/\n([ \t]*\n)+/g, "\n\n").trim()
@@ -38,10 +31,7 @@ function extractInstruction(content: string, name: string): string {
 }
 
 export function renderSystemPrompt(flags?: ToolFlags): string {
-    return processConditionals(SYSTEM_PROMPT, {
-        compress: flags?.compress ?? true,
-        manual: flags?.manual ?? false,
-    })
+    return renderSystemPromptInternal(flags?.manual ?? false)
 }
 
 export function renderNudge(mode: NudgeMode = "frequency"): string {

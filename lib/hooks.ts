@@ -87,7 +87,6 @@ export function createSystemPromptHandler(
 
         output.system.push(
             renderSystemPrompt({
-                compress: true,
                 manual: state.manualMode,
             }),
         )
