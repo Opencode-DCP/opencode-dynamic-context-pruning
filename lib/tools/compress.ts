@@ -13,7 +13,6 @@ import {
     findSummaryAnchorForBoundary,
 } from "./utils"
 import { sendCompressNotification } from "../ui/notification"
-import { buildCompressionGraphData, cacheSystemPromptTokens } from "../ui/utils"
 import { prune as applyPruneTransforms } from "../messages/prune"
 import { clog, C } from "../compress-logger"
 
@@ -114,8 +113,6 @@ export function createCompressTool(ctx: ToolContext): ReturnType<typeof tool> {
                     messages,
                     ctx.config.manualMode.enabled,
                 )
-
-                cacheSystemPromptTokens(state, messages)
 
                 clog.info(C.STATE, `State Snapshot (before boundary matching)`, {
                     sessionId: state.sessionId,
@@ -377,13 +374,11 @@ export function createCompressTool(ctx: ToolContext): ReturnType<typeof tool> {
                 }
 
                 if (!hasApiTokenMetadata) {
-                    const estimated = buildCompressionGraphData(
-                        state,
-                        messages,
-                        new Set<string>(),
-                        new Set<string>(),
-                    )
-                    totalSessionTokens = estimated.totalSessionTokens
+                    let estimatedContentTokens = 0
+                    for (const msg of messages) {
+                        estimatedContentTokens += countAllMessageTokens(msg)
+                    }
+                    totalSessionTokens = estimatedContentTokens
                     clog.info(C.COMPRESS, `Token Accounting Fallback`, {
                         totalSessionTokens,
                     })
@@ -434,7 +429,10 @@ export function createCompressTool(ctx: ToolContext): ReturnType<typeof tool> {
                     topic,
                     summary,
                     summaryTokens,
-                    messages,
+                    totalSessionTokens,
+                    estimatedCompressedTokens,
+                    messages.map((m) => m.info.id),
+                    messages.length,
                     currentParams,
                 )
 

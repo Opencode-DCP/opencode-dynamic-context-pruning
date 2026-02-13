@@ -155,6 +155,29 @@ export function truncate(str: string, maxLen: number = 60): string {
     return str.slice(0, maxLen - 3) + "..."
 }
 
+export function formatSessionMap(
+    messageIds: string[],
+    prunedMessages: Map<string, number>,
+    width: number = 50,
+): string {
+    const total = messageIds.length
+    if (total === 0) return `│${"░".repeat(width)}│`
+
+    const bar = new Array(width).fill("█")
+
+    for (let m = 0; m < total; m++) {
+        if (prunedMessages.has(messageIds[m])) {
+            const start = Math.floor((m / total) * width)
+            const end = Math.floor(((m + 1) / total) * width)
+            for (let i = start; i < end; i++) {
+                bar[i] = "░"
+            }
+        }
+    }
+
+    return `│${bar.join("")}│`
+}
+
 export interface CompressionGraphData {
     systemTokens: number
     recentCompressedTokens: number

@@ -1,13 +1,12 @@
 import type { Logger } from "../logger"
 import type { SessionState } from "../state"
 import {
-    buildCompressionGraphData,
-    formatCompressionGraph,
     formatPrunedItemsList,
+    formatSessionMap,
     formatStatsHeader,
     formatTokenCount,
 } from "./utils"
-import { ToolParameterEntry, WithParts } from "../state"
+import { ToolParameterEntry } from "../state"
 import { PluginConfig } from "../config"
 import { clog, C } from "../compress-logger"
 
@@ -140,7 +139,10 @@ export async function sendCompressNotification(
     topic: string,
     summary: string,
     summaryTokens: number,
-    messages: WithParts[],
+    totalSessionTokens: number,
+    compressedTokens: number,
+    sessionMessageIds: string[],
+    totalMessages: number,
     params: any,
 ): Promise<boolean> {
     if (config.pruneNotification === "off") {
@@ -155,26 +157,22 @@ export async function sendCompressNotification(
     } else {
         message = formatStatsHeader(state.stats.totalPruneTokens, state.stats.pruneTokenCounter)
 
-        const newIds = new Set(messageIds)
-        const newToolIds = new Set(toolIds)
-        const graphData = buildCompressionGraphData(state, messages, newIds, newToolIds)
-        const progressBar = formatCompressionGraph(graphData, 50)
-        const pruneTokenCounterStr = `~${formatTokenCount(graphData.recentCompressedTokens)}`
-        const reduction =
-            graphData.totalSessionTokens > 0
-                ? Math.round(
-                      (graphData.recentCompressedTokens / graphData.totalSessionTokens) * 100,
-                  )
-                : 0
+        const pruneTokenCounterStr = `~${formatTokenCount(compressedTokens)}`
 
-        clog.info(C.COMPRESS, `sendCompressNotification graph`, {
+        clog.info(C.COMPRESS, `sendCompressNotification inputs`, {
             summaryTokens,
-            reductionPercent: reduction,
-            ...graphData,
+            totalSessionTokens,
+            compressedTokens,
+            ratio:
+                totalSessionTokens > 0 ? (compressedTokens / totalSessionTokens).toFixed(4) : "N/A",
         })
 
-        message += `\n\n${progressBar}`
+        const progressBar = formatSessionMap(sessionMessageIds, state.prune.messages, 50)
+        const reduction =
+            totalSessionTokens > 0 ? Math.round((compressedTokens / totalSessionTokens) * 100) : 0
+
         message += `\n\n▣ Compressing (${pruneTokenCounterStr} removed, ${reduction}% reduction)`
+        message += `\n${progressBar}`
         message += `\n→ Topic: ${topic}`
         message += `\n→ Items: ${messageIds.length} messages`
         if (toolIds.length > 0) {
