@@ -13,7 +13,7 @@ import { handleHelpCommand } from "./commands/help"
 import { handleSweepCommand } from "./commands/sweep"
 import { handleManualToggleCommand, handleManualTriggerCommand } from "./commands/manual"
 import { ensureSessionInitialized } from "./state/state"
-import { getCurrentParams } from "./strategies/utils"
+import { cacheSystemPromptTokens } from "./ui/utils"
 
 const INTERNAL_AGENT_SIGNATURES = [
     "You are a title generator",
@@ -106,6 +106,8 @@ export function createChatMessageTransformHandler(
         if (state.isSubAgent) {
             return
         }
+
+        cacheSystemPromptTokens(state, output.messages)
 
         syncToolCache(state, config, logger, output.messages)
         buildToolIdList(state, output.messages)

@@ -8,6 +8,7 @@ import { getCurrentParams, countAllMessageTokens, countTokens } from "../strateg
 import type { AssistantMessage } from "@opencode-ai/sdk/v2"
 import { findStringInMessages, collectToolIdsInRange, collectMessageIdsInRange } from "./utils"
 import { sendCompressNotification } from "../ui/notification"
+import { cacheSystemPromptTokens } from "../ui/utils"
 import { prune as applyPruneTransforms } from "../messages/prune"
 import { clog, C } from "../compress-logger"
 
@@ -108,6 +109,8 @@ export function createCompressTool(ctx: ToolContext): ReturnType<typeof tool> {
                     messages,
                     ctx.config.manualMode.enabled,
                 )
+
+                cacheSystemPromptTokens(state, messages)
 
                 clog.info(C.STATE, `State Snapshot (before boundary matching)`, {
                     sessionId: state.sessionId,
@@ -406,20 +409,6 @@ export function createCompressTool(ctx: ToolContext): ReturnType<typeof tool> {
                     compressedToolIds: compressedToolIds.length,
                 })
 
-                // Build token weight map for all messages (for proportional bar graph)
-                const weights = new Map<string, number>()
-                let contentWeight = 0
-                for (const msg of messages) {
-                    const w = countAllMessageTokens(msg)
-                    weights.set(msg.info.id, w)
-                    contentWeight += w
-                }
-
-                // System prompt = API total minus message content
-                const systemWeight = Math.max(0, totalSessionTokens - contentWeight)
-                const sessionIds = ["__system__", ...messages.map((m) => m.info.id)]
-                weights.set("__system__", systemWeight)
-
                 await sendCompressNotification(
                     client,
                     logger,
@@ -431,11 +420,7 @@ export function createCompressTool(ctx: ToolContext): ReturnType<typeof tool> {
                     topic,
                     summary,
                     summaryTokens,
-                    totalSessionTokens,
-                    estimatedCompressedTokens,
-                    sessionIds,
-                    weights,
-                    messages.length,
+                    messages,
                     currentParams,
                 )
 

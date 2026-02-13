@@ -1,6 +1,7 @@
-import { ToolParameterEntry } from "../state"
-import { countTokens } from "../strategies/utils"
+import { SessionState, ToolParameterEntry, WithParts } from "../state"
+import { countTokens, extractToolContent } from "../strategies/utils"
 import { clog, C } from "../compress-logger"
+import { isIgnoredUserMessage } from "../messages/utils"
 
 function extractParameterKey(tool: string, parameters: any): string {
     if (!parameters) return ""
@@ -170,68 +171,233 @@ export function truncate(str: string, maxLen: number = 60): string {
     return str.slice(0, maxLen - 3) + "..."
 }
 
-export function formatProgressBar(
-    total: number,
-    start: number,
-    end: number,
-    width: number = 20,
-): string {
-    if (total <= 0) return `│${" ".repeat(width)}│`
+export interface CompressionGraphData {
+    systemTokens: number
+    recentCompressedTokens: number
+    olderCompressedTokens: number
+    remainingTokens: number
+    totalSessionTokens: number
+}
 
-    const startIdx = Math.floor((start / total) * width)
-    const endIdx = Math.min(width - 1, Math.floor((end / total) * width))
+function countMessageTokensExcludingPrunedTools(state: SessionState, msg: WithParts): number {
+    const parts = Array.isArray(msg.parts) ? msg.parts : []
+    const texts: string[] = []
+
+    for (const part of parts) {
+        if ((part as any).ignored) {
+            continue
+        }
+
+        if (part.type === "text") {
+            texts.push(part.text)
+            continue
+        }
+
+        if (part.type !== "tool") {
+            continue
+        }
+
+        if (!part.callID || state.prune.tools.has(part.callID)) {
+            continue
+        }
+
+        texts.push(...extractToolContent(part))
+    }
+
+    if (texts.length === 0) {
+        return 0
+    }
+    return countTokens(texts.join(" "))
+}
+
+function buildToolParentMap(messages: WithParts[]): Map<string, string> {
+    const map = new Map<string, string>()
+
+    for (const msg of messages) {
+        const parts = Array.isArray(msg.parts) ? msg.parts : []
+        for (const part of parts) {
+            if (part.type !== "tool" || !part.callID) {
+                continue
+            }
+            map.set(part.callID, msg.info.id)
+        }
+    }
+
+    return map
+}
+
+export function cacheSystemPromptTokens(state: SessionState, messages: WithParts[]): void {
+    let firstInputTokens = 0
+    for (const msg of messages) {
+        if (msg.info.role !== "assistant") {
+            continue
+        }
+        const info = msg.info as any
+        const input = info?.tokens?.input || 0
+        const cacheRead = info?.tokens?.cache?.read || 0
+        if (input > 0 || cacheRead > 0) {
+            firstInputTokens = input + cacheRead
+            break
+        }
+    }
+
+    if (firstInputTokens <= 0) {
+        state.systemPromptTokens = undefined
+        return
+    }
+
+    let firstUserText = ""
+    for (const msg of messages) {
+        if (msg.info.role !== "user" || isIgnoredUserMessage(msg)) {
+            continue
+        }
+        const parts = Array.isArray(msg.parts) ? msg.parts : []
+        for (const part of parts) {
+            if (part.type === "text" && !(part as any).ignored) {
+                firstUserText += part.text
+            }
+        }
+        break
+    }
+
+    const estimatedSystemTokens = Math.max(0, firstInputTokens - countTokens(firstUserText))
+    state.systemPromptTokens = estimatedSystemTokens > 0 ? estimatedSystemTokens : undefined
+}
+
+export function buildCompressionGraphData(
+    state: SessionState,
+    messages: WithParts[],
+    newMessageIds: Set<string>,
+    newToolIds: Set<string>,
+): CompressionGraphData {
+    const toolParentMap = buildToolParentMap(messages)
+    const prunedMessageIds = new Set(state.prune.messages.keys())
+
+    let compressedMessageTokens = 0
+    for (const tokens of state.prune.messages.values()) {
+        compressedMessageTokens += tokens
+    }
+
+    let compressedStandaloneToolTokens = 0
+    for (const [toolId, toolTokens] of state.prune.tools.entries()) {
+        const parentMessageId = toolParentMap.get(toolId)
+        if (parentMessageId && prunedMessageIds.has(parentMessageId)) {
+            continue
+        }
+        compressedStandaloneToolTokens += toolTokens
+    }
+
+    const compressedTotalTokens = compressedMessageTokens + compressedStandaloneToolTokens
+
+    let recentMessageTokens = 0
+    for (const messageId of newMessageIds) {
+        recentMessageTokens += state.prune.messages.get(messageId) || 0
+    }
+
+    let recentStandaloneToolTokens = 0
+    for (const toolId of newToolIds) {
+        const parentMessageId = toolParentMap.get(toolId)
+
+        if (parentMessageId && newMessageIds.has(parentMessageId)) {
+            continue
+        }
+
+        if (parentMessageId && prunedMessageIds.has(parentMessageId)) {
+            continue
+        }
+
+        recentStandaloneToolTokens += state.prune.tools.get(toolId) || 0
+    }
+
+    const recentCompressedTokens = recentMessageTokens + recentStandaloneToolTokens
+    const olderCompressedTokens = Math.max(0, compressedTotalTokens - recentCompressedTokens)
+
+    const messageIds = new Set(messages.map((m) => m.info.id))
+    let remainingTokens = 0
+
+    for (const msg of messages) {
+        if (prunedMessageIds.has(msg.info.id)) {
+            continue
+        }
+        if (msg.info.role === "user" && isIgnoredUserMessage(msg)) {
+            continue
+        }
+        remainingTokens += countMessageTokensExcludingPrunedTools(state, msg)
+    }
+
+    for (const summary of state.compressSummaries) {
+        if (!messageIds.has(summary.anchorMessageId)) {
+            continue
+        }
+        remainingTokens += countTokens(summary.summary)
+    }
+
+    const systemTokens = state.systemPromptTokens ?? 0
+    const totalSessionTokens =
+        systemTokens + recentCompressedTokens + olderCompressedTokens + remainingTokens
+
+    clog.info(C.COMPRESS, "Compression graph token accounting", {
+        systemTokens,
+        recentCompressedTokens,
+        olderCompressedTokens,
+        remainingTokens,
+        totalSessionTokens,
+    })
+
+    return {
+        systemTokens,
+        recentCompressedTokens,
+        olderCompressedTokens,
+        remainingTokens,
+        totalSessionTokens,
+    }
+}
+
+function allocateSegmentWidths(values: number[], total: number, width: number): number[] {
+    if (total <= 0 || width <= 0) {
+        return new Array(values.length).fill(0)
+    }
+
+    const raw = values.map((v) => (v / total) * width)
+    const base = raw.map((v) => Math.floor(v))
+    let used = base.reduce((acc, v) => acc + v, 0)
+
+    const order = raw
+        .map((v, idx) => ({ idx, frac: v - Math.floor(v) }))
+        .sort((a, b) => b.frac - a.frac)
+
+    for (let i = 0; used < width && i < order.length; i++) {
+        base[order[i].idx] += 1
+        used++
+    }
+
+    return base
+}
+
+export function formatCompressionGraph(data: CompressionGraphData, width: number = 50): string {
+    const values = [
+        data.systemTokens,
+        data.recentCompressedTokens,
+        data.olderCompressedTokens,
+        data.remainingTokens,
+    ]
+    const chars = ["▌", "⣿", "░", "█"]
+    const segmentWidths = allocateSegmentWidths(values, data.totalSessionTokens, width)
 
     let bar = ""
-    for (let i = 0; i < width; i++) {
-        if (i >= startIdx && i <= endIdx) {
-            bar += "░"
-        } else {
-            bar += "█"
-        }
+    for (let i = 0; i < segmentWidths.length; i++) {
+        bar += chars[i].repeat(Math.max(0, segmentWidths[i]))
+    }
+
+    if (bar.length < width) {
+        bar += " ".repeat(width - bar.length)
     }
 
     return `│${bar}│`
 }
 
-export function formatSessionMap(
-    messageIds: string[],
-    prunedMessages: Map<string, number>,
-    newPrunedIds: Set<string>,
-    weights: Map<string, number>,
-    width: number = 50,
-): string {
-    const total = messageIds.length
-    if (total === 0) return `│${"░".repeat(width)}│`
-
-    // Build cumulative token weights for proportional positioning
-    const cum = [0]
-    for (const id of messageIds) {
-        cum.push(cum[cum.length - 1] + (weights.get(id) || 1))
-    }
-    const totalWeight = cum[cum.length - 1]
-
-    const bar = new Array(width).fill("█")
-
-    for (let m = 0; m < total; m++) {
-        const start = Math.floor((cum[m] / totalWeight) * width)
-        const end = Math.floor((cum[m + 1] / totalWeight) * width)
-
-        if (messageIds[m] === "__system__") {
-            for (let i = start; i < end; i++) {
-                bar[i] = "▌"
-            }
-            continue
-        }
-
-        if (prunedMessages.has(messageIds[m])) {
-            const char = newPrunedIds.has(messageIds[m]) ? "⣿" : "░"
-            for (let i = start; i < end; i++) {
-                bar[i] = char
-            }
-        }
-    }
-
-    return `│${bar.join("")}│`
+export function formatCompressionGraphLegend(): string {
+    return "→ Legend: ▌ system | ⣿ recent compress | ░ older compressed | █ in context"
 }
 
 export function shortenPath(input: string, workingDirectory?: string): string {

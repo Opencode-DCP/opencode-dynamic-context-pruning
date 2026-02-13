@@ -53,4 +53,5 @@ export interface SessionState {
     currentTurn: number
     variant: string | undefined
     modelContextLimit: number | undefined
+    systemPromptTokens: number | undefined
 }
