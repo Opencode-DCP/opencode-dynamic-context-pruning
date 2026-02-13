@@ -22,8 +22,6 @@ export interface ToolSettings {
     limitNudgeInterval: number
     protectedTools: string[]
     contextLimit: number | `${number}%`
-    contextPressureEnabled: boolean
-    compressContextEnabled: boolean
     modelLimits?: Record<string, number | `${number}%`>
 }
 
@@ -110,8 +108,6 @@ export const VALID_CONFIG_KEYS = new Set([
     "tools.settings.limitNudgeInterval",
     "tools.settings.protectedTools",
     "tools.settings.contextLimit",
-    "tools.settings.contextPressureEnabled",
-    "tools.settings.compressContextEnabled",
     "tools.settings.modelLimits",
     "tools.compress",
     "tools.compress.permission",
@@ -348,17 +344,6 @@ export function validateConfigTypes(config: Record<string, any>): ValidationErro
                 }
             }
 
-            if (
-                tools.settings.contextPressureEnabled !== undefined &&
-                typeof tools.settings.contextPressureEnabled !== "boolean"
-            ) {
-                errors.push({
-                    key: "tools.settings.contextPressureEnabled",
-                    expected: "boolean",
-                    actual: typeof tools.settings.contextPressureEnabled,
-                })
-            }
-
             if (tools.settings.modelLimits !== undefined) {
                 if (
                     typeof tools.settings.modelLimits !== "object" ||
@@ -561,8 +546,6 @@ const defaultConfig: PluginConfig = {
             limitNudgeInterval: 1,
             protectedTools: [...DEFAULT_PROTECTED_TOOLS],
             contextLimit: 100000,
-            contextPressureEnabled: true,
-            compressContextEnabled: true,
         },
         compress: {
             permission: "allow",
@@ -735,10 +718,6 @@ function mergeTools(base: PluginConfig["tools"], override?: ToolOverride): Plugi
                 ]),
             ],
             contextLimit: override.settings?.contextLimit ?? base.settings.contextLimit,
-            contextPressureEnabled:
-                override.settings?.contextPressureEnabled ?? base.settings.contextPressureEnabled,
-            compressContextEnabled:
-                override.settings?.compressContextEnabled ?? base.settings.compressContextEnabled,
             modelLimits: override.settings?.modelLimits ?? base.settings.modelLimits,
         },
         compress: {
