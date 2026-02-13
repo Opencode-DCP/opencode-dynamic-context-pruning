@@ -1,7 +1,9 @@
 // Generated prompts (from .md files via scripts/generate-prompts.ts)
 import { SYSTEM as SYSTEM_PROMPT } from "./_codegen/system.generated"
 import { NUDGE } from "./_codegen/nudge.generated"
-import { COMPRESS as COMPRESS_TOOL_SPEC } from "./_codegen/compress.generated"
+import { COMPRESS } from "./_codegen/compress.generated"
+
+export { COMPRESS as COMPRESS_TOOL_SPEC }
 
 export function renderSystemPrompt(manual?: boolean): string {
     let result = SYSTEM_PROMPT
@@ -32,21 +34,4 @@ export function renderNudge(mode: NudgeMode = "frequency"): string {
     }
 
     return extractInstruction(NUDGE, "context_management_required")
-}
-
-const PROMPTS: Record<string, string> = {
-    "compress-tool-spec": COMPRESS_TOOL_SPEC,
-}
-
-export function loadPrompt(name: string, vars?: Record<string, string>): string {
-    let content = PROMPTS[name]
-    if (!content) {
-        throw new Error(`Prompt not found: ${name}`)
-    }
-    if (vars) {
-        for (const [key, value] of Object.entries(vars)) {
-            content = content.replace(new RegExp(`\\{\\{${key}\\}\\}`, "g"), value)
-        }
-    }
-    return content
 }

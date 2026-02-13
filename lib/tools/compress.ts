@@ -3,7 +3,7 @@ import type { WithParts, CompressSummary } from "../state"
 import type { ToolContext } from "./types"
 import { ensureSessionInitialized } from "../state"
 import { saveSessionState } from "../state/persistence"
-import { loadPrompt } from "../prompts"
+import { COMPRESS_TOOL_SPEC } from "../prompts"
 import { getCurrentParams, countAllMessageTokens, countTokens } from "../strategies/utils"
 import type { AssistantMessage } from "@opencode-ai/sdk/v2"
 import { findStringInMessages, collectToolIdsInRange, collectMessageIdsInRange } from "./utils"
@@ -12,7 +12,7 @@ import { buildCompressionGraphData, cacheSystemPromptTokens } from "../ui/utils"
 import { prune as applyPruneTransforms } from "../messages/prune"
 import { clog, C } from "../compress-logger"
 
-const COMPRESS_TOOL_DESCRIPTION = loadPrompt("compress-tool-spec")
+const COMPRESS_TOOL_DESCRIPTION = COMPRESS_TOOL_SPEC
 const COMPRESS_SUMMARY_PREFIX = "[Compressed conversation block]\n\n"
 
 export function createCompressTool(ctx: ToolContext): ReturnType<typeof tool> {
