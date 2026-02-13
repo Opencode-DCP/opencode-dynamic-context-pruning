@@ -515,7 +515,7 @@ const defaultConfig: PluginConfig = {
     protectedFilePatterns: [],
     tools: {
         settings: {
-            nudgeGap: 1,
+            nudgeGap: 5,
             protectedTools: [...DEFAULT_PROTECTED_TOOLS],
             contextLimit: 100000,
         },
