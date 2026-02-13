@@ -152,7 +152,7 @@ export function addAnchor(
     return anchorMessageIds.size !== previousSize
 }
 
-export function applyAnchoredHints(
+export function applyAnchoredNudge(
     anchorMessageIds: Set<string>,
     messages: WithParts[],
     modelId: string | undefined,

@@ -3,7 +3,7 @@ import type { Logger } from "../../logger"
 import type { PluginConfig } from "../../config"
 import {
     addAnchor,
-    applyAnchoredHints,
+    applyAnchoredNudge,
     findLastNonIgnoredMessage,
     getNudgeGap,
     getModelInfo,
@@ -50,7 +50,7 @@ export const insertCompressToolContext = (
         }
     }
 
-    applyAnchoredHints(state.contextLimitAnchors, messages, modelId, CONTEXT_LIMIT_HINT_TEXT)
+    applyAnchoredNudge(state.contextLimitAnchors, messages, modelId, CONTEXT_LIMIT_HINT_TEXT)
 
     if (anchorsChanged) {
         persistAnchors(state, logger)
