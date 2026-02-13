@@ -161,6 +161,39 @@ export interface CompressionGraphData {
     olderCompressedTokens: number
     remainingTokens: number
     totalSessionTokens: number
+    segments: CompressionGraphSegment[]
+}
+
+type CompressionGraphSegmentType = "system" | "recentCompressed" | "olderCompressed" | "inContext"
+
+export interface CompressionGraphSegment {
+    type: CompressionGraphSegmentType
+    tokens: number
+}
+
+function appendGraphSegment(
+    segments: CompressionGraphSegment[],
+    type: CompressionGraphSegmentType,
+    tokens: number,
+): void {
+    if (tokens <= 0) {
+        return
+    }
+
+    const last = segments[segments.length - 1]
+    if (last && last.type === type) {
+        last.tokens += tokens
+        return
+    }
+
+    segments.push({ type, tokens })
+}
+
+function incrementMapValue(map: Map<string, number>, key: string, value: number): void {
+    if (value <= 0) {
+        return
+    }
+    map.set(key, (map.get(key) || 0) + value)
 }
 
 function countMessageTokensExcludingPrunedTools(state: SessionState, msg: WithParts): number {
@@ -256,19 +289,44 @@ export function buildCompressionGraphData(
 ): CompressionGraphData {
     const toolParentMap = buildToolParentMap(messages)
     const prunedMessageIds = new Set(state.prune.messages.keys())
+    const messageIds = new Set(messages.map((m) => m.info.id))
 
     let compressedMessageTokens = 0
     for (const tokens of state.prune.messages.values()) {
         compressedMessageTokens += tokens
     }
 
+    const recentStandaloneByMessage = new Map<string, number>()
+    const olderStandaloneByMessage = new Map<string, number>()
+
+    let unparentedRecentStandaloneTokens = 0
+    let unparentedOlderStandaloneTokens = 0
     let compressedStandaloneToolTokens = 0
+    let recentStandaloneToolTokens = 0
     for (const [toolId, toolTokens] of state.prune.tools.entries()) {
         const parentMessageId = toolParentMap.get(toolId)
         if (parentMessageId && prunedMessageIds.has(parentMessageId)) {
             continue
         }
+
         compressedStandaloneToolTokens += toolTokens
+
+        const isRecent = newToolIds.has(toolId)
+        if (isRecent) {
+            recentStandaloneToolTokens += toolTokens
+        }
+
+        if (parentMessageId) {
+            incrementMapValue(
+                isRecent ? recentStandaloneByMessage : olderStandaloneByMessage,
+                parentMessageId,
+                toolTokens,
+            )
+        } else if (isRecent) {
+            unparentedRecentStandaloneTokens += toolTokens
+        } else {
+            unparentedOlderStandaloneTokens += toolTokens
+        }
     }
 
     const compressedTotalTokens = compressedMessageTokens + compressedStandaloneToolTokens
@@ -278,25 +336,21 @@ export function buildCompressionGraphData(
         recentMessageTokens += state.prune.messages.get(messageId) || 0
     }
 
-    let recentStandaloneToolTokens = 0
-    for (const toolId of newToolIds) {
-        const parentMessageId = toolParentMap.get(toolId)
-
-        if (parentMessageId && newMessageIds.has(parentMessageId)) {
-            continue
-        }
-
-        if (parentMessageId && prunedMessageIds.has(parentMessageId)) {
-            continue
-        }
-
-        recentStandaloneToolTokens += state.prune.tools.get(toolId) || 0
-    }
-
     const recentCompressedTokens = recentMessageTokens + recentStandaloneToolTokens
     const olderCompressedTokens = Math.max(0, compressedTotalTokens - recentCompressedTokens)
 
-    const messageIds = new Set(messages.map((m) => m.info.id))
+    const summaryTokensByAnchor = new Map<string, number>()
+    let summaryTokensTotal = 0
+    for (const summary of state.compressSummaries) {
+        if (!messageIds.has(summary.anchorMessageId)) {
+            continue
+        }
+
+        const tokens = countTokens(summary.summary)
+        summaryTokensTotal += tokens
+        incrementMapValue(summaryTokensByAnchor, summary.anchorMessageId, tokens)
+    }
+
     let remainingTokens = 0
 
     for (const msg of messages) {
@@ -309,16 +363,46 @@ export function buildCompressionGraphData(
         remainingTokens += countMessageTokensExcludingPrunedTools(state, msg)
     }
 
-    for (const summary of state.compressSummaries) {
-        if (!messageIds.has(summary.anchorMessageId)) {
-            continue
-        }
-        remainingTokens += countTokens(summary.summary)
-    }
+    remainingTokens += summaryTokensTotal
 
     const systemTokens = state.systemPromptTokens ?? 0
     const totalSessionTokens =
         systemTokens + recentCompressedTokens + olderCompressedTokens + remainingTokens
+
+    const segments: CompressionGraphSegment[] = []
+    appendGraphSegment(segments, "system", systemTokens)
+
+    for (const msg of messages) {
+        const messageId = msg.info.id
+        const summaryTokens = summaryTokensByAnchor.get(messageId) || 0
+        appendGraphSegment(segments, "inContext", summaryTokens)
+
+        if (prunedMessageIds.has(messageId)) {
+            const messageTokens = state.prune.messages.get(messageId) || 0
+            appendGraphSegment(
+                segments,
+                newMessageIds.has(messageId) ? "recentCompressed" : "olderCompressed",
+                messageTokens,
+            )
+        } else if (!(msg.info.role === "user" && isIgnoredUserMessage(msg))) {
+            const messageTokens = countMessageTokensExcludingPrunedTools(state, msg)
+            appendGraphSegment(segments, "inContext", messageTokens)
+        }
+
+        appendGraphSegment(
+            segments,
+            "recentCompressed",
+            recentStandaloneByMessage.get(messageId) || 0,
+        )
+        appendGraphSegment(
+            segments,
+            "olderCompressed",
+            olderStandaloneByMessage.get(messageId) || 0,
+        )
+    }
+
+    appendGraphSegment(segments, "recentCompressed", unparentedRecentStandaloneTokens)
+    appendGraphSegment(segments, "olderCompressed", unparentedOlderStandaloneTokens)
 
     clog.info(C.COMPRESS, "Compression graph token accounting", {
         systemTokens,
@@ -326,6 +410,7 @@ export function buildCompressionGraphData(
         olderCompressedTokens,
         remainingTokens,
         totalSessionTokens,
+        segments: segments.length,
     })
 
     return {
@@ -334,6 +419,7 @@ export function buildCompressionGraphData(
         olderCompressedTokens,
         remainingTokens,
         totalSessionTokens,
+        segments,
     }
 }
 
@@ -359,18 +445,31 @@ function allocateSegmentWidths(values: number[], total: number, width: number): 
 }
 
 export function formatCompressionGraph(data: CompressionGraphData, width: number = 50): string {
-    const values = [
-        data.systemTokens,
-        data.recentCompressedTokens,
-        data.olderCompressedTokens,
-        data.remainingTokens,
-    ]
-    const chars = ["▌", "⣿", "░", "█"]
-    const segmentWidths = allocateSegmentWidths(values, data.totalSessionTokens, width)
+    const segments: CompressionGraphSegment[] =
+        data.segments.length > 0
+            ? data.segments
+            : [
+                  { type: "system", tokens: data.systemTokens },
+                  { type: "recentCompressed", tokens: data.recentCompressedTokens },
+                  { type: "olderCompressed", tokens: data.olderCompressedTokens },
+                  { type: "inContext", tokens: data.remainingTokens },
+              ]
+
+    const chars: Record<CompressionGraphSegmentType, string> = {
+        system: "▌",
+        recentCompressed: "⣿",
+        olderCompressed: "░",
+        inContext: "█",
+    }
+    const segmentWidths = allocateSegmentWidths(
+        segments.map((segment) => segment.tokens),
+        data.totalSessionTokens,
+        width,
+    )
 
     let bar = ""
-    for (let i = 0; i < segmentWidths.length; i++) {
-        bar += chars[i].repeat(Math.max(0, segmentWidths[i]))
+    for (let i = 0; i < segments.length; i++) {
+        bar += chars[segments[i].type].repeat(Math.max(0, segmentWidths[i]))
     }
 
     if (bar.length < width) {

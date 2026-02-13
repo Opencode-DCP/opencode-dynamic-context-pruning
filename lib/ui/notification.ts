@@ -174,7 +174,7 @@ export async function sendCompressNotification(
         })
 
         message += `\n\n${progressBar}`
-        message += `\n▣ Compressing (${pruneTokenCounterStr} removed, ${reduction}% reduction)`
+        message += `\n\n▣ Compressing (${pruneTokenCounterStr} removed, ${reduction}% reduction)`
         message += `\n→ Topic: ${topic}`
         message += `\n→ Items: ${messageIds.length} messages`
         if (toolIds.length > 0) {
