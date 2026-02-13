@@ -6,7 +6,12 @@ import { saveSessionState } from "../state/persistence"
 import { COMPRESS_TOOL_SPEC } from "../prompts"
 import { getCurrentParams, countAllMessageTokens, countTokens } from "../strategies/utils"
 import type { AssistantMessage } from "@opencode-ai/sdk/v2"
-import { findStringInMessages, collectToolIdsInRange, collectMessageIdsInRange } from "./utils"
+import {
+    findStringInMessages,
+    collectToolIdsInRange,
+    collectMessageIdsInRange,
+    findSummaryAnchorForBoundary,
+} from "./utils"
 import { sendCompressNotification } from "../ui/notification"
 import { buildCompressionGraphData, cacheSystemPromptTokens } from "../ui/utils"
 import { prune as applyPruneTransforms } from "../messages/prune"
@@ -183,9 +188,11 @@ export function createCompressTool(ctx: ToolContext): ReturnType<typeof tool> {
                             summaries: state.compressSummaries.length,
                         },
                     )
-                    // TODO: This takes the first summary text match and does not error on
-                    // multiple matching summaries (ambiguous fallback).
-                    const s = state.compressSummaries.find((s) => s.summary.includes(startString))
+                    const s = findSummaryAnchorForBoundary(
+                        state.compressSummaries,
+                        startString,
+                        "startString",
+                    )
                     if (s) {
                         rawStartIndex = messages.findIndex((m) => m.info.id === s.anchorMessageId)
                         clog.info(C.COMPRESS, `✓ Start resolved via summary anchor`, {
@@ -193,7 +200,7 @@ export function createCompressTool(ctx: ToolContext): ReturnType<typeof tool> {
                             rawStartIndex,
                         })
                     } else {
-                        clog.error(
+                        clog.warn(
                             C.COMPRESS,
                             `✗ Start not found in any summary either\nCannot resolve boundary`,
                         )
@@ -208,9 +215,11 @@ export function createCompressTool(ctx: ToolContext): ReturnType<typeof tool> {
                             summaries: state.compressSummaries.length,
                         },
                     )
-                    // TODO: This takes the first summary text match and does not error on
-                    // multiple matching summaries (ambiguous fallback).
-                    const s = state.compressSummaries.find((s) => s.summary.includes(endString))
+                    const s = findSummaryAnchorForBoundary(
+                        state.compressSummaries,
+                        endString,
+                        "endString",
+                    )
                     if (s) {
                         rawEndIndex = messages.findIndex((m) => m.info.id === s.anchorMessageId)
                         clog.info(C.COMPRESS, `✓ End resolved via summary anchor`, {
@@ -218,7 +227,7 @@ export function createCompressTool(ctx: ToolContext): ReturnType<typeof tool> {
                             rawEndIndex,
                         })
                     } else {
-                        clog.error(
+                        clog.warn(
                             C.COMPRESS,
                             `✗ End not found in any summary either\nCannot resolve boundary`,
                         )
@@ -397,16 +406,6 @@ export function createCompressTool(ctx: ToolContext): ReturnType<typeof tool> {
                 })
 
                 state.stats.pruneTokenCounter += estimatedCompressedTokens
-
-                const rawStartResult = {
-                    messageId: anchorMessageId,
-                    messageIndex: rawStartIndex,
-                }
-                const rawEndMessageId = messages[rawEndIndex]?.info.id || endResult.messageId
-                const rawEndResult = {
-                    messageId: rawEndMessageId,
-                    messageIndex: rawEndIndex,
-                }
 
                 const currentParams = getCurrentParams(state, messages, logger)
                 const summaryTokens = countTokens(args.content.summary)

@@ -1,5 +1,5 @@
 import { partial_ratio } from "fuzzball"
-import type { WithParts } from "../state"
+import type { CompressSummary, WithParts } from "../state"
 import type { Logger } from "../logger"
 import { isIgnoredUserMessage } from "../messages/utils"
 import { clog, C } from "../compress-logger"
@@ -19,6 +19,36 @@ interface MatchResult {
     messageIndex: number
     score: number
     matchType: "exact" | "fuzzy"
+}
+
+export function findSummaryAnchorForBoundary(
+    summaries: CompressSummary[],
+    searchString: string,
+    stringType: "startString" | "endString",
+): CompressSummary | undefined {
+    const matches = summaries.filter((s) => s.summary.includes(searchString))
+
+    if (matches.length > 1) {
+        const sample = matches.slice(0, 8).map((s) => ({
+            anchorMessageId: s.anchorMessageId,
+            preview: s.summary.substring(0, 120),
+        }))
+
+        clog.error(C.BOUNDARY, `✗ Multiple Summary Matches (ambiguous)`, {
+            type: stringType,
+            count: matches.length,
+            matches: sample,
+            omitted: Math.max(0, matches.length - sample.length),
+            searchPreview: searchString.substring(0, 150),
+        })
+
+        throw new Error(
+            `Found multiple matches for ${stringType}. ` +
+                `Provide more surrounding context to uniquely identify the intended match.`,
+        )
+    }
+
+    return matches[0]
 }
 
 function summarizeMatches(
