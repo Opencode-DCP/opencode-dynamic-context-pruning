@@ -17,7 +17,7 @@ export interface CompressTool {
 }
 
 export interface ToolSettings {
-    limitNudgeInterval: number
+    nudgeGap: number
     protectedTools: string[]
     contextLimit: number | `${number}%`
     modelLimits?: Record<string, number | `${number}%`>
@@ -101,7 +101,7 @@ export const VALID_CONFIG_KEYS = new Set([
     "manualMode.automaticStrategies",
     "tools",
     "tools.settings",
-    "tools.settings.limitNudgeInterval",
+    "tools.settings.nudgeGap",
     "tools.settings.protectedTools",
     "tools.settings.contextLimit",
     "tools.settings.modelLimits",
@@ -282,13 +282,13 @@ export function validateConfigTypes(config: Record<string, any>): ValidationErro
     if (tools) {
         if (tools.settings) {
             if (
-                tools.settings.limitNudgeInterval !== undefined &&
-                typeof tools.settings.limitNudgeInterval !== "number"
+                tools.settings.nudgeGap !== undefined &&
+                typeof tools.settings.nudgeGap !== "number"
             ) {
                 errors.push({
-                    key: "tools.settings.limitNudgeInterval",
+                    key: "tools.settings.nudgeGap",
                     expected: "number",
-                    actual: typeof tools.settings.limitNudgeInterval,
+                    actual: typeof tools.settings.nudgeGap,
                 })
             }
 
@@ -515,7 +515,7 @@ const defaultConfig: PluginConfig = {
     protectedFilePatterns: [],
     tools: {
         settings: {
-            limitNudgeInterval: 1,
+            nudgeGap: 1,
             protectedTools: [...DEFAULT_PROTECTED_TOOLS],
             contextLimit: 100000,
         },
@@ -679,8 +679,7 @@ function mergeTools(base: PluginConfig["tools"], override?: ToolOverride): Plugi
 
     return {
         settings: {
-            limitNudgeInterval:
-                override.settings?.limitNudgeInterval ?? base.settings.limitNudgeInterval,
+            nudgeGap: override.settings?.nudgeGap ?? base.settings.nudgeGap,
             protectedTools: [
                 ...new Set([
                     ...base.settings.protectedTools,

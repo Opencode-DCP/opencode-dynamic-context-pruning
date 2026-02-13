@@ -112,7 +112,7 @@
                     "description": "General tool settings",
                     "additionalProperties": false,
                     "properties": {
-                        "limitNudgeInterval": {
+                        "nudgeGap": {
                             "type": "number",
                             "default": 1,
                             "minimum": 1,
