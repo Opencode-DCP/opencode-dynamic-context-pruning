@@ -17,8 +17,6 @@ export interface CompressTool {
 }
 
 export interface ToolSettings {
-    nudgeEnabled: boolean
-    nudgeFrequency: number
     limitNudgeInterval: number
     protectedTools: string[]
     contextLimit: number | `${number}%`
@@ -103,8 +101,6 @@ export const VALID_CONFIG_KEYS = new Set([
     "manualMode.automaticStrategies",
     "tools",
     "tools.settings",
-    "tools.settings.nudgeEnabled",
-    "tools.settings.nudgeFrequency",
     "tools.settings.limitNudgeInterval",
     "tools.settings.protectedTools",
     "tools.settings.contextLimit",
@@ -285,28 +281,6 @@ export function validateConfigTypes(config: Record<string, any>): ValidationErro
     const tools = config.tools
     if (tools) {
         if (tools.settings) {
-            if (
-                tools.settings.nudgeEnabled !== undefined &&
-                typeof tools.settings.nudgeEnabled !== "boolean"
-            ) {
-                errors.push({
-                    key: "tools.settings.nudgeEnabled",
-                    expected: "boolean",
-                    actual: typeof tools.settings.nudgeEnabled,
-                })
-            }
-
-            if (
-                tools.settings.nudgeFrequency !== undefined &&
-                typeof tools.settings.nudgeFrequency !== "number"
-            ) {
-                errors.push({
-                    key: "tools.settings.nudgeFrequency",
-                    expected: "number",
-                    actual: typeof tools.settings.nudgeFrequency,
-                })
-            }
-
             if (
                 tools.settings.limitNudgeInterval !== undefined &&
                 typeof tools.settings.limitNudgeInterval !== "number"
@@ -541,8 +515,6 @@ const defaultConfig: PluginConfig = {
     protectedFilePatterns: [],
     tools: {
         settings: {
-            nudgeEnabled: true,
-            nudgeFrequency: 10,
             limitNudgeInterval: 1,
             protectedTools: [...DEFAULT_PROTECTED_TOOLS],
             contextLimit: 100000,
@@ -707,8 +679,6 @@ function mergeTools(base: PluginConfig["tools"], override?: ToolOverride): Plugi
 
     return {
         settings: {
-            nudgeEnabled: override.settings?.nudgeEnabled ?? base.settings.nudgeEnabled,
-            nudgeFrequency: override.settings?.nudgeFrequency ?? base.settings.nudgeFrequency,
             limitNudgeInterval:
                 override.settings?.limitNudgeInterval ?? base.settings.limitNudgeInterval,
             protectedTools: [

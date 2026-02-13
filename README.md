@@ -109,9 +109,6 @@ DCP uses its own config file:
 >     "tools": {
 >         // Shared settings for context management
 >         "settings": {
->             // Nudge the LLM to use context management (every <nudgeFrequency> tool results)
->             "nudgeEnabled": true,
->             "nudgeFrequency": 10,
 >             // Token limit at which the model compresses session context
 >             // to keep the model in the "smart zone" (not a hard limit)
 >             // Accepts: number or "X%" (percentage of model's context window)

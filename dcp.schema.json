@@ -112,16 +112,6 @@
                     "description": "General tool settings",
                     "additionalProperties": false,
                     "properties": {
-                        "nudgeEnabled": {
-                            "type": "boolean",
-                            "default": true,
-                            "description": "Enable nudge reminders to manage context"
-                        },
-                        "nudgeFrequency": {
-                            "type": "number",
-                            "default": 10,
-                            "description": "Frequency of nudge reminders (in turns)"
-                        },
                         "limitNudgeInterval": {
                             "type": "number",
                             "default": 1,
