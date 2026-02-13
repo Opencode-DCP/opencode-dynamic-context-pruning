@@ -166,8 +166,7 @@ DCP provides a `/dcp` slash command:
 - `/dcp stats` — Shows cumulative pruning statistics across all sessions.
 - `/dcp sweep` — Prunes all tools since the last user message. Accepts an optional count: `/dcp sweep 10` prunes the last 10 tools. Respects `commands.protectedTools`.
 - `/dcp manual [on|off]` — Toggle manual mode or set explicit state. When on, the AI will not autonomously use context management tools.
-- `/dcp prune [focus]` — Trigger a single prune tool execution. Optional focus text directs the AI's pruning decisions.
-- `/dcp distill [focus]` — Trigger a single distill tool execution. Optional focus text directs what to distill.
+
 - `/dcp compress [focus]` — Trigger a single compress tool execution. Optional focus text directs what range to compress.
 
 ### Protected Tools

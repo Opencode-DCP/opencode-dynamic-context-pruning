@@ -138,22 +138,6 @@ function extractParameterKey(tool: string, parameters: any): string {
     return paramStr.substring(0, 50)
 }
 
-export function countDistillationTokens(distillation?: string[]): number {
-    if (!distillation || distillation.length === 0) return 0
-    return countTokens(distillation.join("\n"))
-}
-
-export function formatExtracted(distillation?: string[]): string {
-    if (!distillation || distillation.length === 0) {
-        return ""
-    }
-    let result = `\n\n▣ Extracted`
-    for (const finding of distillation) {
-        result += `\n───\n${finding}`
-    }
-    return result
-}
-
 export function formatStatsHeader(totalTokensSaved: number, pruneTokenCounter: number): string {
     const totalTokensSavedStr = `~${formatTokenCount(totalTokensSaved + pruneTokenCounter)}`
     return [`▣ DCP | ${totalTokensSavedStr} saved total`].join("\n")
