@@ -43,12 +43,6 @@ export function syncToolCache(
                     turnProtectionTurns > 0 &&
                     state.currentTurn - turnCounter < turnProtectionTurns
 
-                if (part.tool === "compress") {
-                    state.lastToolPrune = true
-                } else {
-                    state.lastToolPrune = false
-                }
-
                 if (state.toolParameters.has(part.callID)) {
                     continue
                 }

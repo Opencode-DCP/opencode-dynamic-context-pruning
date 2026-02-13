@@ -76,7 +76,6 @@ export function createSessionState(): SessionState {
         },
         toolParameters: new Map<string, ToolParameterEntry>(),
         toolIdList: [],
-        lastToolPrune: false,
         lastCompaction: 0,
         currentTurn: 0,
         variant: undefined,
@@ -102,7 +101,6 @@ export function resetSessionState(state: SessionState): void {
     }
     state.toolParameters.clear()
     state.toolIdList = []
-    state.lastToolPrune = false
     state.lastCompaction = 0
     state.currentTurn = 0
     state.variant = undefined

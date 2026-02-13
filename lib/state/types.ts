@@ -47,7 +47,6 @@ export interface SessionState {
     stats: SessionStats
     toolParameters: Map<string, ToolParameterEntry>
     toolIdList: string[]
-    lastToolPrune: boolean
     lastCompaction: number
     currentTurn: number
     variant: string | undefined
