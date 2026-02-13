@@ -3,11 +3,7 @@ import { SYSTEM as SYSTEM_PROMPT } from "./_codegen/system.generated"
 import { NUDGE } from "./_codegen/nudge.generated"
 import { COMPRESS as COMPRESS_TOOL_SPEC } from "./_codegen/compress.generated"
 
-export interface ToolFlags {
-    manual: boolean
-}
-
-function renderSystemPromptInternal(manual: boolean): string {
+export function renderSystemPrompt(manual?: boolean): string {
     let result = SYSTEM_PROMPT
     result = result.replace(/\/\/.*?\/\//g, "")
 
@@ -28,10 +24,6 @@ function extractInstruction(content: string, name: string): string {
     )
     const match = content.match(regex)
     return match ? match[0] : content
-}
-
-export function renderSystemPrompt(flags?: ToolFlags): string {
-    return renderSystemPromptInternal(flags?.manual ?? false)
 }
 
 export function renderNudge(mode: NudgeMode = "frequency"): string {

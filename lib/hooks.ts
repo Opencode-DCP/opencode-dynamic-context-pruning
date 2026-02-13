@@ -85,11 +85,7 @@ export function createSystemPromptHandler(
             return
         }
 
-        output.system.push(
-            renderSystemPrompt({
-                manual: state.manualMode,
-            }),
-        )
+        output.system.push(renderSystemPrompt(state.manualMode))
     }
 }
 
