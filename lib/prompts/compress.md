@@ -79,6 +79,7 @@ WHERE TO NEVER PICK STRINGS FROM:
 
 - `<system-reminder>` tags or any XML wrapper/meta-commentary around messages
 - Injected system instructions (plan mode text, max-steps warnings, mode-switch text, environment info)
+- Reasoning parts or chain-of-thought text
 - File/directory listing framing text (e.g. "Called the Read tool with the following input...")
 - Strings that span across message or part boundaries
 - Entire serialized JSON objects (key ordering may differ - pick a distinctive substring within instead)
