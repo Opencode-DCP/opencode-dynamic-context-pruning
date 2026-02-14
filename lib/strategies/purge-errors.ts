@@ -39,7 +39,7 @@ export const purgeErrors = (
     }
 
     const protectedTools = config.strategies.purgeErrors.protectedTools
-    const turnThreshold = config.strategies.purgeErrors.turns
+    const turnThreshold = Math.max(1, config.strategies.purgeErrors.turns)
 
     const newPruneIds: string[] = []
 

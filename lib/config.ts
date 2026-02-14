@@ -220,6 +220,13 @@ export function validateConfigTypes(config: Record<string, any>): ValidationErro
                 actual: typeof config.turnProtection.turns,
             })
         }
+        if (typeof config.turnProtection.turns === "number" && config.turnProtection.turns < 1) {
+            errors.push({
+                key: "turnProtection.turns",
+                expected: "positive number (>= 1)",
+                actual: `${config.turnProtection.turns}`,
+            })
+        }
     }
 
     const commands = config.commands
@@ -292,6 +299,16 @@ export function validateConfigTypes(config: Record<string, any>): ValidationErro
                 })
             }
 
+            if (
+                typeof tools.settings.nudgeFrequency === "number" &&
+                tools.settings.nudgeFrequency < 1
+            ) {
+                errors.push({
+                    key: "tools.settings.nudgeFrequency",
+                    expected: "positive number (>= 1)",
+                    actual: `${tools.settings.nudgeFrequency} (will be clamped to 1)`,
+                })
+            }
             if (
                 tools.settings.protectedTools !== undefined &&
                 !Array.isArray(tools.settings.protectedTools)
@@ -433,7 +450,17 @@ export function validateConfigTypes(config: Record<string, any>): ValidationErro
                     actual: typeof strategies.purgeErrors.turns,
                 })
             }
-
+            // Warn if turns is 0 or negative - will be clamped to 1
+            if (
+                typeof strategies.purgeErrors.turns === "number" &&
+                strategies.purgeErrors.turns < 1
+            ) {
+                errors.push({
+                    key: "strategies.purgeErrors.turns",
+                    expected: "positive number (>= 1)",
+                    actual: `${strategies.purgeErrors.turns} (will be clamped to 1)`,
+                })
+            }
             if (
                 strategies.purgeErrors.protectedTools !== undefined &&
                 !Array.isArray(strategies.purgeErrors.protectedTools)
