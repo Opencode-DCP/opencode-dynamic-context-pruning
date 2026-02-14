@@ -310,6 +310,16 @@ export function validateConfigTypes(config: Record<string, any>): ValidationErro
                 })
             }
             if (
+                typeof tools.settings.nudgeFrequency === "number" &&
+                tools.settings.nudgeFrequency < 1
+            ) {
+                errors.push({
+                    key: "tools.settings.nudgeFrequency",
+                    expected: "positive number (>= 1)",
+                    actual: `${tools.settings.nudgeFrequency} (will be clamped to 1)`,
+                })
+            }
+            if (
                 tools.settings.protectedTools !== undefined &&
                 !Array.isArray(tools.settings.protectedTools)
             ) {
