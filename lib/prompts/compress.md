@@ -31,6 +31,28 @@ USER INTENT FIDELITY
 When the compressed range includes user messages, preserve the user's intent with extra care. Do not change scope, constraints, priorities, acceptance criteria, or requested outcomes.
 Directly quote user messages when they are short enough to include safely. Direct quotes are preferred when they best preserve exact meaning.
 
+SUMMARY TAG MERGE PROTOCOL
+When the range you are compressing includes previously-compressed summaries, you MUST preserve them by using summary tags in your new `summary` text.
+
+- Use placeholders like `{summary_0}`, `{summary_1}`, `{summary_2}` where prior summaries should be injected.
+- Placeholder matching is case-insensitive (`{sumMary_0}` is treated the same as `{summary_0}`).
+- Tags map to the existing `<compress_result name="summary_N">` labels present in inherited summaries.
+- If there are multiple prior summaries, reference each one exactly once unless duplication is truly necessary.
+- Integrate tags naturally into your narrative so inherited context lands in the right section, not just as a generic preface.
+
+Example pattern inside your `summary`:
+
+```
+## Prior context
+{summary_0}
+
+## Recent work
+...
+
+## Additional inherited details
+{summary_1}
+```
+
 Yet be LEAN. Strip away the noise: failed attempts that led nowhere, verbose tool outputs, back-and-forth exploration. What remains should be pure signal - golden nuggets of detail that preserve full understanding with zero ambiguity.
 
 THE WAYS OF COMPRESS

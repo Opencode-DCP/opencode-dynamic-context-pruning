@@ -8,6 +8,8 @@ You should prioritize context management, but do not interrupt a critical atomic
 IMMEDIATE ACTION REQUIRED
 KNOWLEDGE PRESERVATION: If holding valuable raw data you POTENTIALLY will need in your task, compress the smallest closed range that preserves those findings. Write a high-fidelity summary so no key technical insight is lost.
 
+If the selected range includes previously-compressed summaries, place `{summary_0}`, `{summary_1}`, ... in your new summary where inherited context should be injected. Matching is case-insensitive and maps to inherited `<compress_result name="summary_N">` labels.
+
 NOISE REMOVAL: If you read files or ran commands that yielded no value, compress those dead-end ranges into explicit noise summaries and move on.
 
 PHASE COMPLETION: If a chapter is complete, compress the entire sequence into a detailed technical summary with unambiguous outcomes.
@@ -40,4 +42,6 @@ NEVER use tool input schema keys or field names. The ONLY acceptable use of tool
 
 Ensure your summaries are inclusive of all parts of the range.
 If the compressed range includes user messages, preserve user intent exactly. Prefer direct quotes for short user messages to avoid semantic drift.
+
+When the range includes prior compressed summaries, reference them with `{summary_0}`, `{summary_1}`, ... in the new summary so inherited details are injected at the right location (case-insensitive matching).
 </instruction>

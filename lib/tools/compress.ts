@@ -18,6 +18,9 @@ import { clog, C } from "../compress-logger"
 
 const COMPRESS_TOOL_DESCRIPTION = COMPRESS_TOOL_SPEC
 const COMPRESS_SUMMARY_PREFIX = "[Compressed conversation block]\n\n"
+const SUMMARY_PLACEHOLDER_REGEX = /\{summary_(\d+)\}/gi
+const COMPRESS_RESULT_NAME_REGEX = /^<compress_result\s+name="([^"]+)"[^>]*>/i
+const SUMMARY_NAME_REGEX = /^summary_(\d+)$/i
 
 function stripSummaryPrefix(summary: string): string {
     if (summary.startsWith(COMPRESS_SUMMARY_PREFIX)) {
@@ -26,19 +29,136 @@ function stripSummaryPrefix(summary: string): string {
     return summary.trim()
 }
 
-export function mergeSubsumedSummaries(
-    removedSummaries: CompressSummary[],
-    newSummary: string,
-): string {
-    const inheritedSummaryBlocks = removedSummaries
+function wrapSummaryBlock(name: string, content: string): string {
+    return `<compress_result name="${name}">\n${content.trim()}\n</compress_result>`
+}
+
+function getNextSummaryNumericId(summaries: CompressSummary[]): number {
+    let maxId = -1
+
+    for (const summary of summaries) {
+        const content = stripSummaryPrefix(summary.summary)
+        const matches = content.matchAll(/<compress_result\s+name="summary_(\d+)"[^>]*>/gi)
+        for (const match of matches) {
+            const value = Number.parseInt(match[1], 10)
+            if (!Number.isNaN(value) && value > maxId) {
+                maxId = value
+            }
+        }
+    }
+
+    return maxId + 1
+}
+
+interface NamedSummaryBlock {
+    name: string
+    block: string
+}
+
+function buildNamedSummaryBlocks(removedSummaries: CompressSummary[]): NamedSummaryBlock[] {
+    const stripped = removedSummaries
         .map((s) => stripSummaryPrefix(s.summary))
         .filter((s) => s.length > 0)
 
-    if (inheritedSummaryBlocks.length === 0) {
+    if (stripped.length === 0) {
+        return []
+    }
+
+    const namesInUse = new Set<string>()
+    for (const block of stripped) {
+        const match = block.match(COMPRESS_RESULT_NAME_REGEX)
+        const existingName = match?.[1]?.trim() || ""
+
+        if (SUMMARY_NAME_REGEX.test(existingName)) {
+            namesInUse.add(existingName.toLowerCase())
+        }
+    }
+
+    const result: NamedSummaryBlock[] = []
+    let fallbackId = 0
+    const nextFallbackName = (): string => {
+        while (namesInUse.has(`summary_${fallbackId}`)) {
+            fallbackId++
+        }
+        const name = `summary_${fallbackId}`
+        namesInUse.add(name)
+        fallbackId++
+        return name
+    }
+
+    for (const block of stripped) {
+        const match = block.match(COMPRESS_RESULT_NAME_REGEX)
+        const existingName = match?.[1]?.trim() || ""
+        if (SUMMARY_NAME_REGEX.test(existingName)) {
+            const normalizedName = existingName.toLowerCase()
+            result.push({
+                name: normalizedName,
+                block,
+            })
+            continue
+        }
+
+        const fallbackName = nextFallbackName()
+        result.push({
+            name: fallbackName,
+            block: wrapSummaryBlock(fallbackName, block),
+        })
+    }
+
+    return result
+}
+
+export function mergeSubsumedSummaries(
+    removedSummaries: CompressSummary[],
+    newSummary: string,
+    currentSummaryName: string,
+): string {
+    const namedSummaryBlocks = buildNamedSummaryBlocks(removedSummaries)
+
+    if (namedSummaryBlocks.length === 0) {
         return newSummary
     }
 
-    return `${inheritedSummaryBlocks.join("\n\n")}\n\n${newSummary}`
+    const summaryByName = new Map(namedSummaryBlocks.map((entry) => [entry.name, entry.block]))
+
+    const usedSummaryNames = new Set<string>()
+
+    const mergedByTag = newSummary.replace(
+        SUMMARY_PLACEHOLDER_REGEX,
+        (_fullTag, numericSuffix: string) => {
+            const name = `summary_${numericSuffix}`.toLowerCase()
+            const block = summaryByName.get(name)
+            if (!block) {
+                return ""
+            }
+
+            usedSummaryNames.add(name)
+            return block
+        },
+    )
+
+    const unresolvedSummaries = namedSummaryBlocks
+        .filter((entry) => !usedSummaryNames.has(entry.name))
+        .map((entry) => entry.block)
+
+    const trimmedMerged = mergedByTag.trim()
+
+    if (unresolvedSummaries.length === 0) {
+        return trimmedMerged
+    }
+
+    const unresolvedCount = unresolvedSummaries.length
+    const unresolvedHeader =
+        unresolvedCount === 1
+            ? `${currentSummaryName} overlapped 1 summary that was not included in the output. It has been appended below:`
+            : `${currentSummaryName} overlapped ${unresolvedCount} summaries that were not included in the output. They have been appended below:`
+    const unresolvedAppendix = `${unresolvedHeader}\n\n${unresolvedSummaries.join("\n\n")}`
+
+    if (trimmedMerged.length === 0) {
+        return unresolvedAppendix
+    }
+
+    return `${trimmedMerged}\n\n${unresolvedAppendix}`
 }
 
 export function createCompressTool(ctx: ToolContext): ReturnType<typeof tool> {
@@ -310,6 +430,9 @@ export function createCompressTool(ctx: ToolContext): ReturnType<typeof tool> {
                     },
                 })
 
+                const nextSummaryNumericId = getNextSummaryNumericId(state.compressSummaries)
+                const nextSummaryName = `summary_${nextSummaryNumericId}`
+
                 // Remove any existing summaries whose anchors are now inside this range
                 // This prevents duplicate injections when a larger compress subsumes a smaller one
                 const removedSummaries = state.compressSummaries.filter((s) =>
@@ -331,17 +454,23 @@ export function createCompressTool(ctx: ToolContext): ReturnType<typeof tool> {
                     )
                 }
 
-                const mergedSummary = mergeSubsumedSummaries(removedSummaries, summary)
+                const mergedSummary = mergeSubsumedSummaries(
+                    removedSummaries,
+                    summary,
+                    nextSummaryName,
+                )
+                const wrappedMergedSummary = wrapSummaryBlock(nextSummaryName, mergedSummary)
 
                 const anchorMessageId = messages[rawStartIndex]?.info.id || startResult.messageId
                 const compressSummary: CompressSummary = {
                     anchorMessageId,
-                    summary: COMPRESS_SUMMARY_PREFIX + mergedSummary,
+                    summary: COMPRESS_SUMMARY_PREFIX + wrappedMergedSummary,
                 }
                 state.compressSummaries.push(compressSummary)
 
                 clog.info(C.COMPRESS, `Summary Creation`, {
                     anchor: anchorMessageId,
+                    summaryName: nextSummaryName,
                     totalSummaries: state.compressSummaries.length,
                 })
 
@@ -451,7 +580,7 @@ export function createCompressTool(ctx: ToolContext): ReturnType<typeof tool> {
                     compressedToolIds,
                     compressedMessageIds,
                     topic,
-                    summary,
+                    wrappedMergedSummary,
                     summaryTokens,
                     totalSessionTokens,
                     estimatedCompressedTokens,

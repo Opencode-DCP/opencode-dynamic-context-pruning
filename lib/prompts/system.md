@@ -36,6 +36,14 @@ DO NOT USE A TOOL SCHEMA FIELD FOR START OR END STRING.
 THE SUMMARY STANDARD
 Your summary MUST be technical and specific enough to preserve FULL understanding of what transpired, such that NO ambiguity remains about what asked, found, planned, done, or decided - yet noise free
 
+SUMMARY TAG MERGE PROTOCOL
+When compressing a range that includes previously-compressed summaries, preserve them by placing summary tags in your new summary text:
+
+- Use `{summary_0}`, `{summary_1}`, `{summary_2}`, ... at the exact points where inherited summaries should appear.
+- Matching is case-insensitive (`{sumMary_0}` and `{summary_0}` are equivalent).
+- Tags map to inherited `<compress_result name="summary_N">` labels already present in context.
+- Prefer integrating each tag once into the right section rather than dumping inherited summaries as an undifferentiated block.
+
 When compressing ranges that include user messages, preserve user intent faithfully. Do not reinterpret or redirect the request. Directly quote short user messages when that is the most reliable way to preserve exact meaning.
 
 Preserve key details: file paths, symbols, signatures, constraints, decisions, outcomes, commands, etc.. in order to produce a high fidelity, authoritative technical record
@@ -52,7 +60,8 @@ It is of your responsibility to keep a sharp, high-quality context window for op
 </instruction>
 
 <manual><instruction name=manual_mode policy_level=critical>
-Manual mode is enabled. Do NOT use compress unless the user has explicitly triggered it through a manual marker.
+MANUAL MODE IS CURRENTLY ENABLED
+Do NOT use compress unless the user has explicitly triggered it through a manual marker.
 
 Only use the compress tool after seeing `<compress triggered manually>` in the current user instruction context.
 
