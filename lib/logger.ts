@@ -85,9 +85,7 @@ export class Logger {
 
             const logFile = join(dailyLogDir, `${new Date().toISOString().split("T")[0]}.log`)
             await writeFile(logFile, logLine, { flag: "a" })
-        } catch {
-            // Silently ignore logging errors - don't pollute TUI
-        }
+        } catch (error) {}
     }
 
     info(message: string, data?: any) {
@@ -108,11 +106,6 @@ export class Logger {
     error(message: string, data?: any) {
         const component = this.getCallerFile(2)
         return this.write("ERROR", component, message, data)
-    }
-
-    devError(message: string, data?: any) {
-        // Developer error log - only writes to file, never to console/TUI
-        this.error(message, data)
     }
 
     /**
@@ -213,8 +206,6 @@ export class Logger {
             const timestamp = new Date().toISOString().replace(/[:.]/g, "-")
             const contextFile = join(contextDir, `${timestamp}.json`)
             await writeFile(contextFile, JSON.stringify(minimized, null, 2))
-        } catch {
-            // Silently ignore logging errors - don't pollute TUI
-        }
+        } catch (error) {}
     }
 }
