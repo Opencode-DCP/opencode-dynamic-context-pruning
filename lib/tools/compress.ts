@@ -19,6 +19,28 @@ import { clog, C } from "../compress-logger"
 const COMPRESS_TOOL_DESCRIPTION = COMPRESS_TOOL_SPEC
 const COMPRESS_SUMMARY_PREFIX = "[Compressed conversation block]\n\n"
 
+function stripSummaryPrefix(summary: string): string {
+    if (summary.startsWith(COMPRESS_SUMMARY_PREFIX)) {
+        return summary.slice(COMPRESS_SUMMARY_PREFIX.length).trim()
+    }
+    return summary.trim()
+}
+
+export function mergeSubsumedSummaries(
+    removedSummaries: CompressSummary[],
+    newSummary: string,
+): string {
+    const inheritedSummaryBlocks = removedSummaries
+        .map((s) => stripSummaryPrefix(s.summary))
+        .filter((s) => s.length > 0)
+
+    if (inheritedSummaryBlocks.length === 0) {
+        return newSummary
+    }
+
+    return `${inheritedSummaryBlocks.join("\n\n")}\n\n${newSummary}`
+}
+
 export function createCompressTool(ctx: ToolContext): ReturnType<typeof tool> {
     return tool({
         description: COMPRESS_TOOL_DESCRIPTION,
@@ -296,7 +318,7 @@ export function createCompressTool(ctx: ToolContext): ReturnType<typeof tool> {
                 if (removedSummaries.length > 0) {
                     clog.info(
                         C.COMPRESS,
-                        `Removing Subsumed Summaries\ncount: ${removedSummaries.length}`,
+                        `Merging Subsumed Summaries\ncount: ${removedSummaries.length}`,
                         {
                             removed: removedSummaries.map((s) => ({
                                 anchor: s.anchorMessageId,
@@ -309,10 +331,12 @@ export function createCompressTool(ctx: ToolContext): ReturnType<typeof tool> {
                     )
                 }
 
+                const mergedSummary = mergeSubsumedSummaries(removedSummaries, summary)
+
                 const anchorMessageId = messages[rawStartIndex]?.info.id || startResult.messageId
                 const compressSummary: CompressSummary = {
                     anchorMessageId,
-                    summary: COMPRESS_SUMMARY_PREFIX + summary,
+                    summary: COMPRESS_SUMMARY_PREFIX + mergedSummary,
                 }
                 state.compressSummaries.push(compressSummary)
 
@@ -403,7 +427,7 @@ export function createCompressTool(ctx: ToolContext): ReturnType<typeof tool> {
                 state.stats.pruneTokenCounter += estimatedCompressedTokens
 
                 const currentParams = getCurrentParams(state, messages, logger)
-                const summaryTokens = countTokens(args.content.summary)
+                const summaryTokens = countTokens(compressSummary.summary)
 
                 clog.info(C.COMPRESS, `Notification Values`, {
                     totalSessionTokens,
