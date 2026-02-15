@@ -5,13 +5,10 @@ You operate in a context-constrained environment. Manage context continuously to
 The ONLY tool you have for context management is `compress`. It replaces a contiguous portion of the conversation (inclusive) with a technical summary you produce.
 
 OPERATING STANCE
-Compression can operate at various scales. The method is the same regardless of range size, but strategic use case differs.
+Prefer short, closed, summary-safe ranges.
+When multiple independent stale ranges exist, prefer several short compressions (in parallel when possible) over one large-range compression.
 
-You will default to micro and meso compressions
-
-MICRO: ideal for low-latency operations, should aim to compress a range of AT LEAST 5000 tokens to justify the tool call.
-MESO: good to filter signal from noise of heavy tool outputs or decluttering the session from closed/resolved investigation paths, aim for AT LEAST 10000 tokens
-MACRO: more occasional, for truly closed chapters when smaller ranges are not sufficient, aim for 20000+ tokens
+NEVER COMPRESS MORE THAN 20000 TOKENS IN A SINGLE COMPRESS CALL - if you identify a larger stale range, split it into multiple compressions with non-overlapping boundaries.
 
 Use `compress` as steady housekeeping while you work.
 
@@ -19,7 +16,7 @@ CADENCE, SIGNALS, AND LATENCY
 Treat token counts and context growth as soft signals, not hard triggers.
 
 - No fixed threshold mandates compression
-- A closed context slice around ~20k tokens can be reasonable to compress
+- Prioritize closedness and independence over raw range size
 - Prefer smaller, regular compressions over infrequent massive compressions for better latency and summary quality
 - When multiple independent stale ranges are ready, batch compressions in parallel
 
@@ -46,7 +43,7 @@ DO NOT COMPRESS IF
 - the task in the target range is still actively in progress
 - you cannot identify reliable boundaries yet
 
-Evaluate conversation signal-to-noise regularly. Use `compress` deliberately, with a default micro/meso cadence and quality-first summaries. Priorotize ranges intelligently to maintain a high-signal context window that supports your agency
+Evaluate conversation signal-to-noise REGULARLY. Use `compress` deliberately with quality-first summaries. Prefer multiple short, independent range compressions before considering broader ranges, and prioritize ranges intelligently to maintain a high-signal context window that supports your agency
 
 It is of your responsibility to keep a sharp, high-quality context window for optimal performance
 </instruction>

@@ -5,13 +5,13 @@ THE PHILOSOPHY OF COMPRESS
 
 Think of compression as phase transitions: raw exploration becomes refined understanding. The original context served its purpose; your summary now carries that understanding forward.
 
-One method, many scales:
+One method, many safe ranges:
 
-- micro-range compression for disposable noise
-- focused compression for closed investigative slices
-- chapter compression for completed implementation phases
+- short, closed ranges for disposable noise
+- short, closed ranges for resolved investigative slices
+- short, closed ranges for completed implementation chunks
 
-Default to micro and focused/meso ranges. Use chapter-scale compression occasionally when a larger phase is fully closed and bounded.
+Default to multiple short, bounded compressions. Prefer several safe range compressions over one large sweep whenever independent ranges are available.
 
 CADENCE, SIGNALS, AND LATENCY
 Use `compress` during work whenever a slice is summary-safe; do not wait for the user to send another message.
@@ -19,10 +19,10 @@ Use `compress` during work whenever a slice is summary-safe; do not wait for the
 Treat token counts and context growth as soft signals, not hard triggers:
 
 - no fixed threshold forces compression
-- a closed slice around ~20k tokens can be totally reasonable to compress
+- prioritize closedness and independence over raw range size
 - qualitative signals still matter most (stale exploration, noisy tool bursts, resolved branches)
 
-Prefer smaller, regular compressions over infrequent massive compressions for better latency and better summary fidelity.
+PREFER smaller, regular compressions OVER infrequent large compressions for better latency and better summary fidelity.
 
 THE SUMMARY
 Your summary must be EXHAUSTIVE. Capture file paths, function signatures, decisions made, constraints discovered, key findings... EVERYTHING that maintains context integrity. This is not a brief note - it is an authoritative record so faithful that the original conversation adds no value.
@@ -111,7 +111,7 @@ CRITICAL: AVOID USING TOOL INPUT VALUES
 NEVER use tool input schema keys or field names as boundary strings (e.g., "startString", "endString", "filePath", "content"). These may be transformed by the AI SDK and are not reliable. The ONLY acceptable use of tool input strings is a SINGLE concrete field VALUE (not the key), and even then, prefer using assistant text, user messages, or tool result outputs instead. When in doubt, choose boundaries from your own assistant responses or distinctive user message content.
 
 PARALLEL COMPRESS EXECUTION
-When multiple independent ranges are ready and their boundaries do not overlap, launch MULTIPLE `compress` calls in parallel in a single response. Run compression sequentially only when ranges overlap or when a later range depends on the result of an earlier compression.
+When multiple independent ranges are ready and their boundaries do not overlap, launch MULTIPLE `compress` calls in parallel in a single response. This is the PREFERRED pattern over a single large-range compression when the work can be safely split. Run compression sequentially only when ranges overlap or when a later range depends on the result of an earlier compression.
 
 THE FORMAT OF COMPRESS
 
