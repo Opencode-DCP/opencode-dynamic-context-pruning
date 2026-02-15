@@ -22,6 +22,7 @@ export interface SessionStats {
 }
 
 export interface CompressSummary {
+    blockId: number
     anchorMessageId: string
     summary: string
 }
