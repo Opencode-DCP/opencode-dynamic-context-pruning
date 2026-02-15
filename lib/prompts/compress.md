@@ -1,31 +1,59 @@
-Use this tool to collapse a contiguous range of conversation into a preserved summary.
+Your only tool for context management, use it to collapse a range in the conversation into a detailed summary
 
 THE PHILOSOPHY OF COMPRESS
 `compress` transforms verbose conversation sequences into dense, high-fidelity summaries. This is not cleanup - it is crystallization. Your summary becomes the authoritative record of what transpired.
 
 Think of compression as phase transitions: raw exploration becomes refined understanding. The original context served its purpose; your summary now carries that understanding forward.
 
+One method, many safe ranges:
+
+- short, closed ranges for disposable noise
+- short, closed ranges for resolved investigative slices
+- short, closed ranges for completed implementation chunks
+
+Default to multiple short, bounded compressions. Prefer several safe range compressions over one large sweep whenever independent ranges are available.
+
+CADENCE, SIGNALS, AND LATENCY
+Use `compress` during work whenever a slice is summary-safe; do not wait for the user to send another message.
+
+Treat token counts and context growth as soft signals, not hard triggers:
+
+- no fixed threshold forces compression
+- prioritize closedness and independence over raw range size
+- qualitative signals still matter most (stale exploration, noisy tool bursts, resolved branches)
+
+PREFER smaller, regular compressions OVER infrequent large compressions for better latency and better summary fidelity.
+
 THE SUMMARY
 Your summary must be EXHAUSTIVE. Capture file paths, function signatures, decisions made, constraints discovered, key findings... EVERYTHING that maintains context integrity. This is not a brief note - it is an authoritative record so faithful that the original conversation adds no value.
+
+USER INTENT FIDELITY
+When the compressed range includes user messages, preserve the user's intent with extra care. Do not change scope, constraints, priorities, acceptance criteria, or requested outcomes.
+Directly quote user messages when they are short enough to include safely. Direct quotes are preferred when they best preserve exact meaning.
 
 Yet be LEAN. Strip away the noise: failed attempts that led nowhere, verbose tool outputs, back-and-forth exploration. What remains should be pure signal - golden nuggets of detail that preserve full understanding with zero ambiguity.
 
 THE WAYS OF COMPRESS
-`compress` when a chapter closes - when a phase of work is truly complete and the raw conversation has served its purpose:
+Compress when a range is genuinely closed and the raw conversation has served its purpose:
 
 Research concluded and findings are clear
 Implementation finished and verified
 Exploration exhausted and patterns understood
 
-Do NOT compress when:
-You may need exact code, error messages, or file contents from the range
-Work in that area is still active or may resume
-You're mid-sprint on related functionality
+Compress smaller ranges when:
+You need to discard dead-end noise without waiting for a whole chapter to close
+You need to preserve key findings from a narrow slice while freeing context quickly
+You can bound a stale range cleanly with unique boundaries
 
-Before compressing, ask: _"Is this chapter closed?"_ Compression is irreversible. The summary replaces everything in the range.
+Do NOT compress when:
+You may need exact code, error messages, or file contents from the range in the immediate next steps
+Work in that area is still active or likely to resume immediately
+You cannot identify reliable boundaries yet
+
+Before compressing, ask: _"Is this range closed enough to become summary-only right now?"_ Compression is irreversible. The summary replaces everything in the range.
 
 BOUNDARY MATCHING
-You specify boundaries by matching unique text strings in the conversation. CRITICAL: In code-centric conversations, strings repeat often. Provide sufficiently unique text to match exactly once. If a match fails (not found or found multiple times), the tool will error - extend your boundary string with more surrounding context in order to make SURE the tool does NOT error.
+You specify boundaries by matching unique text strings in the conversation. CRITICAL: In code-centric conversations, strings repeat often. Provide sufficiently unique text to match exactly once. Be conservative and choose longer, highly specific boundaries when in doubt. If a match fails (not found or found multiple times), the tool will error - extend your boundary string with more surrounding context in order to make SURE the tool does NOT error.
 
 WHERE TO PICK STRINGS FROM (important for reliable matching):
 
@@ -33,19 +61,44 @@ WHERE TO PICK STRINGS FROM (important for reliable matching):
 - The user's own words in their messages
 - Tool result output text (distinctive substrings within the output)
 - Previous compress summaries
-- Tool input string values (individual values, not whole serialized objects)
+- Tool input string values (LEAST RELIABLE - only single concrete field values, not keys or schema fields, may be transformed by AI SDK)
+
+NEVER USE GENERIC OR REPEATING STRINGS:
+
+Tool status messages repeat identically across every invocation. These are ALWAYS ambiguous:
+
+- "Edit applied successfully." (appears in EVERY successful edit)
+- "File written successfully" or any tool success/error boilerplate
+- Common tool output patterns that are identical across calls
+
+Instead, combine the generic output with surrounding unique context (a file path, a specific code snippet, or your own unique assistant text).
+
+Each boundary string you choose MUST be unique to ONE specific message. Before using a string, ask: "Could this exact text appear in any other place in this conversation?" If yes, extend it or pick a different string.
 
 WHERE TO NEVER PICK STRINGS FROM:
 
 - `<system-reminder>` tags or any XML wrapper/meta-commentary around messages
 - Injected system instructions (plan mode text, max-steps warnings, mode-switch text, environment info)
+- Reasoning parts or chain-of-thought text
 - File/directory listing framing text (e.g. "Called the Read tool with the following input...")
 - Strings that span across message or part boundaries
 - Entire serialized JSON objects (key ordering may differ - pick a distinctive substring within instead)
 
+CRITICAL: AVOID USING TOOL INPUT VALUES
+NEVER use tool input schema keys or field names as boundary strings (e.g., "startString", "endString", "filePath", "content"). These may be transformed by the AI SDK and are not reliable. The ONLY acceptable use of tool input strings is a SINGLE concrete field VALUE (not the key), and even then, prefer using assistant text, user messages, or tool result outputs instead. When in doubt, choose boundaries from your own assistant responses or distinctive user message content.
+
+PARALLEL COMPRESS EXECUTION
+When multiple independent ranges are ready and their boundaries do not overlap, launch MULTIPLE `compress` calls in parallel in a single response. This is the PREFERRED pattern over a single large-range compression when the work can be safely split. Run compression sequentially only when ranges overlap or when a later range depends on the result of an earlier compression.
+
 THE FORMAT OF COMPRESS
-`topic`: Short label (3-5 words) for display - e.g., "Auth System Exploration"
-`content`: Object containing:
-`startString`: Unique text string marking the beginning of the range
-`endString`: Unique text string marking the end of the range
-`summary`: Complete technical summary replacing all content in the range
+
+```
+{
+  topic: string,           // Short label (3-5 words) - e.g., "Auth System Exploration"
+  content: {
+    startString: string,   // Unique text string marking the beginning of the range
+    endString: string,     // Unique text string marking the end of the range
+    summary: string        // Complete technical summary replacing all content in the range
+  }
+}
+```

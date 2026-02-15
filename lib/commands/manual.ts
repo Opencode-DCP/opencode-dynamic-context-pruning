@@ -4,8 +4,6 @@
  *
  * Usage:
  *   /dcp manual [on|off]  - Toggle manual mode or set explicit state
- *   /dcp prune [focus]     - Trigger manual prune execution
- *   /dcp distill [focus]   - Trigger manual distill execution
  *   /dcp compress [focus]  - Trigger manual compress execution
  */
 
@@ -14,32 +12,10 @@ import type { SessionState, WithParts } from "../state"
 import type { PluginConfig } from "../config"
 import { sendIgnoredMessage } from "../ui/notification"
 import { getCurrentParams } from "../strategies/utils"
-import { syncToolCache } from "../state/tool-cache"
-import { buildToolIdList } from "../messages/utils"
-import { buildPrunableToolsList } from "../messages/inject"
 
-const MANUAL_MODE_ON =
-    "Manual mode is now ON. Use /dcp prune, /dcp distill, or /dcp compress to trigger context tools manually."
+const MANUAL_MODE_ON = "Manual mode is now ON. Use /dcp compress to trigger context tools manually."
 
 const MANUAL_MODE_OFF = "Manual mode is now OFF."
-
-const NO_PRUNABLE_TOOLS = "No prunable tool outputs are currently available for manual triggering."
-
-const PRUNE_TRIGGER_PROMPT = [
-    "<prune triggered manually>",
-    "Manual mode trigger received. You must now use the prune tool exactly once.",
-    "Find the most significant set of prunable tool outputs to remove safely.",
-    "Follow prune policy and avoid pruning outputs that may be needed later.",
-    "Return after prune with a brief explanation of what you pruned and why.",
-].join("\n\n")
-
-const DISTILL_TRIGGER_PROMPT = [
-    "<distill triggered manually>",
-    "Manual mode trigger received. You must now use the distill tool.",
-    "Select the most information-dense prunable outputs and distill them into complete technical substitutes.",
-    "Be exhaustive and preserve all critical technical details.",
-    "Return after distill with a brief explanation of what was distilled and why.",
-].join("\n\n")
 
 const COMPRESS_TRIGGER_PROMPT = [
     "<compress triggered manually>",
@@ -49,24 +25,12 @@ const COMPRESS_TRIGGER_PROMPT = [
     "Return after compress with a brief explanation of what range was compressed.",
 ].join("\n\n")
 
-function getTriggerPrompt(
-    tool: "prune" | "distill" | "compress",
-    context?: string,
-    userFocus?: string,
-): string {
-    const base =
-        tool === "prune"
-            ? PRUNE_TRIGGER_PROMPT
-            : tool === "distill"
-              ? DISTILL_TRIGGER_PROMPT
-              : COMPRESS_TRIGGER_PROMPT
+function getTriggerPrompt(tool: "compress", userFocus?: string): string {
+    const base = COMPRESS_TRIGGER_PROMPT
 
     const sections = [base]
     if (userFocus && userFocus.trim().length > 0) {
         sections.push(`Additional user focus:\n${userFocus.trim()}`)
-    }
-    if (context) {
-        sections.push(context)
     }
 
     return sections.join("\n\n")
@@ -109,23 +73,8 @@ export async function handleManualToggleCommand(
 
 export async function handleManualTriggerCommand(
     ctx: ManualCommandContext,
-    tool: "prune" | "distill" | "compress",
+    tool: "compress",
     userFocus?: string,
 ): Promise<string | null> {
-    const { client, state, config, logger, sessionId, messages } = ctx
-
-    if (tool === "prune" || tool === "distill") {
-        syncToolCache(state, config, logger, messages)
-        buildToolIdList(state, messages, logger)
-        const prunableToolsList = buildPrunableToolsList(state, config, logger)
-        if (!prunableToolsList) {
-            const params = getCurrentParams(state, messages, logger)
-            await sendIgnoredMessage(client, sessionId, NO_PRUNABLE_TOOLS, params, logger)
-            return null
-        }
-
-        return getTriggerPrompt(tool, prunableToolsList, userFocus)
-    }
-
-    return getTriggerPrompt("compress", undefined, userFocus)
+    return getTriggerPrompt(tool, userFocus)
 }

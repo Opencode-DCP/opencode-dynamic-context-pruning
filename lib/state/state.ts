@@ -1,6 +1,6 @@
 import type { SessionState, ToolParameterEntry, WithParts } from "./types"
 import type { Logger } from "../logger"
-import { loadSessionState } from "./persistence"
+import { loadSessionState, saveSessionState } from "./persistence"
 import {
     isSubAgentSession,
     findLastCompactionTimestamp,
@@ -47,6 +47,12 @@ export const checkSession = async (
         logger.info("Detected compaction - reset stale state", {
             timestamp: lastCompactionTimestamp,
         })
+
+        saveSessionState(state, logger).catch((error) => {
+            logger.warn("Failed to persist state reset after compaction", {
+                error: error instanceof Error ? error.message : String(error),
+            })
+        })
     }
 
     state.currentTurn = countTurns(state, messages)
@@ -63,18 +69,18 @@ export function createSessionState(): SessionState {
             messages: new Map<string, number>(),
         },
         compressSummaries: [],
+        contextLimitAnchors: new Set<string>(),
         stats: {
             pruneTokenCounter: 0,
             totalPruneTokens: 0,
         },
         toolParameters: new Map<string, ToolParameterEntry>(),
         toolIdList: [],
-        nudgeCounter: 0,
-        lastToolPrune: false,
         lastCompaction: 0,
         currentTurn: 0,
         variant: undefined,
         modelContextLimit: undefined,
+        systemPromptTokens: undefined,
     }
 }
 
@@ -88,18 +94,18 @@ export function resetSessionState(state: SessionState): void {
         messages: new Map<string, number>(),
     }
     state.compressSummaries = []
+    state.contextLimitAnchors = new Set<string>()
     state.stats = {
         pruneTokenCounter: 0,
         totalPruneTokens: 0,
     }
     state.toolParameters.clear()
     state.toolIdList = []
-    state.nudgeCounter = 0
-    state.lastToolPrune = false
     state.lastCompaction = 0
     state.currentTurn = 0
     state.variant = undefined
     state.modelContextLimit = undefined
+    state.systemPromptTokens = undefined
 }
 
 export async function ensureSessionInitialized(
@@ -136,6 +142,7 @@ export async function ensureSessionInitialized(
     state.prune.tools = loadPruneMap(persisted.prune.tools, persisted.prune.toolIds)
     state.prune.messages = loadPruneMap(persisted.prune.messages, persisted.prune.messageIds)
     state.compressSummaries = persisted.compressSummaries || []
+    state.contextLimitAnchors = new Set<string>(persisted.contextLimitAnchors || [])
     state.stats = {
         pruneTokenCounter: persisted.stats?.pruneTokenCounter || 0,
         totalPruneTokens: persisted.stats?.totalPruneTokens || 0,

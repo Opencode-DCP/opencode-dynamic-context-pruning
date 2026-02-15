@@ -1,7 +1,8 @@
 import { partial_ratio } from "fuzzball"
-import type { WithParts } from "../state"
+import type { CompressSummary, WithParts } from "../state"
 import type { Logger } from "../logger"
 import { isIgnoredUserMessage } from "../messages/utils"
+import { clog, C } from "../compress-logger"
 
 export interface FuzzyConfig {
     minScore: number
@@ -20,6 +21,52 @@ interface MatchResult {
     matchType: "exact" | "fuzzy"
 }
 
+export function findSummaryAnchorForBoundary(
+    summaries: CompressSummary[],
+    searchString: string,
+    stringType: "startString" | "endString",
+): CompressSummary | undefined {
+    const matches = summaries.filter((s) => s.summary.includes(searchString))
+
+    if (matches.length > 1) {
+        const sample = matches.slice(0, 8).map((s) => ({
+            anchorMessageId: s.anchorMessageId,
+            preview: s.summary.substring(0, 120),
+        }))
+
+        clog.error(C.BOUNDARY, `✗ Multiple Summary Matches (ambiguous)`, {
+            type: stringType,
+            count: matches.length,
+            matches: sample,
+            omitted: Math.max(0, matches.length - sample.length),
+            searchPreview: searchString.substring(0, 150),
+        })
+
+        throw new Error(
+            `Found multiple matches for ${stringType}. ` +
+                `Provide more surrounding context to uniquely identify the intended match.`,
+        )
+    }
+
+    return matches[0]
+}
+
+function summarizeMatches(
+    matches: MatchResult[],
+    limit = 8,
+): {
+    sample: Array<{ msgId: string; idx: number; score: number }>
+    total: number
+    omitted: number
+} {
+    const sample = matches.slice(0, limit).map((m) => ({
+        msgId: m.messageId,
+        idx: m.messageIndex,
+        score: m.score,
+    }))
+    return { sample, total: matches.length, omitted: Math.max(0, matches.length - sample.length) }
+}
+
 function extractMessageContent(msg: WithParts): string {
     const parts = Array.isArray(msg.parts) ? msg.parts : []
     let content = ""
@@ -32,7 +79,6 @@ function extractMessageContent(msg: WithParts): string {
 
         switch (part.type) {
             case "text":
-            case "reasoning":
                 if (typeof p.text === "string") {
                     content += " " + p.text
                 }
@@ -136,39 +182,95 @@ export function findStringInMessages(
     stringType: "startString" | "endString",
     fuzzyConfig: FuzzyConfig = DEFAULT_FUZZY_CONFIG,
 ): { messageId: string; messageIndex: number } {
+    clog.info(C.BOUNDARY, `Search Configuration`, {
+        type: stringType,
+        targetText: searchString.substring(0, 150),
+        targetLength: searchString.length,
+        messages: messages.length,
+        fuzzyMinScore: fuzzyConfig.minScore,
+        fuzzyMinGap: fuzzyConfig.minGap,
+    })
+
     const searchableMessages = messages.length > 1 ? messages.slice(0, -1) : messages
     const lastMessage = messages.length > 0 ? messages[messages.length - 1] : undefined
 
+    clog.debug(
+        C.BOUNDARY,
+        `Searching ${searchableMessages.length} messages\n(last message excluded: ${messages.length > 1})`,
+    )
+
     const exactMatches = findExactMatches(searchableMessages, searchString)
+    const exactSummary = summarizeMatches(exactMatches)
+
+    clog.info(C.BOUNDARY, `Exact Match Results`, {
+        count: exactSummary.total,
+        matches: exactSummary.sample,
+        omitted: exactSummary.omitted,
+    })
 
     if (exactMatches.length === 1) {
+        clog.info(C.BOUNDARY, `✓ Single exact match`, {
+            messageId: exactMatches[0].messageId,
+            messageIndex: exactMatches[0].messageIndex,
+        })
         return { messageId: exactMatches[0].messageId, messageIndex: exactMatches[0].messageIndex }
     }
 
     if (exactMatches.length > 1) {
+        clog.error(C.BOUNDARY, `✗ Multiple Exact Matches (ambiguous)`, {
+            count: exactMatches.length,
+            matches: exactMatches.map((m) => ({ msgId: m.messageId, idx: m.messageIndex })),
+            searchPreview: searchString.substring(0, 150),
+        })
         throw new Error(
             `Found multiple matches for ${stringType}. ` +
                 `Provide more surrounding context to uniquely identify the intended match.`,
         )
     }
 
+    clog.info(C.BOUNDARY, `No exact match\nAttempting fuzzy search...`, {
+        minScore: fuzzyConfig.minScore,
+        minGap: fuzzyConfig.minGap,
+    })
+
     const fuzzyMatches = findFuzzyMatches(searchableMessages, searchString, fuzzyConfig.minScore)
+    const fuzzySummary = summarizeMatches(fuzzyMatches)
+
+    clog.info(C.BOUNDARY, `Fuzzy Match Results`, {
+        count: fuzzySummary.total,
+        matches: fuzzySummary.sample,
+        omitted: fuzzySummary.omitted,
+    })
 
     if (fuzzyMatches.length === 0) {
+        clog.warn(C.BOUNDARY, `⚠ No fuzzy matches\nTrying last message as last resort...`)
+
         if (lastMessage && !isIgnoredUserMessage(lastMessage)) {
             const lastMsgContent = extractMessageContent(lastMessage)
             const lastMsgIndex = messages.length - 1
+            clog.debug(C.BOUNDARY, `Last message check`, {
+                messageId: lastMessage.info.id,
+                contentLength: lastMsgContent.length,
+            })
             if (lastMsgContent.includes(searchString)) {
-                // logger.info(
-                //     `${stringType} found in last message (last resort) at index ${lastMsgIndex}`,
-                // )
+                clog.info(C.BOUNDARY, `✓ Found in last message (last resort)`, {
+                    messageId: lastMessage.info.id,
+                    messageIndex: lastMsgIndex,
+                })
                 return {
                     messageId: lastMessage.info.id,
                     messageIndex: lastMsgIndex,
                 }
             }
+            clog.warn(C.BOUNDARY, `✗ Not found in last message either`)
         }
 
+        clog.error(C.BOUNDARY, `✗ NOT FOUND ANYWHERE`, {
+            searchString: searchString.substring(0, 200),
+            searchStringLen: searchString.length,
+            messageCount: messages.length,
+            messageRoles: messages.map((m, i) => `${i}:${m.info.role}`),
+        })
         throw new Error(
             `${stringType} not found in conversation. ` +
                 `Make sure the string exists and is spelled exactly as it appears.`,
@@ -180,25 +282,34 @@ export function findStringInMessages(
     const best = fuzzyMatches[0]
     const secondBest = fuzzyMatches[1]
 
-    // Log fuzzy match candidates
-    // logger.info(
-    //     `Fuzzy match for ${stringType}: best=${best.score}% (msg ${best.messageIndex})` +
-    //     (secondBest
-    //         ? `, secondBest=${secondBest.score}% (msg ${secondBest.messageIndex})`
-    //         : ""),
-    // )
+    clog.info(C.BOUNDARY, `Fuzzy Ranking`, {
+        best: { msgId: best.messageId, idx: best.messageIndex, score: best.score },
+        secondBest: secondBest
+            ? { msgId: secondBest.messageId, idx: secondBest.messageIndex, score: secondBest.score }
+            : null,
+        gap: secondBest ? best.score - secondBest.score : "N/A",
+        requiredGap: fuzzyConfig.minGap,
+    })
 
     // Check confidence gap - best must be significantly better than second best
     if (secondBest && best.score - secondBest.score < fuzzyConfig.minGap) {
+        clog.error(C.BOUNDARY, `✗ Ambiguous Fuzzy Match (gap too small)`, {
+            best: best.score,
+            secondBest: secondBest.score,
+            gap: best.score - secondBest.score,
+            required: fuzzyConfig.minGap,
+        })
         throw new Error(
             `Found multiple matches for ${stringType}. ` +
                 `Provide more unique surrounding context to disambiguate.`,
         )
     }
 
-    logger.info(
-        `Fuzzy matched ${stringType} with ${best.score}% confidence at message index ${best.messageIndex}`,
-    )
+    clog.info(C.BOUNDARY, `✓ Fuzzy match accepted`, {
+        messageId: best.messageId,
+        messageIndex: best.messageIndex,
+        score: best.score,
+    })
 
     return { messageId: best.messageId, messageIndex: best.messageIndex }
 }

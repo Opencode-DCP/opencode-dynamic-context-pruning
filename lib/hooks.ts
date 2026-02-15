@@ -3,7 +3,7 @@ import type { Logger } from "./logger"
 import type { PluginConfig } from "./config"
 import { syncToolCache } from "./state/tool-cache"
 import { deduplicate, supersedeWrites, purgeErrors } from "./strategies"
-import { prune, insertPruneToolContext } from "./messages"
+import { prune, insertCompressToolContext } from "./messages"
 import { buildToolIdList, isIgnoredUserMessage } from "./messages/utils"
 import { checkSession } from "./state"
 import { renderSystemPrompt } from "./prompts"
@@ -13,7 +13,7 @@ import { handleHelpCommand } from "./commands/help"
 import { handleSweepCommand } from "./commands/sweep"
 import { handleManualToggleCommand, handleManualTriggerCommand } from "./commands/manual"
 import { ensureSessionInitialized } from "./state/state"
-import { getCurrentParams } from "./strategies/utils"
+import { cacheSystemPromptTokens } from "./ui/utils"
 
 const INTERNAL_AGENT_SIGNATURES = [
     "You are a title generator",
@@ -81,18 +81,11 @@ export function createSystemPromptHandler(
             return
         }
 
-        const flags = {
-            prune: config.tools.prune.permission !== "deny",
-            distill: config.tools.distill.permission !== "deny",
-            compress: config.tools.compress.permission !== "deny",
-            manual: state.manualMode,
-        }
-
-        if (!flags.prune && !flags.distill && !flags.compress) {
+        if (config.tools.compress.permission === "deny") {
             return
         }
 
-        output.system.push(renderSystemPrompt(flags))
+        output.system.push(renderSystemPrompt(state.manualMode))
     }
 }
 
@@ -109,15 +102,18 @@ export function createChatMessageTransformHandler(
             return
         }
 
+        cacheSystemPromptTokens(state, output.messages)
+
         syncToolCache(state, config, logger, output.messages)
-        buildToolIdList(state, output.messages, logger)
+        buildToolIdList(state, output.messages)
 
         deduplicate(state, logger, config, output.messages)
         supersedeWrites(state, logger, config, output.messages)
         purgeErrors(state, logger, config, output.messages)
 
         prune(state, logger, config, output.messages)
-        insertPruneToolContext(state, config, logger, output.messages)
+
+        insertCompressToolContext(state, config, logger, output.messages)
 
         applyPendingManualTriggerPrompt(state, output.messages, logger)
 
@@ -194,12 +190,9 @@ export function createCommandExecuteHandler(
                 throw new Error("__DCP_MANUAL_HANDLED__")
             }
 
-            if (
-                (subcommand === "prune" || subcommand === "distill" || subcommand === "compress") &&
-                config.tools[subcommand].permission !== "deny"
-            ) {
+            if (subcommand === "compress" && config.tools.compress.permission !== "deny") {
                 const userFocus = subArgs.join(" ").trim()
-                const prompt = await handleManualTriggerCommand(commandCtx, subcommand, userFocus)
+                const prompt = await handleManualTriggerCommand(commandCtx, "compress", userFocus)
                 if (!prompt) {
                     throw new Error("__DCP_MANUAL_TRIGGER_BLOCKED__")
                 }

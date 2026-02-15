@@ -2,7 +2,7 @@ import type { Plugin } from "@opencode-ai/plugin"
 import { getConfig } from "./lib/config"
 import { Logger } from "./lib/logger"
 import { createSessionState } from "./lib/state"
-import { createPruneTool, createDistillTool, createCompressTool } from "./lib/strategies"
+import { createCompressTool } from "./lib/tools"
 import {
     createChatMessageTransformHandler,
     createCommandExecuteHandler,
@@ -61,26 +61,8 @@ const plugin: Plugin = (async (ctx) => {
             ctx.directory,
         ),
         tool: {
-            ...(config.tools.distill.permission !== "deny" && {
-                distill: createDistillTool({
-                    client: ctx.client,
-                    state,
-                    logger,
-                    config,
-                    workingDirectory: ctx.directory,
-                }),
-            }),
             ...(config.tools.compress.permission !== "deny" && {
                 compress: createCompressTool({
-                    client: ctx.client,
-                    state,
-                    logger,
-                    config,
-                    workingDirectory: ctx.directory,
-                }),
-            }),
-            ...(config.tools.prune.permission !== "deny" && {
-                prune: createPruneTool({
                     client: ctx.client,
                     state,
                     logger,
@@ -99,9 +81,7 @@ const plugin: Plugin = (async (ctx) => {
             }
 
             const toolsToAdd: string[] = []
-            if (config.tools.distill.permission !== "deny") toolsToAdd.push("distill")
             if (config.tools.compress.permission !== "deny") toolsToAdd.push("compress")
-            if (config.tools.prune.permission !== "deny") toolsToAdd.push("prune")
 
             if (toolsToAdd.length > 0) {
                 const existingPrimaryTools = opencodeConfig.experimental?.primary_tools ?? []
@@ -118,9 +98,7 @@ const plugin: Plugin = (async (ctx) => {
             const permission = opencodeConfig.permission ?? {}
             opencodeConfig.permission = {
                 ...permission,
-                distill: config.tools.distill.permission,
                 compress: config.tools.compress.permission,
-                prune: config.tools.prune.permission,
             } as typeof permission
         },
     }

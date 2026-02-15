@@ -6,4 +6,7 @@ dist/
 repomix-output.xml
 bun.lock
 package-lock.jsonc
-LICENCE
+LICENSE
+scripts/
+tests/
+README.md

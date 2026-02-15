@@ -25,6 +25,7 @@ export interface PersistedSessionState {
     sessionName?: string
     prune: PersistedPrune
     compressSummaries: CompressSummary[]
+    contextLimitAnchors: string[]
     stats: SessionStats
     lastUpdated: string
 }
@@ -66,6 +67,7 @@ export async function saveSessionState(
                 messages: Object.fromEntries(sessionState.prune.messages),
             },
             compressSummaries: sessionState.compressSummaries,
+            contextLimitAnchors: Array.from(sessionState.contextLimitAnchors),
             stats: sessionState.stats,
             lastUpdated: new Date().toISOString(),
         }
@@ -128,6 +130,22 @@ export async function loadSessionState(
         } else {
             state.compressSummaries = []
         }
+
+        const rawContextLimitAnchors = Array.isArray(state.contextLimitAnchors)
+            ? state.contextLimitAnchors
+            : []
+        const validAnchors = rawContextLimitAnchors.filter(
+            (entry): entry is string => typeof entry === "string",
+        )
+        const dedupedAnchors = [...new Set(validAnchors)]
+        if (validAnchors.length !== rawContextLimitAnchors.length) {
+            logger.warn("Filtered out malformed contextLimitAnchors entries", {
+                sessionId: sessionId,
+                original: rawContextLimitAnchors.length,
+                valid: validAnchors.length,
+            })
+        }
+        state.contextLimitAnchors = dedupedAnchors
 
         logger.info("Loaded session state from disk", {
             sessionId: sessionId,

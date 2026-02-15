@@ -43,13 +43,13 @@ export interface SessionState {
     pendingManualTrigger: PendingManualTrigger | null
     prune: Prune
     compressSummaries: CompressSummary[]
+    contextLimitAnchors: Set<string>
     stats: SessionStats
     toolParameters: Map<string, ToolParameterEntry>
     toolIdList: string[]
-    nudgeCounter: number
-    lastToolPrune: boolean
     lastCompaction: number
     currentTurn: number
     variant: string | undefined
     modelContextLimit: number | undefined
+    systemPromptTokens: number | undefined
 }
