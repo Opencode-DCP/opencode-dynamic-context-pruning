@@ -116,6 +116,7 @@ export async function loadSessionState(
                 (s): s is CompressSummary =>
                     s !== null &&
                     typeof s === "object" &&
+                    typeof s.blockId === "number" &&
                     typeof s.anchorMessageId === "string" &&
                     typeof s.summary === "string",
             )

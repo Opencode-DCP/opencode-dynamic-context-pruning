@@ -8,9 +8,10 @@ Usage: opencode-session-timeline [--session ID] [--json] [--no-color]
 
 import json
 import argparse
-from pathlib import Path
 from typing import Optional
 from datetime import datetime
+
+from opencode_api import APIError, add_api_arguments, create_client_from_args, list_sessions_across_projects
 
 # DCP tool names across versions (compress is canonical; others are legacy aliases)
 DCP_TOOLS = {
@@ -54,46 +55,22 @@ def format_duration(ms: Optional[int], colors: Colors = None) -> str:
         return f"{hours}h{minutes}m"
 
 
-def get_session_messages(storage: Path, session_id: str) -> list[dict]:
+def get_session_messages(client, session: dict) -> list[dict]:
     """Get all messages for a session, sorted by creation order."""
-    message_dir = storage / "message" / session_id
-    if not message_dir.exists():
-        return []
-    
-    messages = []
-    for msg_file in message_dir.glob("*.json"):
-        try:
-            msg = json.loads(msg_file.read_text())
-            msg["_file"] = str(msg_file)
-            msg["_id"] = msg_file.stem
-            # Extract timing info
-            time_info = msg.get("time", {})
-            msg["_created"] = time_info.get("created")
-            msg["_completed"] = time_info.get("completed")
-            messages.append(msg)
-        except (json.JSONDecodeError, IOError):
-            pass
-    
-    return sorted(messages, key=lambda m: m.get("_id", ""))
-
-
-def get_message_parts(storage: Path, message_id: str) -> list[dict]:
-    """Get all parts for a message, sorted by creation order."""
-    parts_dir = storage / "part" / message_id
-    if not parts_dir.exists():
-        return []
-    
-    parts = []
-    for part_file in parts_dir.glob("*.json"):
-        try:
-            part = json.loads(part_file.read_text())
-            part["_file"] = str(part_file)
-            part["_id"] = part_file.stem
-            parts.append(part)
-        except (json.JSONDecodeError, IOError):
-            pass
-    
-    return sorted(parts, key=lambda p: p.get("_id", ""))
+    messages = client.get_session_messages(session["id"], directory=session.get("directory"))
+    normalized = []
+    for message in messages:
+        info = message.get("info", {})
+        time_info = info.get("time", {})
+        normalized.append(
+            {
+                "_id": info.get("id", ""),
+                "_created": time_info.get("created"),
+                "_completed": time_info.get("completed"),
+                "_parts": message.get("parts", []),
+            }
+        )
+    return normalized
 
 
 def extract_step_data(parts: list[dict]) -> Optional[dict]:
@@ -131,42 +108,22 @@ def extract_step_data(parts: list[dict]) -> Optional[dict]:
     }
 
 
-def get_most_recent_session(storage: Path) -> Optional[str]:
-    """Get the most recent session ID."""
-    message_dir = storage / "message"
-    if not message_dir.exists():
-        return None
-    
-    sessions = sorted(message_dir.iterdir(), key=lambda x: x.stat().st_mtime, reverse=True)
-    return sessions[0].name if sessions else None
+def get_most_recent_session(client, session_list_limit: int) -> Optional[dict]:
+    """Get the most recent session across all projects."""
+    sessions = list_sessions_across_projects(client, per_project_limit=session_list_limit)
+    return sessions[0] if sessions else None
 
 
-def get_session_title(storage: Path, session_id: str) -> str:
-    """Get session title from metadata."""
-    session_dir = storage / "session"
-    if not session_dir.exists():
-        return "Unknown"
-    
-    for s_dir in session_dir.iterdir():
-        s_file = s_dir / f"{session_id}.json"
-        if s_file.exists():
-            try:
-                sess = json.loads(s_file.read_text())
-                return sess.get("title", "Untitled")
-            except (json.JSONDecodeError, IOError):
-                pass
-    return "Unknown"
-
-
-def analyze_session(storage: Path, session_id: str) -> dict:
+def analyze_session(client, session: dict) -> dict:
     """Analyze a single session step by step."""
-    messages = get_session_messages(storage, session_id)
-    title = get_session_title(storage, session_id)
+    session_id = session["id"]
+    messages = get_session_messages(client, session)
+    title = session.get("title", "Unknown")
     
     steps = []
     for msg in messages:
         msg_id = msg.get("_id", "")
-        parts = get_message_parts(storage, msg_id)
+        parts = msg.get("_parts", [])
         step_data = extract_step_data(parts)
         
         if step_data:
@@ -381,22 +338,23 @@ def main():
         "--no-color", action="store_true",
         help="Disable colored output"
     )
+    add_api_arguments(parser)
     args = parser.parse_args()
-    
-    storage = Path.home() / ".local/share/opencode/storage"
-    
-    if not storage.exists():
-        print("Error: OpenCode storage not found at", storage)
+
+    try:
+        with create_client_from_args(args) as client:
+            if args.session is None:
+                session = get_most_recent_session(client, args.session_list_limit)
+                if session is None:
+                    print("Error: No sessions found")
+                    return 1
+            else:
+                session = client.get_session(args.session)
+
+            result = analyze_session(client, session)
+    except APIError as err:
+        print(f"Error: {err}")
         return 1
-    
-    session_id = args.session
-    if session_id is None:
-        session_id = get_most_recent_session(storage)
-        if session_id is None:
-            print("Error: No sessions found")
-            return 1
-    
-    result = analyze_session(storage, session_id)
     
     if args.json:
         # Remove non-serializable fields

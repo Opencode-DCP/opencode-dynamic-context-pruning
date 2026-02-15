@@ -31,6 +31,29 @@ USER INTENT FIDELITY
 When the compressed range includes user messages, preserve the user's intent with extra care. Do not change scope, constraints, priorities, acceptance criteria, or requested outcomes.
 Directly quote user messages when they are short enough to include safely. Direct quotes are preferred when they best preserve exact meaning.
 
+COMPRESSED BLOCK PLACEHOLDERS
+When the selected range includes previously compressed blocks, use this exact placeholder format when referencing one:
+
+- `{block_N}`
+
+Rules:
+
+- Include every required block placeholder exactly once.
+- Do not invent placeholders for blocks outside the selected range.
+- Treat `{block_N}` placeholders as RESERVED TOKENS. Do not emit `{block_N}` text anywhere except intentional placeholders.
+- If you need to mention a block in prose, use plain text like `compressed block #N` (without curly braces).
+- Preflight check before finalizing: the set of `{block_N}` placeholders in your summary must exactly match the required set, with no duplicates.
+
+These placeholders are semantic references. They will be replaced with the full stored compressed block content when the tool processes your output.
+
+FLOW PRESERVATION WITH PLACEHOLDERS
+When you use compressed block placeholders, write the surrounding summary text so it still reads correctly AFTER placeholder expansion.
+
+- Treat each placeholder as a stand-in for a full conversation segment, not as a short label.
+- Ensure transitions before and after each placeholder preserve chronology and causality.
+- Do not write text that depends on the placeholder staying literal (for example, "as noted in {block_2}").
+- Your final meaning must be coherent once each placeholder is replaced with its full compressed block content.
+
 Yet be LEAN. Strip away the noise: failed attempts that led nowhere, verbose tool outputs, back-and-forth exploration. What remains should be pure signal - golden nuggets of detail that preserve full understanding with zero ambiguity.
 
 THE WAYS OF COMPRESS
