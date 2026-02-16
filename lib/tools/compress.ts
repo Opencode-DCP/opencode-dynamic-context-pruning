@@ -12,9 +12,8 @@ import {
     injectBlockPlaceholders,
     parseBlockPlaceholders,
     resolveAnchorMessageId,
+    resolveBoundaryIds,
     resolveRange,
-    scanBoundaryMatches,
-    validateBoundaryScan,
     validateCompressArgs,
     validateSummaryPlaceholders,
     type CompressToolArgs,
@@ -34,17 +33,19 @@ export function createCompressTool(ctx: ToolContext): ReturnType<typeof tool> {
                 .describe("Short label (3-5 words) for display - e.g., 'Auth System Exploration'"),
             content: tool.schema
                 .object({
-                    startString: tool.schema
+                    startId: tool.schema
                         .string()
-                        .describe("Unique text from conversation marking the beginning of range"),
-                    endString: tool.schema
+                        .describe(
+                            "Message or block ID marking the beginning of range (e.g. m0000, b2)",
+                        ),
+                    endId: tool.schema
                         .string()
-                        .describe("Unique text marking the end of range"),
+                        .describe("Message or block ID marking the end of range (e.g. m0012, b5)"),
                     summary: tool.schema
                         .string()
                         .describe("Complete technical summary replacing all content in range"),
                 })
-                .describe("Compression details: boundaries and replacement summary"),
+                .describe("Compression details: ID boundaries and replacement summary"),
         },
         async execute(args, toolCtx) {
             await toolCtx.ask({
@@ -73,16 +74,11 @@ export function createCompressTool(ctx: ToolContext): ReturnType<typeof tool> {
 
             const searchContext = buildSearchContext(ctx.state, ctx.logger, ctx.config, rawMessages)
 
-            const scan = scanBoundaryMatches(
+            const { startReference, endReference } = resolveBoundaryIds(
                 searchContext,
-                compressArgs.content.startString,
-                compressArgs.content.endString,
-                toolCtx.messageID,
-            )
-            const { startReference, endReference } = validateBoundaryScan(
-                scan,
-                compressArgs.content.startString,
-                compressArgs.content.endString,
+                ctx.state,
+                compressArgs.content.startId,
+                compressArgs.content.endId,
             )
 
             const range = resolveRange(searchContext, startReference, endReference)
@@ -148,5 +144,5 @@ export function createCompressTool(ctx: ToolContext): ReturnType<typeof tool> {
 }
 
 function formatBlock(blockId: number): string {
-    return `[Compressed conversation block #${blockId}]`
+    return `[Compressed conversation b${blockId}]`
 }

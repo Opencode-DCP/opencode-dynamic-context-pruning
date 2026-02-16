@@ -41,7 +41,7 @@ Rules:
 - Include every required block placeholder exactly once.
 - Do not invent placeholders for blocks outside the selected range.
 - Treat `{block_N}` placeholders as RESERVED TOKENS. Do not emit `{block_N}` text anywhere except intentional placeholders.
-- If you need to mention a block in prose, use plain text like `compressed block #N` (without curly braces).
+- If you need to mention a block in prose, use plain text like `compressed bN` (without curly braces).
 - Preflight check before finalizing: the set of `{block_N}` placeholders in your summary must exactly match the required set, with no duplicates.
 
 These placeholders are semantic references. They will be replaced with the full stored compressed block content when the tool processes your output.
@@ -66,7 +66,7 @@ Exploration exhausted and patterns understood
 Compress smaller ranges when:
 You need to discard dead-end noise without waiting for a whole chapter to close
 You need to preserve key findings from a narrow slice while freeing context quickly
-You can bound a stale range cleanly with unique boundaries
+You can bound a stale range cleanly with injected IDs
 
 Do NOT compress when:
 You may need exact code, error messages, or file contents from the range in the immediate next steps
@@ -75,40 +75,28 @@ You cannot identify reliable boundaries yet
 
 Before compressing, ask: _"Is this range closed enough to become summary-only right now?"_ Compression is irreversible. The summary replaces everything in the range.
 
-BOUNDARY MATCHING
-You specify boundaries by matching unique text strings in the conversation. CRITICAL: In code-centric conversations, strings repeat often. Provide sufficiently unique text to match exactly once. Be conservative and choose longer, highly specific boundaries when in doubt. If a match fails (not found or found multiple times), the tool will error - extend your boundary string with more surrounding context in order to make SURE the tool does NOT error.
+BOUNDARY IDS
+You specify boundaries by ID
 
-WHERE TO PICK STRINGS FROM (important for reliable matching):
+Use the injected IDs visible in the conversation:
 
-- Your own assistant text responses (MOST RELIABLE - always stored verbatim)
-- The user's own words in their messages
-- Tool result output text (distinctive substrings within the output)
-- Previous compress summaries
-- Tool input string values (LEAST RELIABLE - only single concrete field values, not keys or schema fields, may be transformed by AI SDK)
+- `mNNNN` IDs identify raw messages
+- `bN` IDs identify previously compressed blocks
 
-NEVER USE GENERIC OR REPEATING STRINGS:
+Rules:
 
-Tool status messages repeat identically across every invocation. These are ALWAYS ambiguous:
+- Pick `startId` and `endId` directly from injected IDs in context.
+- IDs must exist in the current visible context.
+- `startId` must appear before `endId`.
+- Prefer boundaries that produce short, closed ranges.
 
-- "Edit applied successfully." (appears in EVERY successful edit)
-- "File written successfully" or any tool success/error boilerplate
-- Common tool output patterns that are identical across calls
+ID SOURCES
 
-Instead, combine the generic output with surrounding unique context (a file path, a specific code snippet, or your own unique assistant text).
+- User messages include a text marker with their `mNNNN` ID.
+- Assistant messages include a `context_info` tool marker with their `mNNNN` ID.
+- Compressed blocks are addressable by `bN` IDs.
 
-Each boundary string you choose MUST be unique to ONE specific message. Before using a string, ask: "Could this exact text appear in any other place in this conversation?" If yes, extend it or pick a different string.
-
-WHERE TO NEVER PICK STRINGS FROM:
-
-- `<system-reminder>` tags or any XML wrapper/meta-commentary around messages
-- Injected system instructions (plan mode text, max-steps warnings, mode-switch text, environment info)
-- Reasoning parts or chain-of-thought text
-- File/directory listing framing text (e.g. "Called the Read tool with the following input...")
-- Strings that span across message or part boundaries
-- Entire serialized JSON objects (key ordering may differ - pick a distinctive substring within instead)
-
-CRITICAL: AVOID USING TOOL INPUT VALUES
-NEVER use tool input schema keys or field names as boundary strings (e.g., "startString", "endString", "filePath", "content"). These may be transformed by the AI SDK and are not reliable. The ONLY acceptable use of tool input strings is a SINGLE concrete field VALUE (not the key), and even then, prefer using assistant text, user messages, or tool result outputs instead. When in doubt, choose boundaries from your own assistant responses or distinctive user message content.
+Do not invent IDs. Use only IDs that are present in context.
 
 PARALLEL COMPRESS EXECUTION
 When multiple independent ranges are ready and their boundaries do not overlap, launch MULTIPLE `compress` calls in parallel in a single response. This is the PREFERRED pattern over a single large-range compression when the work can be safely split. Run compression sequentially only when ranges overlap or when a later range depends on the result of an earlier compression.
@@ -119,8 +107,8 @@ THE FORMAT OF COMPRESS
 {
   topic: string,           // Short label (3-5 words) - e.g., "Auth System Exploration"
   content: {
-    startString: string,   // Unique text string marking the beginning of the range
-    endString: string,     // Unique text string marking the end of the range
+    startId: string,       // Boundary ID at range start: mNNNN or bN
+    endId: string,         // Boundary ID at range end: mNNNN or bN
     summary: string        // Complete technical summary replacing all content in the range
   }
 }

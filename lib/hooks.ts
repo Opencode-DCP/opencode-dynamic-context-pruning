@@ -1,9 +1,10 @@
 import type { SessionState, WithParts } from "./state"
 import type { Logger } from "./logger"
 import type { PluginConfig } from "./config"
+import { assignMessageRefs } from "./message-ids"
 import { syncToolCache } from "./state/tool-cache"
 import { deduplicate, supersedeWrites, purgeErrors } from "./strategies"
-import { prune, insertCompressToolContext } from "./messages"
+import { prune, insertCompressToolContext, insertMessageIdContext } from "./messages"
 import { buildToolIdList, isIgnoredUserMessage } from "./messages/utils"
 import { checkSession } from "./state"
 import { renderSystemPrompt } from "./prompts"
@@ -104,6 +105,8 @@ export function createChatMessageTransformHandler(
 
         cacheSystemPromptTokens(state, output.messages)
 
+        assignMessageRefs(state, output.messages)
+
         syncToolCache(state, config, logger, output.messages)
         buildToolIdList(state, output.messages)
 
@@ -112,6 +115,8 @@ export function createChatMessageTransformHandler(
         purgeErrors(state, logger, config, output.messages)
 
         prune(state, logger, config, output.messages)
+
+        insertMessageIdContext(state, output.messages)
 
         insertCompressToolContext(state, config, logger, output.messages)
 

@@ -1,18 +1,19 @@
 import type { SessionState, WithParts, CompressSummary } from "../state"
 import type { Logger } from "../logger"
 import type { PluginConfig } from "../config"
+import { formatBlockRef, parseBoundaryId } from "../message-ids"
 import { prune } from "../messages"
 import { isIgnoredUserMessage } from "../messages/utils"
 import { countAllMessageTokens, countTokens } from "../strategies/utils"
 
 const BLOCK_PLACEHOLDER_REGEX = /\{block_(\d+)\}/gi
-const COMPRESSED_BLOCK_HEADER_PREFIX_REGEX = /^\s*\[Compressed conversation block #(\d+)\]/i
+const COMPRESSED_BLOCK_HEADER_PREFIX_REGEX = /^\s*\[Compressed conversation b(\d+)\]/i
 
 export interface CompressToolArgs {
     topic: string
     content: {
-        startString: string
-        endString: string
+        startId: string
+        endId: string
         summary: string
     }
 }
@@ -29,18 +30,6 @@ export interface SearchContext {
     transformedMessages: WithParts[]
     rawMessagesById: Map<string, WithParts>
     summaryByBlockId: Map<number, CompressSummary>
-}
-
-export interface BoundaryMatch {
-    reference: BoundaryReference
-    occurrences: number
-}
-
-export interface BoundaryScan {
-    startMatches: BoundaryMatch[]
-    endMatches: BoundaryMatch[]
-    startTotal: number
-    endTotal: number
 }
 
 export interface RangeResolution {
@@ -70,7 +59,7 @@ export interface AppliedCompressionResult {
 }
 
 export function formatCompressedBlockHeader(blockId: number): string {
-    return `[Compressed conversation block #${blockId}]`
+    return `[Compressed conversation b${blockId}]`
 }
 
 export function formatBlockPlaceholder(blockId: number): string {
@@ -82,15 +71,20 @@ export function validateCompressArgs(args: CompressToolArgs): void {
         throw new Error("topic is required and must be a non-empty string")
     }
 
-    if (
-        typeof args.content?.startString !== "string" ||
-        args.content.startString.trim().length === 0
-    ) {
-        throw new Error("content.startString is required and must be a non-empty string")
+    if (typeof args.content?.startId !== "string" || args.content.startId.trim().length === 0) {
+        throw new Error("content.startId is required and must be a non-empty string")
     }
 
-    if (typeof args.content?.endString !== "string" || args.content.endString.trim().length === 0) {
-        throw new Error("content.endString is required and must be a non-empty string")
+    if (parseBoundaryId(args.content.startId) === null) {
+        throw new Error("content.startId must be a valid message/block ID (mNNNN or bN)")
+    }
+
+    if (typeof args.content?.endId !== "string" || args.content.endId.trim().length === 0) {
+        throw new Error("content.endId is required and must be a non-empty string")
+    }
+
+    if (parseBoundaryId(args.content.endId) === null) {
+        throw new Error("content.endId must be a valid message/block ID (mNNNN or bN)")
     }
 
     if (typeof args.content?.summary !== "string" || args.content.summary.trim().length === 0) {
@@ -133,25 +127,74 @@ export function buildSearchContext(
     }
 }
 
-export function scanBoundaryMatches(
+export function resolveBoundaryIds(
     context: SearchContext,
-    startString: string,
-    endString: string,
-    excludedMessageId?: string,
-): BoundaryScan {
-    const scan: BoundaryScan = {
-        startMatches: [],
-        endMatches: [],
-        startTotal: 0,
-        endTotal: 0,
+    state: SessionState,
+    startId: string,
+    endId: string,
+): { startReference: BoundaryReference; endReference: BoundaryReference } {
+    const lookup = buildBoundaryReferenceLookup(context, state)
+    const issues: string[] = []
+    const parsedStartId = parseBoundaryId(startId)
+    const parsedEndId = parseBoundaryId(endId)
+
+    if (parsedStartId === null) {
+        issues.push("startId is invalid. Use an injected message ID (mNNNN) or block ID (bN).")
     }
+
+    if (parsedEndId === null) {
+        issues.push("endId is invalid. Use an injected message ID (mNNNN) or block ID (bN).")
+    }
+
+    if (issues.length > 0) {
+        throwCombinedIssues(issues)
+    }
+
+    if (!parsedStartId || !parsedEndId) {
+        throw new Error("Invalid boundary ID(s)")
+    }
+
+    const startReference = lookup.get(parsedStartId.ref)
+    const endReference = lookup.get(parsedEndId.ref)
+
+    if (!startReference) {
+        issues.push(
+            `startId ${parsedStartId.ref} is not available in the current conversation context. Choose an injected ID visible in context.`,
+        )
+    }
+
+    if (!endReference) {
+        issues.push(
+            `endId ${parsedEndId.ref} is not available in the current conversation context. Choose an injected ID visible in context.`,
+        )
+    }
+
+    if (issues.length > 0) {
+        throwCombinedIssues(issues)
+    }
+
+    if (!startReference || !endReference) {
+        throw new Error("Failed to resolve boundary IDs")
+    }
+
+    if (startReference.transformedIndex > endReference.transformedIndex) {
+        throw new Error(
+            `startId ${parsedStartId.ref} appears after endId ${parsedEndId.ref} in the conversation. Start must come before end.`,
+        )
+    }
+
+    return { startReference, endReference }
+}
+
+function buildBoundaryReferenceLookup(
+    context: SearchContext,
+    state: SessionState,
+): Map<string, BoundaryReference> {
+    const lookup = new Map<string, BoundaryReference>()
 
     for (let index = 0; index < context.transformedMessages.length; index++) {
         const message = context.transformedMessages[index]
         if (!message) {
-            continue
-        }
-        if (excludedMessageId && message.info.id === excludedMessageId) {
             continue
         }
         if (message.info.role === "user" && isIgnoredUserMessage(message)) {
@@ -167,68 +210,31 @@ export function scanBoundaryMatches(
             context.rawMessagesById.has(message.info.id),
         )
 
-        const startCount = countOccurrences(text, startString)
-        if (startCount > 0) {
-            scan.startMatches.push({
-                reference,
-                occurrences: startCount,
-            })
-            scan.startTotal += startCount
+        if (reference.kind === "compressed-block") {
+            if (reference.blockId === undefined) {
+                continue
+            }
+            const blockRef = formatBlockRef(reference.blockId)
+            if (!lookup.has(blockRef)) {
+                lookup.set(blockRef, reference)
+            }
+            continue
         }
 
-        const endCount = countOccurrences(text, endString)
-        if (endCount > 0) {
-            scan.endMatches.push({
-                reference,
-                occurrences: endCount,
-            })
-            scan.endTotal += endCount
+        if (!reference.messageId) {
+            continue
+        }
+        const messageRef = state.messageIds.byRawId.get(reference.messageId)
+        if (!messageRef) {
+            continue
+        }
+
+        if (!lookup.has(messageRef)) {
+            lookup.set(messageRef, reference)
         }
     }
 
-    return scan
-}
-
-export function validateBoundaryScan(
-    scan: BoundaryScan,
-    startString: string,
-    endString: string,
-): { startReference: BoundaryReference; endReference: BoundaryReference } {
-    const issues: string[] = []
-
-    if (scan.startTotal === 0) {
-        issues.push(
-            "startString not found in conversation. Make sure the string exists and is spelled exactly as it appears.",
-        )
-    } else if (scan.startTotal > 1) {
-        issues.push(
-            `Found multiple matches for startString. Provide more surrounding context to uniquely identify the intended match. Matches: ${formatBoundaryMatches(scan.startMatches)}`,
-        )
-    }
-
-    if (scan.endTotal === 0) {
-        issues.push(
-            "endString not found in conversation. Make sure the string exists and is spelled exactly as it appears.",
-        )
-    } else if (scan.endTotal > 1) {
-        issues.push(
-            `Found multiple matches for endString. Provide more surrounding context to uniquely identify the intended match. Matches: ${formatBoundaryMatches(scan.endMatches)}`,
-        )
-    }
-
-    if (issues.length > 0) {
-        throwCombinedIssues(issues)
-    }
-
-    const startReference = scan.startMatches[0].reference
-    const endReference = scan.endMatches[0].reference
-    if (startReference.transformedIndex > endReference.transformedIndex) {
-        throw new Error(
-            "startString appears after endString in the conversation. Start must come before end.",
-        )
-    }
-
-    return { startReference, endReference }
+    return lookup
 }
 
 export function resolveRange(
@@ -665,7 +671,7 @@ function extractLeadingBlockId(text: string): number | null {
 }
 
 function stripCompressedBlockHeader(summary: string): string {
-    const headerMatch = summary.match(/^\s*\[Compressed conversation block #\d+\]/i)
+    const headerMatch = summary.match(/^\s*\[Compressed conversation b\d+\]/i)
     if (!headerMatch) {
         return summary
     }
@@ -716,51 +722,6 @@ function mergeWithSpacing(left: string, right: string): string {
         return left
     }
     return `${l}\n\n${r}`
-}
-
-function countOccurrences(haystack: string, needle: string): number {
-    if (!needle) {
-        return 0
-    }
-
-    let count = 0
-    let offset = 0
-    while (offset <= haystack.length) {
-        const index = haystack.indexOf(needle, offset)
-        if (index === -1) {
-            break
-        }
-        count++
-        offset = index + 1
-    }
-
-    return count
-}
-
-function formatBoundaryMatches(matches: BoundaryMatch[]): string {
-    const parts: string[] = []
-    for (const match of matches) {
-        if (match.reference.kind === "compressed-block") {
-            const blockId = match.reference.blockId ?? -1
-            const anchor = match.reference.anchorMessageId || "unknown"
-            parts.push(
-                `${formatCompressedBlockHeader(blockId)} @ anchor ${anchor}${match.occurrences > 1 ? ` (${match.occurrences} matches)` : ""}`,
-            )
-            continue
-        }
-
-        const messageId =
-            match.reference.messageId || `transformedIndex:${match.reference.transformedIndex}`
-        parts.push(`${messageId}${match.occurrences > 1 ? ` (${match.occurrences} matches)` : ""}`)
-    }
-    return parts.join(", ")
-}
-
-function truncate(value: string, maxLength = 120): string {
-    if (value.length <= maxLength) {
-        return value
-    }
-    return `${value.slice(0, maxLength - 3)}...`
 }
 
 function throwCombinedIssues(issues: string[]): never {

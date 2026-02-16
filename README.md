@@ -30,7 +30,7 @@ For model-facing behavior (prompts and tool calls), this capability is always ad
 
 ### Tool
 
-**Compress** — Exposes a single `compress` tool with one method: match a conversation range using `startString` and `endString`, then replace it with a technical summary.
+**Compress** — Exposes a single `compress` tool with one method: select a conversation range using injected `startId` and `endId` (`mNNNN` or `bN`), then replace it with a technical summary.
 
 The model can use that same method at different scales: tiny ranges for noise cleanup, focused ranges for preserving key findings, and full chapters for completed work.
 

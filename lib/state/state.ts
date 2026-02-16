@@ -76,6 +76,11 @@ export function createSessionState(): SessionState {
         },
         toolParameters: new Map<string, ToolParameterEntry>(),
         toolIdList: [],
+        messageIds: {
+            byRawId: new Map<string, string>(),
+            byRef: new Map<string, string>(),
+            nextRef: 0,
+        },
         lastCompaction: 0,
         currentTurn: 0,
         variant: undefined,
@@ -101,6 +106,11 @@ export function resetSessionState(state: SessionState): void {
     }
     state.toolParameters.clear()
     state.toolIdList = []
+    state.messageIds = {
+        byRawId: new Map<string, string>(),
+        byRef: new Map<string, string>(),
+        nextRef: 0,
+    }
     state.lastCompaction = 0
     state.currentTurn = 0
     state.variant = undefined
