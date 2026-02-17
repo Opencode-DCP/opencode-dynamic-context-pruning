@@ -1,13 +1,9 @@
 import type { SessionState, WithParts, CompressSummary } from "../state"
-import type { Logger } from "../logger"
-import type { PluginConfig } from "../config"
 import { formatBlockRef, parseBoundaryId } from "../message-ids"
-import { prune } from "../messages"
 import { isIgnoredUserMessage } from "../messages/utils"
 import { countAllMessageTokens, countTokens } from "../strategies/utils"
 
 const BLOCK_PLACEHOLDER_REGEX = /\{block_(\d+)\}/gi
-const COMPRESSED_BLOCK_HEADER_PREFIX_REGEX = /^\s*\[Compressed conversation b(\d+)\]/i
 
 export interface CompressToolArgs {
     topic: string
@@ -20,15 +16,16 @@ export interface CompressToolArgs {
 
 export interface BoundaryReference {
     kind: "message" | "compressed-block"
-    transformedIndex: number
+    rawIndex: number
     messageId?: string
     blockId?: number
     anchorMessageId?: string
 }
 
 export interface SearchContext {
-    transformedMessages: WithParts[]
+    rawMessages: WithParts[]
     rawMessagesById: Map<string, WithParts>
+    rawIndexById: Map<string, number>
     summaryByBlockId: Map<number, CompressSummary>
 }
 
@@ -75,16 +72,8 @@ export function validateCompressArgs(args: CompressToolArgs): void {
         throw new Error("content.startId is required and must be a non-empty string")
     }
 
-    if (parseBoundaryId(args.content.startId) === null) {
-        throw new Error("content.startId must be a valid message/block ID (mNNNN or bN)")
-    }
-
     if (typeof args.content?.endId !== "string" || args.content.endId.trim().length === 0) {
         throw new Error("content.endId is required and must be a non-empty string")
-    }
-
-    if (parseBoundaryId(args.content.endId) === null) {
-        throw new Error("content.endId must be a valid message/block ID (mNNNN or bN)")
     }
 
     if (typeof args.content?.summary !== "string" || args.content.summary.trim().length === 0) {
@@ -101,18 +90,18 @@ export async function fetchSessionMessages(client: any, sessionId: string): Prom
     return Array.isArray(payload) ? payload : []
 }
 
-export function buildSearchContext(
-    state: SessionState,
-    logger: Logger,
-    config: PluginConfig,
-    rawMessages: WithParts[],
-): SearchContext {
-    const transformedMessages = structuredClone(rawMessages) as WithParts[]
-    prune(state, logger, config, transformedMessages)
-
+export function buildSearchContext(state: SessionState, rawMessages: WithParts[]): SearchContext {
     const rawMessagesById = new Map<string, WithParts>()
+    const rawIndexById = new Map<string, number>()
     for (const msg of rawMessages) {
         rawMessagesById.set(msg.info.id, msg)
+    }
+    for (let index = 0; index < rawMessages.length; index++) {
+        const message = rawMessages[index]
+        if (!message) {
+            continue
+        }
+        rawIndexById.set(message.info.id, index)
     }
 
     const summaryByBlockId = new Map<number, CompressSummary>()
@@ -121,8 +110,9 @@ export function buildSearchContext(
     }
 
     return {
-        transformedMessages,
+        rawMessages,
         rawMessagesById,
+        rawIndexById,
         summaryByBlockId,
     }
 }
@@ -177,7 +167,7 @@ export function resolveBoundaryIds(
         throw new Error("Failed to resolve boundary IDs")
     }
 
-    if (startReference.transformedIndex > endReference.transformedIndex) {
+    if (startReference.rawIndex > endReference.rawIndex) {
         throw new Error(
             `startId ${parsedStartId.ref} appears after endId ${parsedEndId.ref} in the conversation. Start must come before end.`,
         )
@@ -192,45 +182,50 @@ function buildBoundaryReferenceLookup(
 ): Map<string, BoundaryReference> {
     const lookup = new Map<string, BoundaryReference>()
 
-    for (let index = 0; index < context.transformedMessages.length; index++) {
-        const message = context.transformedMessages[index]
-        if (!message) {
+    for (const [messageRef, messageId] of state.messageIds.byRef) {
+        const rawMessage = context.rawMessagesById.get(messageId)
+        if (!rawMessage) {
             continue
         }
-        if (message.info.role === "user" && isIgnoredUserMessage(message)) {
-            continue
-        }
-
-        const text = buildSearchableMessageText(message)
-        const reference = resolveBoundaryReference(
-            message,
-            index,
-            text,
-            context.summaryByBlockId,
-            context.rawMessagesById.has(message.info.id),
-        )
-
-        if (reference.kind === "compressed-block") {
-            if (reference.blockId === undefined) {
-                continue
-            }
-            const blockRef = formatBlockRef(reference.blockId)
-            if (!lookup.has(blockRef)) {
-                lookup.set(blockRef, reference)
-            }
+        if (rawMessage.info.role === "user" && isIgnoredUserMessage(rawMessage)) {
             continue
         }
 
-        if (!reference.messageId) {
+        const rawIndex = context.rawIndexById.get(messageId)
+        if (rawIndex === undefined) {
             continue
         }
-        const messageRef = state.messageIds.byRawId.get(reference.messageId)
-        if (!messageRef) {
+        lookup.set(messageRef, {
+            kind: "message",
+            rawIndex,
+            messageId,
+        })
+    }
+
+    const summaries = Array.from(context.summaryByBlockId.values()).sort(
+        (a, b) => a.blockId - b.blockId,
+    )
+    for (const summary of summaries) {
+        const anchorMessage = context.rawMessagesById.get(summary.anchorMessageId)
+        if (!anchorMessage) {
+            continue
+        }
+        if (anchorMessage.info.role === "user" && isIgnoredUserMessage(anchorMessage)) {
             continue
         }
 
-        if (!lookup.has(messageRef)) {
-            lookup.set(messageRef, reference)
+        const rawIndex = context.rawIndexById.get(summary.anchorMessageId)
+        if (rawIndex === undefined) {
+            continue
+        }
+        const blockRef = formatBlockRef(summary.blockId)
+        if (!lookup.has(blockRef)) {
+            lookup.set(blockRef, {
+                kind: "compressed-block",
+                rawIndex,
+                blockId: summary.blockId,
+                anchorMessageId: summary.anchorMessageId,
+            })
         }
     }
 
@@ -242,6 +237,8 @@ export function resolveRange(
     startReference: BoundaryReference,
     endReference: BoundaryReference,
 ): RangeResolution {
+    const startRawIndex = startReference.rawIndex
+    const endRawIndex = endReference.rawIndex
     const messageIds: string[] = []
     const messageSeen = new Set<string>()
     const toolIds: string[] = []
@@ -250,49 +247,19 @@ export function resolveRange(
     const requiredBlockSeen = new Set<number>()
     const messageTokenById = new Map<string, number>()
 
-    for (
-        let index = startReference.transformedIndex;
-        index <= endReference.transformedIndex;
-        index++
-    ) {
-        const message = context.transformedMessages[index]
-        if (!message) {
+    for (let index = startRawIndex; index <= endRawIndex; index++) {
+        const rawMessage = context.rawMessages[index]
+        if (!rawMessage) {
             continue
         }
-        if (message.info.role === "user" && isIgnoredUserMessage(message)) {
+        if (rawMessage.info.role === "user" && isIgnoredUserMessage(rawMessage)) {
             continue
         }
 
-        const text = buildSearchableMessageText(message)
-        const reference = resolveBoundaryReference(
-            message,
-            index,
-            text,
-            context.summaryByBlockId,
-            context.rawMessagesById.has(message.info.id),
-        )
-
-        if (reference.kind === "compressed-block") {
-            if (reference.blockId !== undefined && !requiredBlockSeen.has(reference.blockId)) {
-                requiredBlockSeen.add(reference.blockId)
-                requiredBlockIds.push(reference.blockId)
-            }
-            continue
-        }
-
-        if (!context.rawMessagesById.has(message.info.id)) {
-            continue
-        }
-
-        const messageId = message.info.id
+        const messageId = rawMessage.info.id
         if (!messageSeen.has(messageId)) {
             messageSeen.add(messageId)
             messageIds.push(messageId)
-        }
-
-        const rawMessage = context.rawMessagesById.get(messageId)
-        if (!rawMessage) {
-            continue
         }
 
         if (!messageTokenById.has(messageId)) {
@@ -310,6 +277,33 @@ export function resolveRange(
             toolSeen.add(part.callID)
             toolIds.push(part.callID)
         }
+    }
+
+    const rangeMessageIdSet = new Set(messageIds)
+    const summariesInRange: Array<{ blockId: number; rawIndex: number }> = []
+    for (const summary of context.summaryByBlockId.values()) {
+        if (!rangeMessageIdSet.has(summary.anchorMessageId)) {
+            continue
+        }
+
+        const anchorIndex = context.rawIndexById.get(summary.anchorMessageId)
+        if (anchorIndex === undefined) {
+            continue
+        }
+
+        summariesInRange.push({
+            blockId: summary.blockId,
+            rawIndex: anchorIndex,
+        })
+    }
+
+    summariesInRange.sort((a, b) => a.rawIndex - b.rawIndex || a.blockId - b.blockId)
+    for (const summary of summariesInRange) {
+        if (requiredBlockSeen.has(summary.blockId)) {
+            continue
+        }
+        requiredBlockSeen.add(summary.blockId)
+        requiredBlockIds.push(summary.blockId)
     }
 
     if (messageIds.length === 0) {
@@ -560,114 +554,6 @@ export function applyCompressionState(
 
 export function countSummaryTokens(summary: string): number {
     return countTokens(summary)
-}
-
-function resolveBoundaryReference(
-    message: WithParts,
-    transformedIndex: number,
-    searchableText: string,
-    summaryByBlockId: Map<number, CompressSummary>,
-    isRawMessage: boolean,
-): BoundaryReference {
-    const leadingBlockId = extractLeadingBlockId(searchableText)
-    if (!isRawMessage && leadingBlockId !== null) {
-        const blockSummary = summaryByBlockId.get(leadingBlockId)
-        if (blockSummary) {
-            return {
-                kind: "compressed-block",
-                transformedIndex,
-                blockId: leadingBlockId,
-                anchorMessageId: blockSummary.anchorMessageId,
-            }
-        }
-    }
-
-    return {
-        kind: "message",
-        transformedIndex,
-        messageId: message.info.id,
-    }
-}
-
-function buildSearchableMessageText(message: WithParts): string {
-    const parts = Array.isArray(message.parts) ? message.parts : []
-    let content = ""
-
-    for (const part of parts) {
-        const p = part as Record<string, unknown>
-        if ((part as any).ignored) {
-            continue
-        }
-
-        switch (part.type) {
-            case "text":
-                if (typeof p.text === "string") {
-                    content += ` ${p.text}`
-                }
-                break
-
-            case "tool": {
-                if ((part as any).tool === "compress") {
-                    break
-                }
-
-                const state = p.state as Record<string, unknown> | undefined
-                if (!state) break
-
-                if (state.status === "completed" && state.output !== undefined) {
-                    content +=
-                        " " +
-                        (typeof state.output === "string"
-                            ? state.output
-                            : JSON.stringify(state.output))
-                } else if (state.status === "error" && state.error !== undefined) {
-                    content +=
-                        " " +
-                        (typeof state.error === "string"
-                            ? state.error
-                            : JSON.stringify(state.error))
-                }
-
-                if (state.input !== undefined) {
-                    content +=
-                        " " +
-                        (typeof state.input === "string"
-                            ? state.input
-                            : JSON.stringify(state.input))
-                }
-                break
-            }
-
-            case "compaction":
-                if (typeof p.summary === "string") {
-                    content += ` ${p.summary}`
-                }
-                break
-
-            case "subtask":
-                if (typeof p.summary === "string") {
-                    content += ` ${p.summary}`
-                }
-                if (typeof p.result === "string") {
-                    content += ` ${p.result}`
-                }
-                break
-
-            default:
-                break
-        }
-    }
-
-    return content
-}
-
-function extractLeadingBlockId(text: string): number | null {
-    const match = text.match(COMPRESSED_BLOCK_HEADER_PREFIX_REGEX)
-    if (!match) {
-        return null
-    }
-    const id = Number.parseInt(match[1], 10)
-    return Number.isInteger(id) ? id : null
 }
 
 function stripCompressedBlockHeader(summary: string): string {

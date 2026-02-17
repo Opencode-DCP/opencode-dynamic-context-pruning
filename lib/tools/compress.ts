@@ -9,6 +9,7 @@ import {
     buildSearchContext,
     countSummaryTokens,
     fetchSessionMessages,
+    formatCompressedBlockHeader,
     injectBlockPlaceholders,
     parseBlockPlaceholders,
     resolveAnchorMessageId,
@@ -22,11 +23,9 @@ import { getCurrentParams, getCurrentTokenUsage } from "../strategies/utils"
 import { saveSessionState } from "../state/persistence"
 import { sendCompressNotification } from "../ui/notification"
 
-const COMPRESS_TOOL_DESCRIPTION = COMPRESS_TOOL_SPEC
-
 export function createCompressTool(ctx: ToolContext): ReturnType<typeof tool> {
     return tool({
-        description: COMPRESS_TOOL_DESCRIPTION,
+        description: COMPRESS_TOOL_SPEC,
         args: {
             topic: tool.schema
                 .string()
@@ -63,6 +62,7 @@ export function createCompressTool(ctx: ToolContext): ReturnType<typeof tool> {
             })
 
             const rawMessages = await fetchSessionMessages(ctx.client, toolCtx.sessionID)
+
             await ensureSessionInitialized(
                 ctx.client,
                 ctx.state,
@@ -72,7 +72,7 @@ export function createCompressTool(ctx: ToolContext): ReturnType<typeof tool> {
                 ctx.config.manualMode.enabled,
             )
 
-            const searchContext = buildSearchContext(ctx.state, ctx.logger, ctx.config, rawMessages)
+            const searchContext = buildSearchContext(ctx.state, rawMessages)
 
             const { startReference, endReference } = resolveBoundaryIds(
                 searchContext,
@@ -138,11 +138,7 @@ export function createCompressTool(ctx: ToolContext): ReturnType<typeof tool> {
                 params,
             )
 
-            return `Compressed ${applied.messageIds.length} messages into ${formatBlock(blockId)}.`
+            return `Compressed ${applied.messageIds.length} messages into ${formatCompressedBlockHeader(blockId)}.`
         },
     })
-}
-
-function formatBlock(blockId: number): string {
-    return `[Compressed conversation b${blockId}]`
 }
