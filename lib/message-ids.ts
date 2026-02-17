@@ -83,10 +83,6 @@ export function parseBoundaryId(id: string): ParsedBoundaryId | null {
     return null
 }
 
-export function formatMessageIdMarker(ref: string): string {
-    return `Message ID: ${ref}`
-}
-
 export function formatMessageIdTag(ref: string): string {
     return `<${MESSAGE_ID_TAG_NAME}>${ref}</${MESSAGE_ID_TAG_NAME}>`
 }

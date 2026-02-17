@@ -1,7 +1,7 @@
 import type { SessionState, WithParts } from "../../state"
 import type { Logger } from "../../logger"
 import type { PluginConfig } from "../../config"
-import { formatMessageIdMarker, formatMessageIdTag } from "../../message-ids"
+import { formatMessageIdTag } from "../../message-ids"
 import { createSyntheticTextPart, createSyntheticToolPart, isIgnoredUserMessage } from "../utils"
 import {
     addAnchor,
@@ -102,16 +102,10 @@ export const insertMessageIdContext = (state: SessionState, messages: WithParts[
             continue
         }
 
-        const marker = formatMessageIdMarker(messageRef)
         const tag = formatMessageIdTag(messageRef)
 
-        if (message.info.role === "user") {
-            const hasMarker = message.parts.some(
-                (part) => part.type === "text" && part.text.trim() === marker,
-            )
-            if (!hasMarker) {
-                message.parts.push(createSyntheticTextPart(message, marker))
-            }
+        if (message.info.role === "user" && !isIgnoredUserMessage(message)) {
+            message.parts.push(createSyntheticTextPart(message, tag))
             continue
         }
 
@@ -124,6 +118,6 @@ export const insertMessageIdContext = (state: SessionState, messages: WithParts[
             continue
         }
 
-        message.parts.push(createSyntheticToolPart(message, marker, toolModelId))
+        message.parts.push(createSyntheticToolPart(message, tag, toolModelId))
     }
 }

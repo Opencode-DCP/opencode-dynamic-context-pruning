@@ -1,9 +1,9 @@
 import type { SessionState, WithParts, CompressSummary } from "../state"
-import { formatBlockRef, parseBoundaryId } from "../message-ids"
+import { formatBlockRef, formatMessageIdTag, parseBoundaryId } from "../message-ids"
 import { isIgnoredUserMessage } from "../messages/utils"
 import { countAllMessageTokens, countTokens } from "../strategies/utils"
 
-const BLOCK_PLACEHOLDER_REGEX = /\{block_(\d+)\}/gi
+const BLOCK_PLACEHOLDER_REGEX = /\(b(\d+)\)|\{block_(\d+)\}/gi
 
 export interface CompressToolArgs {
     topic: string
@@ -56,11 +56,15 @@ export interface AppliedCompressionResult {
 }
 
 export function formatCompressedBlockHeader(blockId: number): string {
-    return `[Compressed conversation b${blockId}]`
+    return "[Compressed conversation section]"
+}
+
+export function formatCompressedBlockFooter(blockId: number): string {
+    return formatMessageIdTag(formatBlockRef(blockId))
 }
 
 export function formatBlockPlaceholder(blockId: number): string {
-    return `{block_${blockId}}`
+    return `(b${blockId})`
 }
 
 export function validateCompressArgs(args: CompressToolArgs): void {
@@ -343,7 +347,8 @@ export function parseBlockPlaceholders(summary: string): ParsedBlockPlaceholder[
     let match: RegExpExecArray | null
     while ((match = regex.exec(summary)) !== null) {
         const full = match[0]
-        const parsed = Number.parseInt(match[1], 10)
+        const blockIdPart = match[1] || match[2]
+        const parsed = Number.parseInt(blockIdPart, 10)
         if (!Number.isInteger(parsed)) {
             continue
         }
@@ -455,7 +460,7 @@ export function injectBlockPlaceholders(
             }
 
             expanded += summary.slice(cursor, placeholder.startIndex)
-            expanded += stripCompressedBlockHeader(target.summary)
+            expanded += restoreStoredCompressedSummary(target.summary)
             cursor = placeholder.endIndex
 
             if (!consumedSeen.has(placeholder.blockId)) {
@@ -506,11 +511,12 @@ export function allocateBlockId(summaries: CompressSummary[]): number {
 
 export function addCompressedBlockHeader(blockId: number, summary: string): string {
     const header = formatCompressedBlockHeader(blockId)
+    const footer = formatCompressedBlockFooter(blockId)
     const body = summary.trim()
     if (body.length === 0) {
-        return header
+        return `${header}\n${footer}`
     }
-    return `${header}\n${body}`
+    return `${header}\n${body}\n\n${footer}`
 }
 
 export function applyCompressionState(
@@ -556,14 +562,17 @@ export function countSummaryTokens(summary: string): number {
     return countTokens(summary)
 }
 
-function stripCompressedBlockHeader(summary: string): string {
-    const headerMatch = summary.match(/^\s*\[Compressed conversation b\d+\]/i)
+function restoreStoredCompressedSummary(summary: string): string {
+    const headerMatch = summary.match(/^\s*\[Compressed conversation(?: section)?(?: b\d+)?\]/i)
     if (!headerMatch) {
         return summary
     }
 
     const afterHeader = summary.slice(headerMatch[0].length)
-    return afterHeader.replace(/^(?:\r?\n)+/, "")
+    const withoutLeadingBreaks = afterHeader.replace(/^(?:\r?\n)+/, "")
+    return withoutLeadingBreaks
+        .replace(/(?:\r?\n)*<dcp-message-id>b\d+<\/dcp-message-id>\s*$/i, "")
+        .replace(/(?:\r?\n)+$/, "")
 }
 
 function injectBoundarySummaryIfMissing(
@@ -586,7 +595,7 @@ function injectBoundarySummaryIfMissing(
         throw new Error(`Compressed block not found: ${formatBlockPlaceholder(reference.blockId)}`)
     }
 
-    const injectedBody = stripCompressedBlockHeader(target.summary)
+    const injectedBody = restoreStoredCompressedSummary(target.summary)
     const next =
         position === "start"
             ? mergeWithSpacing(injectedBody, summary)
