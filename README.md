@@ -120,6 +120,8 @@ DCP uses its own config file:
 >             //     "openai/gpt-5": 120000,
 >             //     "anthropic/claude-3-7-sonnet": "80%"
 >             // },
+>             // How often the context-limit nudge fires (1 = every fetch, 5 = every 5th)
+>             "nudgeFrequency": 5,
 >             // Additional tools to protect from pruning
 >             "protectedTools": [],
 >         },

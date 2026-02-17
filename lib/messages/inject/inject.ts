@@ -7,7 +7,7 @@ import {
     addAnchor,
     applyAnchoredNudge,
     findLastNonIgnoredMessage,
-    getNudgeGap,
+    getNudgeFrequency,
     getModelInfo,
     isContextOverLimit,
     messageHasCompress,
@@ -67,7 +67,7 @@ export const insertCompressToolContext = (
     if (isContextOverLimit(config, state, providerId, modelId, messages)) {
         const lastNonIgnoredMessage = findLastNonIgnoredMessage(messages)
         if (lastNonIgnoredMessage) {
-            const interval = getNudgeGap(config)
+            const interval = getNudgeFrequency(config)
             const added = addAnchor(
                 state.contextLimitAnchors,
                 lastNonIgnoredMessage.message.info.id,

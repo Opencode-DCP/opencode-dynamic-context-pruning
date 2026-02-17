@@ -17,8 +17,8 @@ export interface LastNonIgnoredMessage {
     index: number
 }
 
-export function getNudgeGap(config: PluginConfig): number {
-    return Math.max(1, Math.floor(config.tools.settings.nudgeGap || 1))
+export function getNudgeFrequency(config: PluginConfig): number {
+    return Math.max(1, Math.floor(config.tools.settings.nudgeFrequency || 1))
 }
 
 export function persistAnchors(state: SessionState, logger: Logger): void {

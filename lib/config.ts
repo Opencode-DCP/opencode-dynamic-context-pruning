@@ -17,7 +17,7 @@ export interface CompressTool {
 }
 
 export interface ToolSettings {
-    nudgeGap: number
+    nudgeFrequency: number
     protectedTools: string[]
     contextLimit: number | `${number}%`
     modelLimits?: Record<string, number | `${number}%`>
@@ -101,7 +101,7 @@ export const VALID_CONFIG_KEYS = new Set([
     "manualMode.automaticStrategies",
     "tools",
     "tools.settings",
-    "tools.settings.nudgeGap",
+    "tools.settings.nudgeFrequency",
     "tools.settings.protectedTools",
     "tools.settings.contextLimit",
     "tools.settings.modelLimits",
@@ -289,26 +289,16 @@ export function validateConfigTypes(config: Record<string, any>): ValidationErro
     if (tools) {
         if (tools.settings) {
             if (
-                tools.settings.nudgeGap !== undefined &&
-                typeof tools.settings.nudgeGap !== "number"
-            ) {
-                errors.push({
-                    key: "tools.settings.nudgeGap",
-                    expected: "number",
-                    actual: typeof tools.settings.nudgeGap,
-                })
-            }
-
-            if (
-                typeof tools.settings.nudgeFrequency === "number" &&
-                tools.settings.nudgeFrequency < 1
+                tools.settings.nudgeFrequency !== undefined &&
+                typeof tools.settings.nudgeFrequency !== "number"
             ) {
                 errors.push({
                     key: "tools.settings.nudgeFrequency",
-                    expected: "positive number (>= 1)",
-                    actual: `${tools.settings.nudgeFrequency} (will be clamped to 1)`,
+                    expected: "number",
+                    actual: typeof tools.settings.nudgeFrequency,
                 })
             }
+
             if (
                 typeof tools.settings.nudgeFrequency === "number" &&
                 tools.settings.nudgeFrequency < 1
@@ -552,7 +542,7 @@ const defaultConfig: PluginConfig = {
     protectedFilePatterns: [],
     tools: {
         settings: {
-            nudgeGap: 5,
+            nudgeFrequency: 5,
             protectedTools: [...DEFAULT_PROTECTED_TOOLS],
             contextLimit: 100000,
         },
@@ -716,7 +706,7 @@ function mergeTools(base: PluginConfig["tools"], override?: ToolOverride): Plugi
 
     return {
         settings: {
-            nudgeGap: override.settings?.nudgeGap ?? base.settings.nudgeGap,
+            nudgeFrequency: override.settings?.nudgeFrequency ?? base.settings.nudgeFrequency,
             protectedTools: [
                 ...new Set([
                     ...base.settings.protectedTools,
