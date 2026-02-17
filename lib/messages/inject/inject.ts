@@ -1,7 +1,7 @@
 import type { SessionState, WithParts } from "../../state"
 import type { Logger } from "../../logger"
 import type { PluginConfig } from "../../config"
-import { formatMessageIdMarker } from "../../message-ids"
+import { formatMessageIdMarker, formatMessageIdTag } from "../../message-ids"
 import { createSyntheticTextPart, createSyntheticToolPart, isIgnoredUserMessage } from "../utils"
 import {
     addAnchor,
@@ -16,6 +16,35 @@ import {
 import { renderNudge } from "../../prompts"
 
 const CONTEXT_LIMIT_HINT_TEXT = renderNudge("context-limit")
+type MessagePart = WithParts["parts"][number]
+type ToolPart = Extract<MessagePart, { type: "tool" }>
+
+const appendMessageIdTagToToolOutput = (part: ToolPart, tag: string): boolean => {
+    if (part.type !== "tool") {
+        return false
+    }
+    if (part.state?.status !== "completed" || typeof part.state.output !== "string") {
+        return false
+    }
+    if (part.state.output.includes(tag)) {
+        return true
+    }
+
+    const separator = part.state.output.length > 0 && !part.state.output.endsWith("\n") ? "\n" : ""
+    part.state.output = `${part.state.output}${separator}${tag}`
+    return true
+}
+
+const findLastToolPart = (message: WithParts): ToolPart | null => {
+    for (let i = message.parts.length - 1; i >= 0; i--) {
+        const part = message.parts[i]
+        if (part.type === "tool") {
+            return part
+        }
+    }
+
+    return null
+}
 
 export const insertCompressToolContext = (
     state: SessionState,
@@ -74,6 +103,7 @@ export const insertMessageIdContext = (state: SessionState, messages: WithParts[
         }
 
         const marker = formatMessageIdMarker(messageRef)
+        const tag = formatMessageIdTag(messageRef)
 
         if (message.info.role === "user") {
             const hasMarker = message.parts.some(
@@ -89,21 +119,11 @@ export const insertMessageIdContext = (state: SessionState, messages: WithParts[
             continue
         }
 
-        const hasMarker = message.parts.some((part) => {
-            if (part.type !== "tool") {
-                return false
-            }
-            if (part.tool !== "context_info") {
-                return false
-            }
-            return (
-                part.state?.status === "completed" &&
-                typeof part.state.output === "string" &&
-                part.state.output.trim() === marker
-            )
-        })
-        if (!hasMarker) {
-            message.parts.push(createSyntheticToolPart(message, marker, toolModelId))
+        const lastToolPart = findLastToolPart(message)
+        if (lastToolPart && appendMessageIdTagToToolOutput(lastToolPart, tag)) {
+            continue
         }
+
+        message.parts.push(createSyntheticToolPart(message, marker, toolModelId))
     }
 }

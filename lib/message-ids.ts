@@ -2,6 +2,7 @@ import type { SessionState, WithParts } from "./state"
 
 const MESSAGE_REF_REGEX = /^m(\d{4})$/
 const BLOCK_REF_REGEX = /^b([1-9]\d*)$/
+const MESSAGE_ID_TAG_NAME = "dcp-message-id"
 
 const MESSAGE_REF_WIDTH = 4
 const MESSAGE_REF_MIN_INDEX = 0
@@ -84,6 +85,10 @@ export function parseBoundaryId(id: string): ParsedBoundaryId | null {
 
 export function formatMessageIdMarker(ref: string): string {
     return `Message ID: ${ref}`
+}
+
+export function formatMessageIdTag(ref: string): string {
+    return `<${MESSAGE_ID_TAG_NAME}>${ref}</${MESSAGE_ID_TAG_NAME}>`
 }
 
 export function assignMessageRefs(state: SessionState, messages: WithParts[]): number {
