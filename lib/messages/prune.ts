@@ -187,8 +187,14 @@ const filterCompressedRanges = (
             if (userMessage) {
                 const userInfo = userMessage.info as UserMessage
                 const summaryContent = summary.summary
+                const summarySeed = `${summary.blockId}:${summary.anchorMessageId}`
                 result.push(
-                    createSyntheticUserMessage(userMessage, summaryContent, userInfo.variant),
+                    createSyntheticUserMessage(
+                        userMessage,
+                        summaryContent,
+                        userInfo.variant,
+                        summarySeed,
+                    ),
                 )
 
                 logger.info("Injected compress summary", {
