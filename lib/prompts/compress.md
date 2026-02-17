@@ -93,8 +93,11 @@ Rules:
 ID SOURCES
 
 - User messages include a text marker with their `mNNNN` ID.
-- Assistant messages include a `context_info` tool marker with their `mNNNN` ID.
+- Assistant messages usually include an XML metadata tag in the last tool output: `<dcp-message-id>mNNNN</dcp-message-id>`.
+- Assistant messages without tool outputs use a synthetic `context_info` marker instead.
 - Compressed blocks are addressable by `bN` IDs.
+
+Treat `<dcp-message-id>...</dcp-message-id>` as metadata only. It is not part of the tool result semantics.
 
 Do not invent IDs. Use only IDs that are present in context.
 
