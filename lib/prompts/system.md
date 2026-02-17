@@ -21,14 +21,14 @@ Treat token counts and context growth as soft signals, not hard triggers.
 - When multiple independent stale ranges are ready, batch compressions in parallel
 
 BOUNDARY MATCHING
-`compress` uses inclusive string boundaries, matching a string at the start of a message or tool output will consume the entire item. Be conservative and precise: choose unique strings with enough surrounding context to avoid ambiguous matches or accidental range capture
+`compress` uses inclusive ID boundaries via `content.startId` and `content.endId`. IDs are injected in context as message refs (`mNNNN`) and compressed block refs (`bN`).
 
-NEVER use generic tool status messages as boundaries (e.g. "Edit applied successfully.", "File written successfully"). These repeat across every tool call and will always fail with multiple matches.
+Only choose IDs currently visible in context. Do not invent IDs.
 
 RESPECT THE CHRONOLOGY OF THE RANGE
-STARTSTRING MUST ALWAYS BE ABOVE ENDSTRING
-ENDSTRING MUST ALWAYS BE BELOW STARTSTRING
-DO NOT USE A TOOL SCHEMA FIELD FOR START OR END STRING.
+`content.startId` MUST refer to an item above/before `content.endId`
+`content.endId` MUST refer to an item below/after `content.startId`
+Always provide boundaries via the tool schema fields `content.startId` and `content.endId`.
 
 THE SUMMARY STANDARD
 Your summary MUST be technical and specific enough to preserve FULL understanding of what transpired, such that NO ambiguity remains about what asked, found, planned, done, or decided - yet noise free
