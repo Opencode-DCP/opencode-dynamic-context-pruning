@@ -23,7 +23,7 @@ Treat token counts and context growth as soft signals, not hard triggers.
 BOUNDARY MATCHING
 `compress` uses inclusive ID boundaries via `content.startId` and `content.endId`. IDs are injected in context as message refs (`mNNNN`) and compressed block refs (`bN`).
 
-Assistant tool outputs may include metadata tags like `<dcp-message-id>mNNNN</dcp-message-id>`.
+Each message has an ID inside XML metadata tags like `<dcp-message-id>...</dcp-message-id>`.
 Treat these tags as boundary metadata only, not as tool result content.
 
 Only choose IDs currently visible in context. Do not invent IDs.
