@@ -3,23 +3,30 @@
 Analyze token values at each step within a single OpenCode session.
 Shows cache growth over time and highlights DCP tool usage that causes cache drops.
 
-Usage: opencode-session-timeline [--session ID] [--json] [--no-color]
+Queries the OpenCode SQLite database directly for fast, offline access.
+
+Usage: opencode-session-timeline [--session ID] [--json] [--no-color] [--db PATH]
 """
 
-import json
 import argparse
+import json
 from typing import Optional
-from datetime import datetime
 
 from opencode_api import APIError, add_api_arguments, create_client_from_args, list_sessions_across_projects
 
-# DCP tool names across versions (compress is canonical; others are legacy aliases)
+
 DCP_TOOLS = {
-    "compress", "prune", "distill",
-    "discard", "extract", "context_pruning", "squash", "consolidate"
+    "compress",
+    "prune",
+    "distill",
+    "discard",
+    "extract",
+    "context_pruning",
+    "squash",
+    "consolidate",
 }
 
-# ANSI colors
+
 class Colors:
     RESET = "\033[0m"
     BOLD = "\033[1m"
@@ -27,58 +34,35 @@ class Colors:
     RED = "\033[31m"
     GREEN = "\033[32m"
     YELLOW = "\033[33m"
-    BLUE = "\033[34m"
-    MAGENTA = "\033[35m"
     CYAN = "\033[36m"
+
 
 NO_COLOR = Colors()
 for attr in dir(NO_COLOR):
-    if not attr.startswith('_'):
+    if not attr.startswith("_"):
         setattr(NO_COLOR, attr, "")
 
 
-def format_duration(ms: Optional[int], colors: Colors = None) -> str:
-    """Format milliseconds as human-readable duration."""
+def format_duration(ms: Optional[int]) -> str:
     if ms is None:
         return "-"
-    
     seconds = ms / 1000
     if seconds < 60:
         return f"{seconds:.1f}s"
-    elif seconds < 3600:
+    if seconds < 3600:
         minutes = int(seconds // 60)
         secs = seconds % 60
         return f"{minutes}m{secs:.0f}s"
-    else:
-        hours = int(seconds // 3600)
-        minutes = int((seconds % 3600) // 60)
-        return f"{hours}h{minutes}m"
-
-
-def get_session_messages(client, session: dict) -> list[dict]:
-    """Get all messages for a session, sorted by creation order."""
-    messages = client.get_session_messages(session["id"], directory=session.get("directory"))
-    normalized = []
-    for message in messages:
-        info = message.get("info", {})
-        time_info = info.get("time", {})
-        normalized.append(
-            {
-                "_id": info.get("id", ""),
-                "_created": time_info.get("created"),
-                "_completed": time_info.get("completed"),
-                "_parts": message.get("parts", []),
-            }
-        )
-    return normalized
+    hours = int(seconds // 3600)
+    minutes = int((seconds % 3600) // 60)
+    return f"{hours}h{minutes}m"
 
 
 def extract_step_data(parts: list[dict]) -> Optional[dict]:
-    """Extract step-finish data and tool calls from message parts."""
     step_finish = None
     tools_used = []
     dcp_tools_used = []
-    
+
     for part in parts:
         if part.get("type") == "step-finish" and "tokens" in part:
             step_finish = part
@@ -87,13 +71,12 @@ def extract_step_data(parts: list[dict]) -> Optional[dict]:
             tools_used.append(tool_name)
             if tool_name in DCP_TOOLS:
                 dcp_tools_used.append(tool_name)
-    
+
     if step_finish is None:
         return None
-    
+
     tokens = step_finish.get("tokens", {})
     cache = tokens.get("cache", {})
-    
     return {
         "input": tokens.get("input", 0),
         "output": tokens.get("output", 0),
@@ -104,240 +87,112 @@ def extract_step_data(parts: list[dict]) -> Optional[dict]:
         "reason": step_finish.get("reason", "unknown"),
         "tools_used": tools_used,
         "dcp_tools_used": dcp_tools_used,
-        "has_dcp": len(dcp_tools_used) > 0
+        "has_dcp": len(dcp_tools_used) > 0,
     }
 
 
 def get_most_recent_session(client, session_list_limit: int) -> Optional[dict]:
-    """Get the most recent session across all projects."""
     sessions = list_sessions_across_projects(client, per_project_limit=session_list_limit)
     return sessions[0] if sessions else None
 
 
 def analyze_session(client, session: dict) -> dict:
-    """Analyze a single session step by step."""
     session_id = session["id"]
-    messages = get_session_messages(client, session)
+    messages = client.get_session_messages(session_id, directory=session.get("directory"))
     title = session.get("title", "Unknown")
-    
+
     steps = []
-    for msg in messages:
-        msg_id = msg.get("_id", "")
-        parts = msg.get("_parts", [])
+    for message in messages:
+        info = message.get("info", {})
+        parts = message.get("parts", [])
         step_data = extract_step_data(parts)
-        
-        if step_data:
-            step_data["message_id"] = msg_id
-            step_data["created"] = msg.get("_created")
-            step_data["completed"] = msg.get("_completed")
-            steps.append(step_data)
-    
-    # Calculate deltas
-    for i, step in enumerate(steps):
-        if i == 0:
+        if not step_data:
+            continue
+        time_info = info.get("time", {})
+        step_data["message_id"] = info.get("id", "")
+        step_data["created"] = time_info.get("created")
+        step_data["completed"] = time_info.get("completed")
+        steps.append(step_data)
+
+    for idx, step in enumerate(steps):
+        if idx == 0:
             step["cache_read_delta"] = step["cache_read"]
             step["input_delta"] = step["input"]
-        else:
-            prev = steps[i - 1]
-            step["cache_read_delta"] = step["cache_read"] - prev["cache_read"]
-            step["input_delta"] = step["input"] - prev["input"]
-        
-        # Calculate cache hit rate
-        total_context = step["input"] + step["cache_read"]
-        step["cache_hit_rate"] = (step["cache_read"] / total_context * 100) if total_context > 0 else 0
-        
-        # Calculate step duration and time since previous step
-        created = step.get("created")
-        completed = step.get("completed")
-        
-        if created and completed:
-            step["duration_ms"] = completed - created
-        else:
-            step["duration_ms"] = None
-        
-        if i == 0:
             step["time_since_prev_ms"] = None
         else:
-            prev_completed = steps[i - 1].get("completed")
-            if prev_completed and created:
-                step["time_since_prev_ms"] = created - prev_completed
-            else:
-                step["time_since_prev_ms"] = None
-    
+            prev = steps[idx - 1]
+            step["cache_read_delta"] = step["cache_read"] - prev["cache_read"]
+            step["input_delta"] = step["input"] - prev["input"]
+            prev_completed = prev.get("completed")
+            created = step.get("created")
+            step["time_since_prev_ms"] = (created - prev_completed) if (prev_completed and created) else None
+
+        created = step.get("created")
+        completed = step.get("completed")
+        step["duration_ms"] = (completed - created) if (created and completed) else None
+
+        total_context = step["input"] + step["cache_read"]
+        step["cache_hit_rate"] = (step["cache_read"] / total_context * 100) if total_context > 0 else 0
+
     return {
         "session_id": session_id,
         "title": title,
         "steps": steps,
-        "total_steps": len(steps)
+        "total_steps": len(steps),
     }
 
 
 def print_timeline(result: dict, colors: Colors):
-    """Print the step-by-step timeline."""
     c = colors
-    
     print(f"{c.BOLD}{'=' * 130}{c.RESET}")
     print(f"{c.BOLD}SESSION TIMELINE: Token Values at Each Step{c.RESET}")
-    print(f"{c.BOLD}{'=' * 130}{c.RESET}")
-    print()
+    print(f"{c.BOLD}{'=' * 130}{c.RESET}\n")
     print(f"  Session: {c.CYAN}{result['session_id']}{c.RESET}")
     print(f"  Title:   {result['title']}")
-    print(f"  Steps:   {result['total_steps']}")
-    print()
-    
+    print(f"  Steps:   {result['total_steps']}\n")
+
     if not result["steps"]:
         print("  No steps found in this session.")
         return
-    
-    # Header
-    print(f"{c.BOLD}{'Step':<6} {'Cache Read':>12} {'Δ Cache':>12} {'Input':>10} {'Output':>10} {'Cache %':>9} {'Duration':>10} {'Gap':>10} {'DCP Tools':<15} {'Reason':<12}{c.RESET}")
+
+    print(
+        f"{c.BOLD}{'Step':<6} {'Cache Read':>12} {'Δ Cache':>12} {'Input':>10} {'Output':>10} {'Cache %':>9} {'Duration':>10} {'Gap':>10} {'DCP Tools':<15} {'Reason':<12}{c.RESET}"
+    )
     print("-" * 130)
-    
-    prev_cache = 0
-    for i, step in enumerate(result["steps"], 1):
-        cache_read = step["cache_read"]
+
+    for idx, step in enumerate(result["steps"], 1):
         cache_delta = step["cache_read_delta"]
-        input_tokens = step["input"]
-        output_tokens = step["output"]
-        cache_pct = step["cache_hit_rate"]
-        has_dcp = step["has_dcp"]
-        dcp_tools = step["dcp_tools_used"]
-        reason = step["reason"]
-        
-        # Color the delta based on direction
         if cache_delta > 0:
-            delta_str = f"{c.GREEN}+{cache_delta:,}{c.RESET}"
+            delta = f"{c.GREEN}{'+' + f'{cache_delta:,}':>11}{c.RESET}"
         elif cache_delta < 0:
-            delta_str = f"{c.RED}{cache_delta:,}{c.RESET}"
+            delta = f"{c.RED}{f'{cache_delta:,}':>12}{c.RESET}"
         else:
-            delta_str = f"{c.DIM}0{c.RESET}"
-        
-        # Pad delta string for alignment (accounting for color codes)
-        delta_display = f"{cache_delta:+,}" if cache_delta != 0 else "0"
-        delta_padded = f"{delta_str:>22}" if cache_delta != 0 else f"{c.DIM}{'0':>12}{c.RESET}"
-        
-        # Highlight DCP rows
-        if has_dcp:
-            row_prefix = f"{c.YELLOW}{c.BOLD}"
-            row_suffix = c.RESET
-            dcp_str = f"{c.YELLOW}{', '.join(dcp_tools)}{c.RESET}"
+            delta = f"{c.DIM}{'0':>12}{c.RESET}"
+
+        pct = step["cache_hit_rate"]
+        if pct >= 80:
+            pct_str = f"{c.GREEN}{pct:>8.1f}%{c.RESET}"
+        elif pct >= 50:
+            pct_str = f"{c.YELLOW}{pct:>8.1f}%{c.RESET}"
         else:
-            row_prefix = ""
-            row_suffix = ""
-            dcp_str = f"{c.DIM}-{c.RESET}"
-        
-        # Cache percentage coloring
-        if cache_pct >= 80:
-            pct_str = f"{c.GREEN}{cache_pct:>8.1f}%{c.RESET}"
-        elif cache_pct >= 50:
-            pct_str = f"{c.YELLOW}{cache_pct:>8.1f}%{c.RESET}"
-        else:
-            pct_str = f"{c.RED}{cache_pct:>8.1f}%{c.RESET}"
-        
-        # Format delta with proper width
-        if cache_delta > 0:
-            delta_formatted = f"{c.GREEN}{'+' + f'{cache_delta:,}':>11}{c.RESET}"
-        elif cache_delta < 0:
-            delta_formatted = f"{c.RED}{f'{cache_delta:,}':>12}{c.RESET}"
-        else:
-            delta_formatted = f"{c.DIM}{'0':>12}{c.RESET}"
-        
-        print(f"{row_prefix}{i:<6}{row_suffix} {cache_read:>12,} {delta_formatted} {input_tokens:>10,} {output_tokens:>10,} {pct_str} {format_duration(step.get('duration_ms')):>10} {format_duration(step.get('time_since_prev_ms')):>10} {dcp_str:<15} {reason:<12}")
-        
-        prev_cache = cache_read
-    
+            pct_str = f"{c.RED}{pct:>8.1f}%{c.RESET}"
+
+        dcp_str = f"{c.YELLOW}{', '.join(step['dcp_tools_used'])}{c.RESET}" if step["has_dcp"] else f"{c.DIM}-{c.RESET}"
+        row_prefix = f"{c.YELLOW}{c.BOLD}" if step["has_dcp"] else ""
+        row_suffix = c.RESET if step["has_dcp"] else ""
+
+        print(
+            f"{row_prefix}{idx:<6}{row_suffix} {step['cache_read']:>12,} {delta} {step['input']:>10,} {step['output']:>10,} {pct_str} {format_duration(step.get('duration_ms')):>10} {format_duration(step.get('time_since_prev_ms')):>10} {dcp_str:<15} {step['reason']:<12}"
+        )
+
     print("-" * 130)
-    print()
-    
-    # Summary statistics
-    steps = result["steps"]
-    total_input = sum(s["input"] for s in steps)
-    total_output = sum(s["output"] for s in steps)
-    total_cache_read = sum(s["cache_read"] for s in steps)
-    
-    dcp_steps = [s for s in steps if s["has_dcp"]]
-    cache_increases = [s for s in steps if s["cache_read_delta"] > 0]
-    cache_decreases = [s for s in steps if s["cache_read_delta"] < 0]
-    
-    # Overall cache hit rate
-    total_context = total_input + total_cache_read
-    overall_cache_rate = (total_cache_read / total_context * 100) if total_context > 0 else 0
-    
-    print(f"{c.BOLD}CACHE BEHAVIOR SUMMARY{c.RESET}")
-    print("-" * 50)
-    
-    # Overall cache hit rate with coloring
-    if overall_cache_rate >= 80:
-        rate_str = f"{c.GREEN}{overall_cache_rate:.1f}%{c.RESET}"
-    elif overall_cache_rate >= 50:
-        rate_str = f"{c.YELLOW}{overall_cache_rate:.1f}%{c.RESET}"
-    else:
-        rate_str = f"{c.RED}{overall_cache_rate:.1f}%{c.RESET}"
-    
-    print(f"  {c.BOLD}Overall cache hit rate:   {rate_str}{c.RESET}")
-    print(f"  Total input tokens:         {total_input:>12,}")
-    print(f"  Total cache read tokens:    {total_cache_read:>12,}")
-    print()
-    print(f"  Steps with cache increase:  {c.GREEN}{len(cache_increases):>5}{c.RESET}")
-    print(f"  Steps with cache decrease:  {c.RED}{len(cache_decreases):>5}{c.RESET}")
-    print(f"  Steps with DCP tools:       {c.YELLOW}{len(dcp_steps):>5}{c.RESET}")
-    print()
-    
-    if dcp_steps:
-        dcp_decreases = [s for s in dcp_steps if s["cache_read_delta"] < 0]
-        print(f"  DCP steps with cache drop:  {len(dcp_decreases)}/{len(dcp_steps)}")
-        if dcp_decreases:
-            avg_drop = sum(s["cache_read_delta"] for s in dcp_decreases) / len(dcp_decreases)
-            print(f"  Avg cache drop on DCP:      {c.RED}{avg_drop:,.0f}{c.RESET} tokens")
-    
-    print()
-    
-    # Cache growth verification
-    if len(steps) >= 2:
-        first_cache = steps[0]["cache_read"]
-        last_cache = steps[-1]["cache_read"]
-        max_cache = max(s["cache_read"] for s in steps)
-        
-        print(f"{c.BOLD}CACHE GROWTH VERIFICATION{c.RESET}")
-        print("-" * 50)
-        print(f"  First step cache read:      {first_cache:>12,}")
-        print(f"  Last step cache read:       {last_cache:>12,}")
-        print(f"  Max cache read observed:    {max_cache:>12,}")
-        
-        if last_cache > first_cache:
-            growth = last_cache - first_cache
-            print(f"  Net cache growth:           {c.GREEN}+{growth:>11,}{c.RESET}")
-            print(f"\n  {c.GREEN}✓ Provider caching appears to be working{c.RESET}")
-        elif last_cache < first_cache:
-            loss = first_cache - last_cache
-            print(f"  Net cache loss:             {c.RED}-{loss:>11,}{c.RESET}")
-            if dcp_steps:
-                print(f"\n  {c.YELLOW}⚠ Cache decreased (likely due to DCP pruning){c.RESET}")
-            else:
-                print(f"\n  {c.RED}⚠ Cache decreased without DCP - investigate{c.RESET}")
-        else:
-            print(f"\n  {c.DIM}Cache unchanged between first and last step{c.RESET}")
-    
-    print()
-    print(f"{c.BOLD}{'=' * 130}{c.RESET}")
 
 
 def main():
-    parser = argparse.ArgumentParser(
-        description="Analyze token values at each step within an OpenCode session"
-    )
-    parser.add_argument(
-        "--session", "-s", type=str, default=None,
-        help="Session ID to analyze (default: most recent)"
-    )
-    parser.add_argument(
-        "--json", "-j", action="store_true",
-        help="Output as JSON"
-    )
-    parser.add_argument(
-        "--no-color", action="store_true",
-        help="Disable colored output"
-    )
+    parser = argparse.ArgumentParser(description="Analyze token values at each step within an OpenCode session")
+    parser.add_argument("--session", "-s", type=str, default=None, help="Session ID to analyze (default: most recent)")
+    parser.add_argument("--json", "-j", action="store_true", help="Output as JSON")
+    parser.add_argument("--no-color", action="store_true", help="Disable colored output")
     add_api_arguments(parser)
     args = parser.parse_args()
 
@@ -350,21 +205,19 @@ def main():
                     return 1
             else:
                 session = client.get_session(args.session)
-
             result = analyze_session(client, session)
     except APIError as err:
         print(f"Error: {err}")
         return 1
-    
+
     if args.json:
-        # Remove non-serializable fields
         print(json.dumps(result, indent=2, default=str))
     else:
         colors = NO_COLOR if args.no_color else Colors()
         print_timeline(result, colors)
-    
+
     return 0
 
 
 if __name__ == "__main__":
-    exit(main())
+    raise SystemExit(main())

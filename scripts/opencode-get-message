@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Get full OpenCode message payload(s) by message ID from the OpenCode API.
+Get full OpenCode message payload(s) by message ID from the OpenCode database.
 
 Usage:
   opencode-get-message <message-id> [message-id ...]
@@ -9,7 +9,6 @@ Usage:
 
 import argparse
 import json
-import sys
 
 from opencode_api import APIError, add_api_arguments, create_client_from_args, list_sessions_across_projects
 
@@ -70,13 +69,9 @@ def main() -> int:
         default=200,
         help="When --session is omitted, scan this many recent sessions for message IDs",
     )
-    parser.add_argument("--db", default=None, help=argparse.SUPPRESS)
     parser.add_argument("message_ids", nargs="+", help="One or more message IDs")
     add_api_arguments(parser)
     args = parser.parse_args()
-
-    if args.db:
-        print("Warning: --db is deprecated and ignored; this script now uses the OpenCode API", file=sys.stderr)
 
     try:
         with create_client_from_args(args) as client:
