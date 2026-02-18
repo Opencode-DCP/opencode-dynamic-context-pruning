@@ -16,8 +16,6 @@ Default to multiple short, bounded compressions. Prefer several safe range compr
 CADENCE, SIGNALS, AND LATENCY
 Use `compress` during work whenever a slice is summary-safe; do not wait for the user to send another message.
 
-Treat token counts and context growth as soft signals, not hard triggers:
-
 - no fixed threshold forces compression
 - prioritize closedness and independence over raw range size
 - qualitative signals still matter most (stale exploration, noisy tool bursts, resolved branches)
