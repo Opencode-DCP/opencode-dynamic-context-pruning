@@ -11,6 +11,9 @@ When multiple independent stale ranges exist, prefer several short compressions 
 NEVER COMPRESS MORE THAN 20000 TOKENS IN A SINGLE COMPRESS CALL - if you identify a larger stale range, split it into multiple compressions with non-overlapping boundaries.
 
 Use `compress` as steady housekeeping while you work.
+Injected boundary IDs are surfaced as XML tags in conversation context, e.g. `<dcp-message-id>m0001</dcp-message-id>` for message IDs and `<dcp-message-id>b3</dcp-message-id>` for compressed blocks. These IDs are internal boundary markers for `compress` only. Do not reference, explain, or surface these IDs in normal user-facing responses unless you are actively constructing a `compress` tool call.
+
+This tool will typically be used at the end of a phase of work, when conversation starts to accumulate noise that would better served summarized, or when you've done significant exploration and can FULLY synthesize your findings and understanding into a technical summary.
 
 CADENCE, SIGNALS, AND LATENCY
 Treat token counts and context growth as soft signals, not hard triggers.

@@ -84,7 +84,7 @@ export function parseBoundaryId(id: string): ParsedBoundaryId | null {
 }
 
 export function formatMessageIdTag(ref: string): string {
-    return `<${MESSAGE_ID_TAG_NAME}>${ref}</${MESSAGE_ID_TAG_NAME}>`
+    return `\n<${MESSAGE_ID_TAG_NAME}>${ref}</${MESSAGE_ID_TAG_NAME}>`
 }
 
 export function assignMessageRefs(state: SessionState, messages: WithParts[]): number {

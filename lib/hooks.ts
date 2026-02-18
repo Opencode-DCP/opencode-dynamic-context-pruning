@@ -118,7 +118,7 @@ export function createChatMessageTransformHandler(
 
         insertCompressToolContext(state, config, logger, output.messages)
 
-        insertMessageIdContext(state, output.messages)
+        insertMessageIdContext(state, config, output.messages)
 
         applyPendingManualTriggerPrompt(state, output.messages, logger)
 
