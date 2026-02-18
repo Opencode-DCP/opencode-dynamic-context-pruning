@@ -9,8 +9,8 @@ const PRUNED_TOOL_OUTPUT_REPLACEMENT =
     "[Output removed to save context - information superseded or no longer needed]"
 const PRUNED_TOOL_ERROR_INPUT_REPLACEMENT = "[input removed due to failed tool call]"
 const PRUNED_QUESTION_INPUT_REPLACEMENT = "[questions removed - see output for user's answers]"
-const PRUNED_COMPRESS_INPUT_REPLACEMENT =
-    "[compress content removed - topic retained for reference]"
+const PRUNED_COMPRESS_SUMMARY_REPLACEMENT =
+    "[summary removed to save context - see injected compressed block]"
 
 export const prune = (
     state: SessionState,
@@ -109,8 +109,9 @@ const pruneToolInputs = (state: SessionState, logger: Logger, messages: WithPart
                 continue
             }
             if (part.tool === "compress" && part.state.status === "completed") {
-                if (part.state.input?.content !== undefined) {
-                    part.state.input.content = PRUNED_COMPRESS_INPUT_REPLACEMENT
+                const content = part.state.input?.content
+                if (content && typeof content === "object" && "summary" in content) {
+                    content.summary = PRUNED_COMPRESS_SUMMARY_REPLACEMENT
                 }
                 continue
             }
