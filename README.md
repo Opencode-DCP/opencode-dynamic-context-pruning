@@ -122,8 +122,6 @@ DCP uses its own config file:
 >             // },
 >             // How often the context-limit nudge fires (1 = every fetch, 5 = every 5th)
 >             "nudgeFrequency": 5,
->             // Additional tools to protect from pruning
->             "protectedTools": [],
 >         },
 >         // Unified context compression tool
 >         "compress": {
@@ -176,7 +174,7 @@ DCP provides a `/dcp` slash command:
 By default, these tools are always protected from pruning:
 `task`, `todowrite`, `todoread`, `compress`, `batch`, `plan_enter`, `plan_exit`
 
-The `protectedTools` arrays in each section add to this default list.
+The `protectedTools` arrays in `commands` and `strategies` add to this default list.
 
 ### Config Precedence
 

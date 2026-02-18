@@ -118,14 +118,6 @@
                             "minimum": 1,
                             "description": "How often the context-limit nudge fires when above contextLimit (1 = every fetch, 5 = every 5th fetch)"
                         },
-                        "protectedTools": {
-                            "type": "array",
-                            "items": {
-                                "type": "string"
-                            },
-                            "default": [],
-                            "description": "Tool names that should be protected from automatic pruning"
-                        },
                         "contextLimit": {
                             "description": "When session tokens exceed this limit, a compress nudge is injected (\"X%\" uses percentage of the model's context window)",
                             "default": 100000,

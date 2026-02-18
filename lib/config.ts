@@ -18,7 +18,6 @@ export interface CompressTool {
 
 export interface ToolSettings {
     nudgeFrequency: number
-    protectedTools: string[]
     contextLimit: number | `${number}%`
     modelLimits?: Record<string, number | `${number}%`>
 }
@@ -102,7 +101,6 @@ export const VALID_CONFIG_KEYS = new Set([
     "tools",
     "tools.settings",
     "tools.settings.nudgeFrequency",
-    "tools.settings.protectedTools",
     "tools.settings.contextLimit",
     "tools.settings.modelLimits",
     "tools.compress",
@@ -309,17 +307,6 @@ export function validateConfigTypes(config: Record<string, any>): ValidationErro
                     actual: `${tools.settings.nudgeFrequency} (will be clamped to 1)`,
                 })
             }
-            if (
-                tools.settings.protectedTools !== undefined &&
-                !Array.isArray(tools.settings.protectedTools)
-            ) {
-                errors.push({
-                    key: "tools.settings.protectedTools",
-                    expected: "string[]",
-                    actual: typeof tools.settings.protectedTools,
-                })
-            }
-
             if (tools.settings.contextLimit !== undefined) {
                 const isValidNumber = typeof tools.settings.contextLimit === "number"
                 const isPercentString =
@@ -543,7 +530,6 @@ const defaultConfig: PluginConfig = {
     tools: {
         settings: {
             nudgeFrequency: 5,
-            protectedTools: [...DEFAULT_PROTECTED_TOOLS],
             contextLimit: 100000,
         },
         compress: {
@@ -707,12 +693,6 @@ function mergeTools(base: PluginConfig["tools"], override?: ToolOverride): Plugi
     return {
         settings: {
             nudgeFrequency: override.settings?.nudgeFrequency ?? base.settings.nudgeFrequency,
-            protectedTools: [
-                ...new Set([
-                    ...base.settings.protectedTools,
-                    ...(override.settings?.protectedTools ?? []),
-                ]),
-            ],
             contextLimit: override.settings?.contextLimit ?? base.settings.contextLimit,
             modelLimits: override.settings?.modelLimits ?? base.settings.modelLimits,
         },
@@ -765,7 +745,6 @@ function deepCloneConfig(config: PluginConfig): PluginConfig {
         tools: {
             settings: {
                 ...config.tools.settings,
-                protectedTools: [...config.tools.settings.protectedTools],
                 modelLimits: { ...config.tools.settings.modelLimits },
             },
             compress: { ...config.tools.compress },

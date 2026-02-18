@@ -51,9 +51,7 @@ export function syncToolCache(
                     continue
                 }
 
-                const allProtectedTools = config.tools.settings.protectedTools
-                const isProtectedTool = allProtectedTools.includes(part.tool)
-                const tokenCount = isProtectedTool ? undefined : countToolTokens(part)
+                const tokenCount = countToolTokens(part)
 
                 state.toolParameters.set(part.callID, {
                     tool: part.tool,
