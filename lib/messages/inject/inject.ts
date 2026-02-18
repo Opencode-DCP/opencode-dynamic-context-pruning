@@ -2,7 +2,13 @@ import type { SessionState, WithParts } from "../../state"
 import type { Logger } from "../../logger"
 import type { PluginConfig } from "../../config"
 import { formatMessageIdTag } from "../../message-ids"
-import { createSyntheticTextPart, createSyntheticToolPart, isIgnoredUserMessage } from "../utils"
+import {
+    appendMessageIdTagToToolOutput,
+    createSyntheticTextPart,
+    createSyntheticToolPart,
+    findLastToolPart,
+    isIgnoredUserMessage,
+} from "../utils"
 import {
     addAnchor,
     applyAnchoredNudge,
@@ -14,36 +20,6 @@ import {
     persistAnchors,
 } from "./utils"
 import { renderNudge } from "../../prompts"
-
-const CONTEXT_LIMIT_HINT_TEXT = renderNudge("context-limit")
-type MessagePart = WithParts["parts"][number]
-type ToolPart = Extract<MessagePart, { type: "tool" }>
-
-const appendMessageIdTagToToolOutput = (part: ToolPart, tag: string): boolean => {
-    if (part.type !== "tool") {
-        return false
-    }
-    if (part.state?.status !== "completed" || typeof part.state.output !== "string") {
-        return false
-    }
-    if (part.state.output.includes(tag)) {
-        return true
-    }
-
-    part.state.output = `${part.state.output}${tag}`
-    return true
-}
-
-const findLastToolPart = (message: WithParts): ToolPart | null => {
-    for (let i = message.parts.length - 1; i >= 0; i--) {
-        const part = message.parts[i]
-        if (part.type === "tool") {
-            return part
-        }
-    }
-
-    return null
-}
 
 export const insertCompressToolContext = (
     state: SessionState,
@@ -80,7 +56,7 @@ export const insertCompressToolContext = (
         }
     }
 
-    applyAnchoredNudge(state.contextLimitAnchors, messages, modelId, CONTEXT_LIMIT_HINT_TEXT)
+    applyAnchoredNudge(state.contextLimitAnchors, messages, modelId, renderNudge("context-limit"))
 
     if (anchorsChanged) {
         persistAnchors(state, logger)

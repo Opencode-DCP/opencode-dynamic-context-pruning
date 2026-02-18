@@ -103,6 +103,35 @@ export const createSyntheticToolPart = (
     }
 }
 
+type MessagePart = WithParts["parts"][number]
+type ToolPart = Extract<MessagePart, { type: "tool" }>
+
+export const appendMessageIdTagToToolOutput = (part: ToolPart, tag: string): boolean => {
+    if (part.type !== "tool") {
+        return false
+    }
+    if (part.state?.status !== "completed" || typeof part.state.output !== "string") {
+        return false
+    }
+    if (part.state.output.includes(tag)) {
+        return true
+    }
+
+    part.state.output = `${part.state.output}${tag}`
+    return true
+}
+
+export const findLastToolPart = (message: WithParts): ToolPart | null => {
+    for (let i = message.parts.length - 1; i >= 0; i--) {
+        const part = message.parts[i]
+        if (part.type === "tool") {
+            return part
+        }
+    }
+
+    return null
+}
+
 export function buildToolIdList(state: SessionState, messages: WithParts[]): string[] {
     const toolIds: string[] = []
     for (const msg of messages) {
