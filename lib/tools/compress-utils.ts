@@ -509,7 +509,7 @@ export function allocateBlockId(summaries: CompressSummary[]): number {
     return max + 1
 }
 
-export function addCompressedBlockHeader(blockId: number, summary: string): string {
+export function wrapCompressedSummary(blockId: number, summary: string): string {
     const header = formatCompressedBlockHeader(blockId)
     const footer = formatCompressedBlockFooter(blockId)
     const body = summary.trim()
