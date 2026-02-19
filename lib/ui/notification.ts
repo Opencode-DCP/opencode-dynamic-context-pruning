@@ -1,15 +1,14 @@
 import type { Logger } from "../logger"
 import type { SessionState } from "../state"
 import {
-    countDistillationTokens,
-    formatExtracted,
     formatPrunedItemsList,
+    formatSessionMap,
     formatStatsHeader,
     formatTokenCount,
-    formatProgressBar,
 } from "./utils"
 import { ToolParameterEntry } from "../state"
 import { PluginConfig } from "../config"
+import { clog, C } from "../compress-logger"
 
 export type PruneReason = "completion" | "noise" | "extraction"
 export const PRUNE_REASON_LABELS: Record<PruneReason, string> = {
@@ -18,22 +17,12 @@ export const PRUNE_REASON_LABELS: Record<PruneReason, string> = {
     extraction: "Extraction",
 }
 
-function buildMinimalMessage(
-    state: SessionState,
-    reason: PruneReason | undefined,
-    distillation: string[] | undefined,
-    showDistillation: boolean,
-): string {
-    const extractedTokens = countDistillationTokens(distillation)
-    const extractedSuffix =
-        extractedTokens > 0 ? ` (distilled ${formatTokenCount(extractedTokens)})` : ""
-    const reasonSuffix = reason && extractedTokens === 0 ? ` — ${PRUNE_REASON_LABELS[reason]}` : ""
-    let message =
+function buildMinimalMessage(state: SessionState, reason: PruneReason | undefined): string {
+    const reasonSuffix = reason ? ` — ${PRUNE_REASON_LABELS[reason]}` : ""
+    return (
         formatStatsHeader(state.stats.totalPruneTokens, state.stats.pruneTokenCounter) +
-        reasonSuffix +
-        extractedSuffix
-
-    return message + formatExtracted(showDistillation ? distillation : undefined)
+        reasonSuffix
+    )
 }
 
 function buildDetailedMessage(
@@ -42,25 +31,19 @@ function buildDetailedMessage(
     pruneToolIds: string[],
     toolMetadata: Map<string, ToolParameterEntry>,
     workingDirectory: string,
-    distillation: string[] | undefined,
-    showDistillation: boolean,
 ): string {
     let message = formatStatsHeader(state.stats.totalPruneTokens, state.stats.pruneTokenCounter)
 
     if (pruneToolIds.length > 0) {
         const pruneTokenCounterStr = `~${formatTokenCount(state.stats.pruneTokenCounter)}`
-        const extractedTokens = countDistillationTokens(distillation)
-        const extractedSuffix =
-            extractedTokens > 0 ? `, distilled ${formatTokenCount(extractedTokens)}` : ""
-        const reasonLabel =
-            reason && extractedTokens === 0 ? ` — ${PRUNE_REASON_LABELS[reason]}` : ""
-        message += `\n\n▣ Pruning (${pruneTokenCounterStr}${extractedSuffix})${reasonLabel}`
+        const reasonLabel = reason ? ` — ${PRUNE_REASON_LABELS[reason]}` : ""
+        message += `\n\n▣ Pruning (${pruneTokenCounterStr})${reasonLabel}`
 
         const itemLines = formatPrunedItemsList(pruneToolIds, toolMetadata, workingDirectory)
         message += "\n" + itemLines.join("\n")
     }
 
-    return (message + formatExtracted(showDistillation ? distillation : undefined)).trim()
+    return message.trim()
 }
 
 const TOAST_BODY_MAX_LINES = 12
@@ -110,7 +93,6 @@ export async function sendUnifiedNotification(
     reason: PruneReason | undefined,
     params: any,
     workingDirectory: string,
-    distillation?: string[],
 ): Promise<boolean> {
     const hasPruned = pruneToolIds.length > 0
     if (!hasPruned) {
@@ -121,20 +103,10 @@ export async function sendUnifiedNotification(
         return false
     }
 
-    const showDistillation = config.tools.distill.showDistillation
-
     const message =
         config.pruneNotification === "minimal"
-            ? buildMinimalMessage(state, reason, distillation, showDistillation)
-            : buildDetailedMessage(
-                  state,
-                  reason,
-                  pruneToolIds,
-                  toolMetadata,
-                  workingDirectory,
-                  distillation,
-                  showDistillation,
-              )
+            ? buildMinimalMessage(state, reason)
+            : buildDetailedMessage(state, reason, pruneToolIds, toolMetadata, workingDirectory)
 
     if (config.pruneNotificationType === "toast") {
         let toastMessage = truncateExtractedSection(message)
@@ -143,7 +115,7 @@ export async function sendUnifiedNotification(
 
         await client.tui.showToast({
             body: {
-                title: "DCP: Prune Notification",
+                title: "DCP: Compress Notification",
                 message: toastMessage,
                 variant: "info",
                 duration: 5000,
@@ -166,8 +138,10 @@ export async function sendCompressNotification(
     messageIds: string[],
     topic: string,
     summary: string,
-    startResult: any,
-    endResult: any,
+    summaryTokens: number,
+    totalSessionTokens: number,
+    compressedTokens: number,
+    sessionMessageIds: string[],
     totalMessages: number,
     params: any,
 ): Promise<boolean> {
@@ -176,20 +150,29 @@ export async function sendCompressNotification(
     }
 
     let message: string
+    const summaryTokensStr = formatTokenCount(summaryTokens)
 
     if (config.pruneNotification === "minimal") {
         message = formatStatsHeader(state.stats.totalPruneTokens, state.stats.pruneTokenCounter)
     } else {
         message = formatStatsHeader(state.stats.totalPruneTokens, state.stats.pruneTokenCounter)
 
-        const pruneTokenCounterStr = `~${formatTokenCount(state.stats.pruneTokenCounter)}`
-        const progressBar = formatProgressBar(
-            totalMessages,
-            startResult.messageIndex,
-            endResult.messageIndex,
-            25,
-        )
-        message += `\n\n▣ Compressing (${pruneTokenCounterStr}) ${progressBar}`
+        const pruneTokenCounterStr = `~${formatTokenCount(compressedTokens)}`
+
+        clog.info(C.COMPRESS, `sendCompressNotification inputs`, {
+            summaryTokens,
+            totalSessionTokens,
+            compressedTokens,
+            ratio:
+                totalSessionTokens > 0 ? (compressedTokens / totalSessionTokens).toFixed(4) : "N/A",
+        })
+
+        const progressBar = formatSessionMap(sessionMessageIds, state.prune.messages, 50)
+        const reduction =
+            totalSessionTokens > 0 ? Math.round((compressedTokens / totalSessionTokens) * 100) : 0
+
+        message += `\n\n▣ Compressing (${pruneTokenCounterStr} removed, ${reduction}% reduction)`
+        message += `\n${progressBar}`
         message += `\n→ Topic: ${topic}`
         message += `\n→ Items: ${messageIds.length} messages`
         if (toolIds.length > 0) {
@@ -198,7 +181,7 @@ export async function sendCompressNotification(
             message += ` condensed`
         }
         if (config.tools.compress.showCompression) {
-            message += `\n→ Compression: ${summary}`
+            message += `\n→ Compression (~${summaryTokensStr}): ${summary}`
         }
     }
 
@@ -208,8 +191,8 @@ export async function sendCompressNotification(
             const truncatedSummary = truncateToastSummary(summary)
             if (truncatedSummary !== summary) {
                 toastMessage = toastMessage.replace(
-                    `\n→ Compression: ${summary}`,
-                    `\n→ Compression: ${truncatedSummary}`,
+                    `\n→ Compression (~${summaryTokensStr}): ${summary}`,
+                    `\n→ Compression (~${summaryTokensStr}): ${truncatedSummary}`,
                 )
             }
         }

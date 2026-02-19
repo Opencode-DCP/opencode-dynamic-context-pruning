@@ -1,32 +1,30 @@
 import { tool } from "@opencode-ai/plugin"
-import type { BoundaryReference, CompressToolArgs } from "./compress-utils"
-import type { PruneToolContext } from "./types"
+import type { ToolContext } from "./types"
+import { COMPRESS_TOOL_SPEC } from "../prompts"
 import { ensureSessionInitialized } from "../state"
-import { saveSessionState } from "../state/persistence"
-import { loadPrompt } from "../prompts"
-import { getCurrentParams, getTotalToolTokens } from "../strategies/utils"
-import { sendCompressNotification } from "../ui/notification"
-import { assignMessageRefs } from "../message-ids"
 import {
-    addCompressedBlockHeader,
+    wrapCompressedSummary,
     allocateBlockId,
+    applyCompressionState,
     buildSearchContext,
     fetchSessionMessages,
+    COMPRESSED_BLOCK_HEADER,
     injectBlockPlaceholders,
     parseBlockPlaceholders,
     resolveAnchorMessageId,
     resolveBoundaryIds,
     resolveRange,
-    upsertCompressedSummary,
     validateCompressArgs,
     validateSummaryPlaceholders,
+    type CompressToolArgs,
 } from "./compress-utils"
+import { getCurrentParams, getCurrentTokenUsage, countTokens } from "../strategies/utils"
+import { saveSessionState } from "../state/persistence"
+import { sendCompressNotification } from "../ui/notification"
 
-const COMPRESS_TOOL_DESCRIPTION = loadPrompt("compress-tool-spec")
-
-export function createCompressTool(ctx: PruneToolContext): ReturnType<typeof tool> {
+export function createCompressTool(ctx: ToolContext): ReturnType<typeof tool> {
     return tool({
-        description: COMPRESS_TOOL_DESCRIPTION,
+        description: COMPRESS_TOOL_SPEC,
         args: {
             topic: tool.schema
                 .string()
@@ -48,9 +46,6 @@ export function createCompressTool(ctx: PruneToolContext): ReturnType<typeof too
                 .describe("Compression details: ID boundaries and replacement summary"),
         },
         async execute(args, toolCtx) {
-            const { client, state, logger } = ctx
-            const sessionId = toolCtx.sessionID
-
             await toolCtx.ask({
                 permission: "compress",
                 patterns: ["*"],
@@ -61,24 +56,26 @@ export function createCompressTool(ctx: PruneToolContext): ReturnType<typeof too
             const compressArgs = args as CompressToolArgs
             validateCompressArgs(compressArgs)
 
-            const rawMessages = await fetchSessionMessages(client, sessionId)
+            toolCtx.metadata({
+                title: `Compress: ${compressArgs.topic}`,
+            })
+
+            const rawMessages = await fetchSessionMessages(ctx.client, toolCtx.sessionID)
 
             await ensureSessionInitialized(
-                client,
-                state,
-                sessionId,
-                logger,
+                ctx.client,
+                ctx.state,
+                toolCtx.sessionID,
+                ctx.logger,
                 rawMessages,
                 ctx.config.manualMode.enabled,
             )
 
-            assignMessageRefs(state, rawMessages)
-
-            const searchContext = buildSearchContext(state, rawMessages)
+            const searchContext = buildSearchContext(ctx.state, rawMessages)
 
             const { startReference, endReference } = resolveBoundaryIds(
                 searchContext,
-                state,
+                ctx.state,
                 compressArgs.content.startId,
                 compressArgs.content.endId,
             )
@@ -103,84 +100,44 @@ export function createCompressTool(ctx: PruneToolContext): ReturnType<typeof too
                 range.endReference,
             )
 
-            const blockId = allocateBlockId(state.compressSummaries)
-            const storedSummary = addCompressedBlockHeader(blockId, injected.expandedSummary)
+            const blockId = allocateBlockId(ctx.state.compressSummaries)
+            const storedSummary = wrapCompressedSummary(blockId, injected.expandedSummary)
+            const summaryTokens = countTokens(storedSummary)
 
-            state.compressSummaries = upsertCompressedSummary(
-                state.compressSummaries,
-                blockId,
+            const applied = applyCompressionState(
+                ctx.state,
+                range,
                 anchorMessageId,
+                blockId,
                 storedSummary,
                 injected.consumedBlockIds,
             )
 
-            const compressedMessageIds = range.messageIds.filter(
-                (id) => !state.prune.messages.has(id),
-            )
-            let textTokens = 0
-            for (const messageId of compressedMessageIds) {
-                const tokenCount = range.messageTokenById.get(messageId) || 0
-                textTokens += tokenCount
-                state.prune.messages.set(messageId, tokenCount)
-            }
+            await saveSessionState(ctx.state, ctx.logger)
 
-            const compressedToolIds = range.toolIds.filter((id) => !state.prune.tools.has(id))
-            const toolTokens = getTotalToolTokens(state, compressedToolIds)
-            for (const id of compressedToolIds) {
-                const entry = state.toolParameters.get(id)
-                state.prune.tools.set(id, entry?.tokenCount ?? 0)
-            }
+            const params = getCurrentParams(ctx.state, rawMessages, ctx.logger)
+            const totalSessionTokens = getCurrentTokenUsage(rawMessages)
+            const sessionMessageIds = rawMessages.map((msg) => msg.info.id)
 
-            const estimatedCompressedTokens = textTokens + toolTokens
-            state.stats.pruneTokenCounter += estimatedCompressedTokens
-
-            const rawStartResult = {
-                messageId: getBoundaryMessageId(startReference),
-                messageIndex: startReference.rawIndex,
-            }
-            const rawEndResult = {
-                messageId: getBoundaryMessageId(endReference),
-                messageIndex: endReference.rawIndex,
-            }
-
-            const currentParams = getCurrentParams(state, rawMessages, logger)
             await sendCompressNotification(
-                client,
-                logger,
+                ctx.client,
+                ctx.logger,
                 ctx.config,
-                state,
-                sessionId,
-                compressedToolIds,
-                compressedMessageIds,
+                ctx.state,
+                toolCtx.sessionID,
+                range.toolIds,
+                applied.messageIds,
                 compressArgs.topic,
                 injected.expandedSummary,
-                rawStartResult,
-                rawEndResult,
+                summaryTokens,
+                totalSessionTokens,
+                applied.compressedTokens,
+                sessionMessageIds,
                 rawMessages.length,
-                currentParams,
+                params,
             )
 
-            state.stats.totalPruneTokens += state.stats.pruneTokenCounter
-            state.stats.pruneTokenCounter = 0
-            state.nudgeCounter = 0
-
-            await saveSessionState(state, logger)
-
-            return `Compressed ${compressedMessageIds.length} messages (${compressedToolIds.length} tool calls) into summary. The content will be replaced with your summary.`
+            return `Compressed ${applied.messageIds.length} messages into ${COMPRESSED_BLOCK_HEADER}.`
         },
     })
-}
-
-function getBoundaryMessageId(reference: BoundaryReference): string {
-    if (reference.kind === "message") {
-        if (!reference.messageId) {
-            throw new Error("Failed to map boundary matches back to raw messages")
-        }
-        return reference.messageId
-    }
-
-    if (!reference.anchorMessageId) {
-        throw new Error("Failed to map boundary matches back to raw messages")
-    }
-    return reference.anchorMessageId
 }

@@ -1,5 +1,6 @@
 import type { SessionState, WithParts } from "./types"
 import { isMessageCompacted } from "../shared-utils"
+import { isIgnoredUserMessage } from "../messages/utils"
 
 export async function isSubAgentSession(client: any, sessionID: string): Promise<boolean> {
     try {
@@ -45,16 +46,50 @@ export function loadPruneMap(
     return new Map()
 }
 
+function hasCompletedCompress(message: WithParts): boolean {
+    if (message.info.role !== "assistant") {
+        return false
+    }
+
+    const parts = Array.isArray(message.parts) ? message.parts : []
+    return parts.some(
+        (part) =>
+            part.type === "tool" && part.tool === "compress" && part.state?.status === "completed",
+    )
+}
+
+export function collectSoftNudgeAnchors(messages: WithParts[]): Set<string> {
+    const anchors = new Set<string>()
+    let pendingUserMessage = false
+
+    for (let i = messages.length - 1; i >= 0; i--) {
+        const message = messages[i]
+
+        if (hasCompletedCompress(message)) {
+            break
+        }
+
+        if (message.info.role === "user") {
+            if (!isIgnoredUserMessage(message)) {
+                pendingUserMessage = true
+            }
+            continue
+        }
+
+        if (message.info.role === "assistant" && pendingUserMessage) {
+            anchors.add(message.info.id)
+            pendingUserMessage = false
+        }
+    }
+
+    return anchors
+}
+
 export function resetOnCompaction(state: SessionState): void {
     state.toolParameters.clear()
     state.prune.tools = new Map<string, number>()
     state.prune.messages = new Map<string, number>()
     state.compressSummaries = []
-    state.messageIds = {
-        byRawId: new Map<string, string>(),
-        byRef: new Map<string, string>(),
-        nextRef: 0,
-    }
-    state.nudgeCounter = 0
-    state.lastToolPrune = false
+    state.contextLimitAnchors = new Set<string>()
+    state.softNudgeAnchors = new Set<string>()
 }

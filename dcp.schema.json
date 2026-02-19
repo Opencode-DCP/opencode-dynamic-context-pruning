@@ -24,13 +24,13 @@
             "type": "string",
             "enum": ["off", "minimal", "detailed"],
             "default": "detailed",
-            "description": "Level of notification shown when pruning occurs"
+            "description": "Level of notification shown when context management occurs"
         },
         "pruneNotificationType": {
             "type": "string",
             "enum": ["chat", "toast"],
             "default": "chat",
-            "description": "Where to display prune notifications (chat message or toast notification)"
+            "description": "Where to display notifications (chat message or toast notification)"
         },
         "commands": {
             "type": "object",
@@ -104,7 +104,7 @@
         },
         "tools": {
             "type": "object",
-            "description": "Configuration for pruning tools",
+            "description": "Configuration for context-management tools",
             "additionalProperties": false,
             "properties": {
                 "settings": {
@@ -112,23 +112,11 @@
                     "description": "General tool settings",
                     "additionalProperties": false,
                     "properties": {
-                        "nudgeEnabled": {
-                            "type": "boolean",
-                            "default": true,
-                            "description": "Enable nudge reminders to prune context"
-                        },
                         "nudgeFrequency": {
                             "type": "number",
-                            "default": 10,
-                            "description": "Frequency of nudge reminders (in turns)"
-                        },
-                        "protectedTools": {
-                            "type": "array",
-                            "items": {
-                                "type": "string"
-                            },
-                            "default": [],
-                            "description": "Tool names that should be protected from automatic pruning"
+                            "default": 5,
+                            "minimum": 1,
+                            "description": "How often the context-limit nudge fires when above contextLimit (1 = every fetch, 5 = every 5th fetch)"
                         },
                         "contextLimit": {
                             "description": "When session tokens exceed this limit, a compress nudge is injected (\"X%\" uses percentage of the model's context window)",
@@ -160,52 +148,21 @@
                         }
                     }
                 },
-                "distill": {
+                "compress": {
                     "type": "object",
-                    "description": "Configuration for the distill tool",
+                    "description": "Configuration for the unified compress tool",
                     "additionalProperties": false,
                     "properties": {
                         "permission": {
                             "type": "string",
                             "enum": ["ask", "allow", "deny"],
                             "default": "allow",
-                            "description": "Permission mode (deny disables the tool)"
-                        },
-                        "showDistillation": {
-                            "type": "boolean",
-                            "default": false,
-                            "description": "Show distillation output in the UI"
-                        }
-                    }
-                },
-                "compress": {
-                    "type": "object",
-                    "description": "Configuration for the compress tool",
-                    "additionalProperties": false,
-                    "properties": {
-                        "permission": {
-                            "type": "string",
-                            "enum": ["ask", "allow", "deny"],
-                            "default": "ask",
                             "description": "Permission mode (deny disables the tool)"
                         },
                         "showCompression": {
                             "type": "boolean",
                             "default": false,
-                            "description": "Show summary output in the UI"
-                        }
-                    }
-                },
-                "prune": {
-                    "type": "object",
-                    "description": "Configuration for the prune tool",
-                    "additionalProperties": false,
-                    "properties": {
-                        "permission": {
-                            "type": "string",
-                            "enum": ["ask", "allow", "deny"],
-                            "default": "allow",
-                            "description": "Permission mode (deny disables the tool)"
+                            "description": "Show compression summaries in notifications"
                         }
                     }
                 }

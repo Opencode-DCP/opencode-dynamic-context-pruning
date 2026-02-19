@@ -28,6 +28,11 @@ Thumbs.db
 # OpenCode
 .opencode/
 
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+
 # Generated prompt files (from scripts/generate-prompts.ts)
 lib/prompts/**/*.generated.ts
 

@@ -1,3 +1,3 @@
 export { prune } from "./prune"
-export { insertPruneToolContext } from "./inject"
-export { insertMessageIdContext } from "./inject"
+export { insertCompressToolContext } from "./inject/inject"
+export { insertMessageIdContext } from "./inject/inject"

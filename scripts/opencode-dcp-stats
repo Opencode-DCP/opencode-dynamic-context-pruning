@@ -8,15 +8,16 @@ Usage: opencode-dcp-stats [--sessions N] [--min-messages M] [--json] [--verbose]
 
 import json
 import argparse
-from pathlib import Path
 from datetime import datetime
 from collections import defaultdict
 from typing import Optional
 
-# DCP tool names (across different plugin versions)
+from opencode_api import APIError, add_api_arguments, create_client_from_args, list_sessions_across_projects
+
+# DCP tool names across versions (compress is canonical; others are legacy aliases)
 DCP_TOOLS = {
-    "prune", "discard", "extract", "context_pruning",
-    "squash", "compress", "consolidate", "distill"
+    "compress", "prune", "distill",
+    "discard", "extract", "context_pruning", "squash", "consolidate"
 }
 
 # Anthropic pricing: cache read is ~10% of input cost
@@ -24,42 +25,9 @@ CACHE_READ_COST_PER_1K = 0.00030   # $0.30 per 1M tokens
 INPUT_COST_PER_1K = 0.003          # $3.00 per 1M tokens
 
 
-def get_session_messages(storage: Path, session_id: str) -> list[dict]:
-    """Get all messages for a session, sorted by creation order."""
-    message_dir = storage / "message" / session_id
-    if not message_dir.exists():
-        return []
-    
-    messages = []
-    for msg_file in message_dir.glob("*.json"):
-        try:
-            msg = json.loads(msg_file.read_text())
-            msg["_file"] = msg_file
-            msg["_id"] = msg_file.stem
-            messages.append(msg)
-        except (json.JSONDecodeError, IOError):
-            pass
-    
-    return sorted(messages, key=lambda m: m.get("_id", ""))
-
-
-def get_message_parts(storage: Path, message_id: str) -> list[dict]:
-    """Get all parts for a message, sorted by creation order."""
-    parts_dir = storage / "part" / message_id
-    if not parts_dir.exists():
-        return []
-    
-    parts = []
-    for part_file in parts_dir.glob("*.json"):
-        try:
-            part = json.loads(part_file.read_text())
-            part["_file"] = part_file
-            part["_id"] = part_file.stem
-            parts.append(part)
-        except (json.JSONDecodeError, IOError):
-            pass
-    
-    return sorted(parts, key=lambda p: p.get("_id", ""))
+def get_session_messages(client, session: dict) -> list[dict]:
+    """Get all messages for a session."""
+    return client.get_session_messages(session["id"], directory=session.get("directory"))
 
 
 def is_ignored_message(message: dict, parts: list[dict]) -> bool:
@@ -83,22 +51,20 @@ def is_ignored_message(message: dict, parts: list[dict]) -> bool:
     return True
 
 
-def count_real_user_messages(storage: Path, session_id: str) -> int:
+def count_real_user_messages(messages: list[dict]) -> int:
     """Count user messages that are not ignored (real user interactions)."""
-    messages = get_session_messages(storage, session_id)
     count = 0
-    
+
     for msg in messages:
+        info = msg.get("info", {})
+        parts = msg.get("parts", [])
         # Only count user role messages
-        if msg.get("role") != "user":
+        if info.get("role") != "user":
             continue
-        
-        msg_id = msg.get("_id", "")
-        parts = get_message_parts(storage, msg_id)
-        
+
         if not is_ignored_message(msg, parts):
             count += 1
-    
+
     return count
 
 
@@ -136,10 +102,9 @@ def calc_cache_hit_rate(tokens: dict) -> float:
     return (cache_read / total_context) * 100
 
 
-def analyze_session(storage: Path, session_id: str) -> dict:
+def analyze_session(messages: list[dict], session_id: str) -> dict:
     """Analyze DCP impact for a single session."""
-    messages = get_session_messages(storage, session_id)
-    
+
     result = {
         "session_id": session_id,
         "dcp_events": [],
@@ -164,14 +129,15 @@ def analyze_session(storage: Path, session_id: str) -> dict:
     prev_step = None
     prev_dcp_tools = []
     steps_since_dcp = None  # None = no DCP yet, 0 = just had DCP, 1+ = steps after
-    
+
     for i, msg in enumerate(messages):
-        msg_id = msg.get("_id", "")
-        parts = get_message_parts(storage, msg_id)
-        
+        msg_info = msg.get("info", {})
+        msg_id = msg_info.get("id", "")
+        parts = msg.get("parts", [])
+
         step_finish = extract_step_finish(parts)
         dcp_tools = extract_dcp_tools(parts)
-        
+
         if step_finish:
             result["total_steps"] += 1
             tokens = step_finish.get("tokens", {})
@@ -239,27 +205,24 @@ def analyze_session(storage: Path, session_id: str) -> dict:
     return result
 
 
-def analyze_sessions(num_sessions: int = 20, min_messages: int = 5, output_json: bool = False, verbose: bool = False, session_id: str = None):
+def analyze_sessions(
+    client,
+    num_sessions: int = 20,
+    min_messages: int = 5,
+    output_json: bool = False,
+    verbose: bool = False,
+    session_id: str = None,
+    session_list_limit: int = 5000,
+):
     """Analyze DCP impact across recent sessions."""
-    storage = Path.home() / ".local/share/opencode/storage"
-    message_dir = storage / "message"
-    session_dir = storage / "session"
-    
-    if not message_dir.exists():
-        print("Error: OpenCode storage not found at", storage)
-        return
-    
+
     # Get sessions to analyze
     if session_id:
         # Analyze specific session
-        session_path = message_dir / session_id
-        if not session_path.exists():
-            print(f"Error: Session {session_id} not found")
-            return
-        sessions = [session_path]
+        sessions = [client.get_session(session_id)]
     else:
-        sessions = sorted(message_dir.iterdir(), key=lambda x: x.stat().st_mtime, reverse=True)[:num_sessions]
-    
+        sessions = list_sessions_across_projects(client, per_project_limit=session_list_limit)[:num_sessions]
+
     all_results = []
     grand_totals = {
         "sessions_analyzed": 0,
@@ -283,44 +246,34 @@ def analyze_sessions(num_sessions: int = 20, min_messages: int = 5, output_json:
         "hit_rates_by_distance": defaultdict(list)
     }
     
-    for session_path in sessions:
-        session_id = session_path.name
-        
+    for session in sessions:
+        session_id = session.get("id", "")
+        messages = get_session_messages(client, session)
+
         # Check minimum message count (excluding ignored messages)
-        real_user_messages = count_real_user_messages(storage, session_id)
+        real_user_messages = count_real_user_messages(messages)
         if real_user_messages < min_messages:
             grand_totals["sessions_skipped_short"] += 1
             continue
-        
-        result = analyze_session(storage, session_id)
+
+        result = analyze_session(messages, session_id)
         result["user_messages"] = real_user_messages
-        
-        # Get session metadata
-        title = "Unknown"
-        for s_dir in session_dir.iterdir():
-            s_file = s_dir / f"{session_id}.json"
-            if s_file.exists():
-                try:
-                    sess = json.loads(s_file.read_text())
-                    title = sess.get("title", "Untitled")[:50]
-                except (json.JSONDecodeError, IOError):
-                    pass
-                break
-        
-        result["title"] = title
-        
+
+        # Session metadata from API
+        result["title"] = session.get("title", "Untitled")[:50]
+
         if result["total_dcp_calls"] > 0:
             all_results.append(result)
             grand_totals["sessions_with_dcp"] += 1
-        
+
         grand_totals["sessions_analyzed"] += 1
         grand_totals["total_dcp_calls"] += result["total_dcp_calls"]
         grand_totals["total_steps"] += result["total_steps"]
-        
+
         for tool, stats in result["by_tool"].items():
             for key in stats:
                 grand_totals["by_tool"][tool][key] += stats[key]
-        
+
         # Aggregate hit rates by distance
         for dist, rates in result["hit_rates_by_distance"].items():
             grand_totals["hit_rates_by_distance"][dist].extend(rates)
@@ -474,16 +427,26 @@ def main():
                         help="Output as JSON")
     parser.add_argument("--verbose", "-v", action="store_true",
                         help="Show detailed per-event breakdown")
+    add_api_arguments(parser)
     args = parser.parse_args()
-    
-    analyze_sessions(
-        num_sessions=args.sessions,
-        min_messages=args.min_messages,
-        output_json=args.json,
-        verbose=args.verbose,
-        session_id=args.session
-    )
+
+    try:
+        with create_client_from_args(args) as client:
+            analyze_sessions(
+                client,
+                num_sessions=args.sessions,
+                min_messages=args.min_messages,
+                output_json=args.json,
+                verbose=args.verbose,
+                session_id=args.session,
+                session_list_limit=args.session_list_limit,
+            )
+    except APIError as err:
+        print(f"Error: {err}")
+        return 1
+
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

@@ -18,7 +18,6 @@ export function syncToolCache(
     try {
         logger.info("Syncing tool parameters from OpenCode messages")
 
-        state.nudgeCounter = 0
         let turnCounter = 0
 
         for (const msg of messages) {
@@ -44,17 +43,6 @@ export function syncToolCache(
                     turnProtectionTurns > 0 &&
                     state.currentTurn - turnCounter < turnProtectionTurns
 
-                if (part.tool === "distill" || part.tool === "compress" || part.tool === "prune") {
-                    state.nudgeCounter = 0
-                    state.lastToolPrune = true
-                } else {
-                    state.lastToolPrune = false
-                    const allProtectedTools = config.tools.settings.protectedTools
-                    if (!allProtectedTools.includes(part.tool) && !isProtectedByTurn) {
-                        state.nudgeCounter++
-                    }
-                }
-
                 if (state.toolParameters.has(part.callID)) {
                     continue
                 }
@@ -63,9 +51,7 @@ export function syncToolCache(
                     continue
                 }
 
-                const allProtectedTools = config.tools.settings.protectedTools
-                const isProtectedTool = allProtectedTools.includes(part.tool)
-                const tokenCount = isProtectedTool ? undefined : countToolTokens(part)
+                const tokenCount = countToolTokens(part)
 
                 state.toolParameters.set(part.callID, {
                     tool: part.tool,
@@ -76,13 +62,13 @@ export function syncToolCache(
                     tokenCount,
                 })
                 logger.info(
-                    `Cached tool id: ${part.callID} (turn ${turnCounter}${tokenCount !== undefined ? `, ~${tokenCount} tokens` : ""})`,
+                    `Cached tool id: ${part.callID} (turn ${turnCounter}${tokenCount !== undefined ? `, ${tokenCount} tokens` : ""})`,
                 )
             }
         }
 
         logger.info(
-            `Synced cache - size: ${state.toolParameters.size}, currentTurn: ${state.currentTurn}, nudgeCounter: ${state.nudgeCounter}`,
+            `Synced cache - size: ${state.toolParameters.size}, currentTurn: ${state.currentTurn}`,
         )
         trimToolParametersCache(state)
     } catch (error) {

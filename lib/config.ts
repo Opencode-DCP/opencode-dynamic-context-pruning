@@ -4,38 +4,27 @@ import { homedir } from "os"
 import { parse } from "jsonc-parser"
 import type { PluginInput } from "@opencode-ai/plugin"
 
+type Permission = "ask" | "allow" | "deny"
+
 export interface Deduplication {
     enabled: boolean
     protectedTools: string[]
 }
 
-export interface PruneTool {
-    permission: "ask" | "allow" | "deny"
-}
-
-export interface DistillTool {
-    permission: "ask" | "allow" | "deny"
-    showDistillation: boolean
-}
-
 export interface CompressTool {
-    permission: "ask" | "allow" | "deny"
+    permission: Permission
     showCompression: boolean
 }
 
 export interface ToolSettings {
-    nudgeEnabled: boolean
     nudgeFrequency: number
-    protectedTools: string[]
     contextLimit: number | `${number}%`
     modelLimits?: Record<string, number | `${number}%`>
 }
 
 export interface Tools {
     settings: ToolSettings
-    distill: DistillTool
     compress: CompressTool
-    prune: PruneTool
 }
 
 export interface Commands {
@@ -80,25 +69,23 @@ export interface PluginConfig {
     }
 }
 
+type ToolOverride = Partial<Tools>
+
 const DEFAULT_PROTECTED_TOOLS = [
     "task",
     "todowrite",
     "todoread",
-    "distill",
     "compress",
-    "prune",
     "batch",
     "plan_enter",
     "plan_exit",
 ]
 
-// Valid config keys for validation against user config
 export const VALID_CONFIG_KEYS = new Set([
-    // Top-level keys
     "$schema",
     "enabled",
     "debug",
-    "showUpdateToasts", // Deprecated but kept for backwards compatibility
+    "showUpdateToasts",
     "pruneNotification",
     "pruneNotificationType",
     "turnProtection",
@@ -113,35 +100,24 @@ export const VALID_CONFIG_KEYS = new Set([
     "manualMode.automaticStrategies",
     "tools",
     "tools.settings",
-    "tools.settings.nudgeEnabled",
     "tools.settings.nudgeFrequency",
-    "tools.settings.protectedTools",
     "tools.settings.contextLimit",
     "tools.settings.modelLimits",
-    "tools.distill",
-    "tools.distill.permission",
-    "tools.distill.showDistillation",
     "tools.compress",
     "tools.compress.permission",
     "tools.compress.showCompression",
-    "tools.prune",
-    "tools.prune.permission",
     "strategies",
-    // strategies.deduplication
     "strategies.deduplication",
     "strategies.deduplication.enabled",
     "strategies.deduplication.protectedTools",
-    // strategies.supersedeWrites
     "strategies.supersedeWrites",
     "strategies.supersedeWrites.enabled",
-    // strategies.purgeErrors
     "strategies.purgeErrors",
     "strategies.purgeErrors.enabled",
     "strategies.purgeErrors.turns",
     "strategies.purgeErrors.protectedTools",
 ])
 
-// Extract all key paths from a config object for validation
 function getConfigKeyPaths(obj: Record<string, any>, prefix = ""): string[] {
     const keys: string[] = []
     for (const key of Object.keys(obj)) {
@@ -160,13 +136,11 @@ function getConfigKeyPaths(obj: Record<string, any>, prefix = ""): string[] {
     return keys
 }
 
-// Returns invalid keys found in user config
 export function getInvalidConfigKeys(userConfig: Record<string, any>): string[] {
     const userKeys = getConfigKeyPaths(userConfig)
     return userKeys.filter((key) => !VALID_CONFIG_KEYS.has(key))
 }
 
-// Type validators for config values
 interface ValidationError {
     key: string
     expected: string
@@ -176,13 +150,14 @@ interface ValidationError {
 export function validateConfigTypes(config: Record<string, any>): ValidationError[] {
     const errors: ValidationError[] = []
 
-    // Top-level validators
     if (config.enabled !== undefined && typeof config.enabled !== "boolean") {
         errors.push({ key: "enabled", expected: "boolean", actual: typeof config.enabled })
     }
+
     if (config.debug !== undefined && typeof config.debug !== "boolean") {
         errors.push({ key: "debug", expected: "boolean", actual: typeof config.debug })
     }
+
     if (config.pruneNotification !== undefined) {
         const validValues = ["off", "minimal", "detailed"]
         if (!validValues.includes(config.pruneNotification)) {
@@ -212,7 +187,7 @@ export function validateConfigTypes(config: Record<string, any>): ValidationErro
                 expected: "string[]",
                 actual: typeof config.protectedFilePatterns,
             })
-        } else if (!config.protectedFilePatterns.every((v) => typeof v === "string")) {
+        } else if (!config.protectedFilePatterns.every((v: unknown) => typeof v === "string")) {
             errors.push({
                 key: "protectedFilePatterns",
                 expected: "string[]",
@@ -221,7 +196,6 @@ export function validateConfigTypes(config: Record<string, any>): ValidationErro
         }
     }
 
-    // Top-level turnProtection validator
     if (config.turnProtection) {
         if (
             config.turnProtection.enabled !== undefined &&
@@ -233,6 +207,7 @@ export function validateConfigTypes(config: Record<string, any>): ValidationErro
                 actual: typeof config.turnProtection.enabled,
             })
         }
+
         if (
             config.turnProtection.turns !== undefined &&
             typeof config.turnProtection.turns !== "number"
@@ -252,10 +227,15 @@ export function validateConfigTypes(config: Record<string, any>): ValidationErro
         }
     }
 
-    // Commands validator
     const commands = config.commands
     if (commands !== undefined) {
-        if (typeof commands === "object") {
+        if (typeof commands !== "object" || commands === null || Array.isArray(commands)) {
+            errors.push({
+                key: "commands",
+                expected: "object",
+                actual: typeof commands,
+            })
+        } else {
             if (commands.enabled !== undefined && typeof commands.enabled !== "boolean") {
                 errors.push({
                     key: "commands.enabled",
@@ -270,19 +250,18 @@ export function validateConfigTypes(config: Record<string, any>): ValidationErro
                     actual: typeof commands.protectedTools,
                 })
             }
-        } else {
-            errors.push({
-                key: "commands",
-                expected: "{ enabled: boolean, protectedTools: string[] }",
-                actual: typeof commands,
-            })
         }
     }
 
-    // Manual mode validator
     const manualMode = config.manualMode
     if (manualMode !== undefined) {
-        if (typeof manualMode === "object") {
+        if (typeof manualMode !== "object" || manualMode === null || Array.isArray(manualMode)) {
+            errors.push({
+                key: "manualMode",
+                expected: "object",
+                actual: typeof manualMode,
+            })
+        } else {
             if (manualMode.enabled !== undefined && typeof manualMode.enabled !== "boolean") {
                 errors.push({
                     key: "manualMode.enabled",
@@ -290,6 +269,7 @@ export function validateConfigTypes(config: Record<string, any>): ValidationErro
                     actual: typeof manualMode.enabled,
                 })
             }
+
             if (
                 manualMode.automaticStrategies !== undefined &&
                 typeof manualMode.automaticStrategies !== "boolean"
@@ -300,29 +280,12 @@ export function validateConfigTypes(config: Record<string, any>): ValidationErro
                     actual: typeof manualMode.automaticStrategies,
                 })
             }
-        } else {
-            errors.push({
-                key: "manualMode",
-                expected: "{ enabled: boolean, automaticStrategies: boolean }",
-                actual: typeof manualMode,
-            })
         }
     }
 
-    // Tools validators
     const tools = config.tools
     if (tools) {
         if (tools.settings) {
-            if (
-                tools.settings.nudgeEnabled !== undefined &&
-                typeof tools.settings.nudgeEnabled !== "boolean"
-            ) {
-                errors.push({
-                    key: "tools.settings.nudgeEnabled",
-                    expected: "boolean",
-                    actual: typeof tools.settings.nudgeEnabled,
-                })
-            }
             if (
                 tools.settings.nudgeFrequency !== undefined &&
                 typeof tools.settings.nudgeFrequency !== "number"
@@ -333,6 +296,7 @@ export function validateConfigTypes(config: Record<string, any>): ValidationErro
                     actual: typeof tools.settings.nudgeFrequency,
                 })
             }
+
             if (
                 typeof tools.settings.nudgeFrequency === "number" &&
                 tools.settings.nudgeFrequency < 1
@@ -341,16 +305,6 @@ export function validateConfigTypes(config: Record<string, any>): ValidationErro
                     key: "tools.settings.nudgeFrequency",
                     expected: "positive number (>= 1)",
                     actual: `${tools.settings.nudgeFrequency} (will be clamped to 1)`,
-                })
-            }
-            if (
-                tools.settings.protectedTools !== undefined &&
-                !Array.isArray(tools.settings.protectedTools)
-            ) {
-                errors.push({
-                    key: "tools.settings.protectedTools",
-                    expected: "string[]",
-                    actual: typeof tools.settings.protectedTools,
                 })
             }
             if (tools.settings.contextLimit !== undefined) {
@@ -367,9 +321,11 @@ export function validateConfigTypes(config: Record<string, any>): ValidationErro
                     })
                 }
             }
+
             if (tools.settings.modelLimits !== undefined) {
                 if (
                     typeof tools.settings.modelLimits !== "object" ||
+                    tools.settings.modelLimits === null ||
                     Array.isArray(tools.settings.modelLimits)
                 ) {
                     errors.push({
@@ -394,40 +350,21 @@ export function validateConfigTypes(config: Record<string, any>): ValidationErro
                     }
                 }
             }
-            if (tools.distill) {
-                if (tools.distill.permission !== undefined) {
-                    const validValues = ["ask", "allow", "deny"]
-                    if (!validValues.includes(tools.distill.permission)) {
-                        errors.push({
-                            key: "tools.distill.permission",
-                            expected: '"ask" | "allow" | "deny"',
-                            actual: JSON.stringify(tools.distill.permission),
-                        })
-                    }
-                }
-                if (
-                    tools.distill.showDistillation !== undefined &&
-                    typeof tools.distill.showDistillation !== "boolean"
-                ) {
-                    errors.push({
-                        key: "tools.distill.showDistillation",
-                        expected: "boolean",
-                        actual: typeof tools.distill.showDistillation,
-                    })
-                }
-            }
         }
+
         if (tools.compress) {
-            if (tools.compress.permission !== undefined) {
-                const validValues = ["ask", "allow", "deny"]
-                if (!validValues.includes(tools.compress.permission)) {
-                    errors.push({
-                        key: "tools.compress.permission",
-                        expected: '"ask" | "allow" | "deny"',
-                        actual: JSON.stringify(tools.compress.permission),
-                    })
-                }
+            const validValues = ["ask", "allow", "deny"]
+            if (
+                tools.compress.permission !== undefined &&
+                !validValues.includes(tools.compress.permission)
+            ) {
+                errors.push({
+                    key: "tools.compress.permission",
+                    expected: '"ask" | "allow" | "deny"',
+                    actual: JSON.stringify(tools.compress.permission),
+                })
             }
+
             if (
                 tools.compress.showCompression !== undefined &&
                 typeof tools.compress.showCompression !== "boolean"
@@ -439,24 +376,10 @@ export function validateConfigTypes(config: Record<string, any>): ValidationErro
                 })
             }
         }
-        if (tools.prune) {
-            if (tools.prune.permission !== undefined) {
-                const validValues = ["ask", "allow", "deny"]
-                if (!validValues.includes(tools.prune.permission)) {
-                    errors.push({
-                        key: "tools.prune.permission",
-                        expected: '"ask" | "allow" | "deny"',
-                        actual: JSON.stringify(tools.prune.permission),
-                    })
-                }
-            }
-        }
     }
 
-    // Strategies validators
     const strategies = config.strategies
     if (strategies) {
-        // deduplication
         if (
             strategies.deduplication?.enabled !== undefined &&
             typeof strategies.deduplication.enabled !== "boolean"
@@ -467,6 +390,7 @@ export function validateConfigTypes(config: Record<string, any>): ValidationErro
                 actual: typeof strategies.deduplication.enabled,
             })
         }
+
         if (
             strategies.deduplication?.protectedTools !== undefined &&
             !Array.isArray(strategies.deduplication.protectedTools)
@@ -478,7 +402,6 @@ export function validateConfigTypes(config: Record<string, any>): ValidationErro
             })
         }
 
-        // supersedeWrites
         if (strategies.supersedeWrites) {
             if (
                 strategies.supersedeWrites.enabled !== undefined &&
@@ -492,7 +415,6 @@ export function validateConfigTypes(config: Record<string, any>): ValidationErro
             }
         }
 
-        // purgeErrors
         if (strategies.purgeErrors) {
             if (
                 strategies.purgeErrors.enabled !== undefined &&
@@ -504,6 +426,7 @@ export function validateConfigTypes(config: Record<string, any>): ValidationErro
                     actual: typeof strategies.purgeErrors.enabled,
                 })
             }
+
             if (
                 strategies.purgeErrors.turns !== undefined &&
                 typeof strategies.purgeErrors.turns !== "number"
@@ -541,7 +464,6 @@ export function validateConfigTypes(config: Record<string, any>): ValidationErro
     return errors
 }
 
-// Show validation warnings for a config file
 function showConfigValidationWarnings(
     ctx: PluginInput,
     configPath: string,
@@ -577,7 +499,7 @@ function showConfigValidationWarnings(
         try {
             ctx.client.tui.showToast({
                 body: {
-                    title: `DCP: Invalid ${configType}`,
+                    title: `DCP: ${configType} warning`,
                     message: `${configPath}\n${messages.join("\n")}`,
                     variant: "warning",
                     duration: 7000,
@@ -607,21 +529,12 @@ const defaultConfig: PluginConfig = {
     protectedFilePatterns: [],
     tools: {
         settings: {
-            nudgeEnabled: true,
-            nudgeFrequency: 10,
-            protectedTools: [...DEFAULT_PROTECTED_TOOLS],
+            nudgeFrequency: 5,
             contextLimit: 100000,
         },
-        distill: {
-            permission: "allow",
-            showDistillation: false,
-        },
         compress: {
-            permission: "deny",
-            showCompression: false,
-        },
-        prune: {
             permission: "allow",
+            showCompression: false,
         },
     },
     strategies: {
@@ -654,7 +567,9 @@ function findOpencodeDir(startDir: string): string | null {
             return candidate
         }
         const parent = dirname(current)
-        if (parent === current) break
+        if (parent === current) {
+            break
+        }
         current = parent
     }
     return null
@@ -665,43 +580,39 @@ function getConfigPaths(ctx?: PluginInput): {
     configDir: string | null
     project: string | null
 } {
-    // Global: ~/.config/opencode/dcp.jsonc|json
-    let globalPath: string | null = null
-    if (existsSync(GLOBAL_CONFIG_PATH_JSONC)) {
-        globalPath = GLOBAL_CONFIG_PATH_JSONC
-    } else if (existsSync(GLOBAL_CONFIG_PATH_JSON)) {
-        globalPath = GLOBAL_CONFIG_PATH_JSON
-    }
+    const global = existsSync(GLOBAL_CONFIG_PATH_JSONC)
+        ? GLOBAL_CONFIG_PATH_JSONC
+        : existsSync(GLOBAL_CONFIG_PATH_JSON)
+          ? GLOBAL_CONFIG_PATH_JSON
+          : null
 
-    // Custom config directory: $OPENCODE_CONFIG_DIR/dcp.jsonc|json
-    let configDirPath: string | null = null
+    let configDir: string | null = null
     const opencodeConfigDir = process.env.OPENCODE_CONFIG_DIR
     if (opencodeConfigDir) {
         const configJsonc = join(opencodeConfigDir, "dcp.jsonc")
         const configJson = join(opencodeConfigDir, "dcp.json")
-        if (existsSync(configJsonc)) {
-            configDirPath = configJsonc
-        } else if (existsSync(configJson)) {
-            configDirPath = configJson
-        }
+        configDir = existsSync(configJsonc)
+            ? configJsonc
+            : existsSync(configJson)
+              ? configJson
+              : null
     }
 
-    // Project: <project>/.opencode/dcp.jsonc|json
-    let projectPath: string | null = null
+    let project: string | null = null
     if (ctx?.directory) {
         const opencodeDir = findOpencodeDir(ctx.directory)
         if (opencodeDir) {
             const projectJsonc = join(opencodeDir, "dcp.jsonc")
             const projectJson = join(opencodeDir, "dcp.json")
-            if (existsSync(projectJsonc)) {
-                projectPath = projectJsonc
-            } else if (existsSync(projectJson)) {
-                projectPath = projectJson
-            }
+            project = existsSync(projectJsonc)
+                ? projectJsonc
+                : existsSync(projectJson)
+                  ? projectJson
+                  : null
         }
     }
 
-    return { global: globalPath, configDir: configDirPath, project: projectPath }
+    return { global, configDir, project }
 }
 
 function createDefaultConfig(): void {
@@ -722,16 +633,15 @@ interface ConfigLoadResult {
 }
 
 function loadConfigFile(configPath: string): ConfigLoadResult {
-    let fileContent: string
+    let fileContent = ""
     try {
         fileContent = readFileSync(configPath, "utf-8")
     } catch {
-        // File doesn't exist or can't be read - not a parse error
         return { data: null }
     }
 
     try {
-        const parsed = parse(fileContent)
+        const parsed = parse(fileContent, undefined, { allowTrailingComma: true })
         if (parsed === undefined || parsed === null) {
             return { data: null, parseError: "Config file is empty or invalid" }
         }
@@ -745,7 +655,9 @@ function mergeStrategies(
     base: PluginConfig["strategies"],
     override?: Partial<PluginConfig["strategies"]>,
 ): PluginConfig["strategies"] {
-    if (!override) return base
+    if (!override) {
+        return base
+    }
 
     return {
         deduplication: {
@@ -773,35 +685,20 @@ function mergeStrategies(
     }
 }
 
-function mergeTools(
-    base: PluginConfig["tools"],
-    override?: Partial<PluginConfig["tools"]>,
-): PluginConfig["tools"] {
-    if (!override) return base
+function mergeTools(base: PluginConfig["tools"], override?: ToolOverride): PluginConfig["tools"] {
+    if (!override) {
+        return base
+    }
 
     return {
         settings: {
-            nudgeEnabled: override.settings?.nudgeEnabled ?? base.settings.nudgeEnabled,
             nudgeFrequency: override.settings?.nudgeFrequency ?? base.settings.nudgeFrequency,
-            protectedTools: [
-                ...new Set([
-                    ...base.settings.protectedTools,
-                    ...(override.settings?.protectedTools ?? []),
-                ]),
-            ],
             contextLimit: override.settings?.contextLimit ?? base.settings.contextLimit,
             modelLimits: override.settings?.modelLimits ?? base.settings.modelLimits,
-        },
-        distill: {
-            permission: override.distill?.permission ?? base.distill.permission,
-            showDistillation: override.distill?.showDistillation ?? base.distill.showDistillation,
         },
         compress: {
             permission: override.compress?.permission ?? base.compress.permission,
             showCompression: override.compress?.showCompression ?? base.compress.showCompression,
-        },
-        prune: {
-            permission: override.prune?.permission ?? base.prune.permission,
         },
     }
 }
@@ -810,7 +707,9 @@ function mergeCommands(
     base: PluginConfig["commands"],
     override?: Partial<PluginConfig["commands"]>,
 ): PluginConfig["commands"] {
-    if (override === undefined) return base
+    if (!override) {
+        return base
+    }
 
     return {
         enabled: override.enabled ?? base.enabled,
@@ -846,21 +745,16 @@ function deepCloneConfig(config: PluginConfig): PluginConfig {
         tools: {
             settings: {
                 ...config.tools.settings,
-                protectedTools: [...config.tools.settings.protectedTools],
                 modelLimits: { ...config.tools.settings.modelLimits },
             },
-            distill: { ...config.tools.distill },
             compress: { ...config.tools.compress },
-            prune: { ...config.tools.prune },
         },
         strategies: {
             deduplication: {
                 ...config.strategies.deduplication,
                 protectedTools: [...config.strategies.deduplication.protectedTools],
             },
-            supersedeWrites: {
-                ...config.strategies.supersedeWrites,
-            },
+            supersedeWrites: { ...config.strategies.supersedeWrites },
             purgeErrors: {
                 ...config.strategies.purgeErrors,
                 protectedTools: [...config.strategies.purgeErrors.protectedTools],
@@ -869,140 +763,76 @@ function deepCloneConfig(config: PluginConfig): PluginConfig {
     }
 }
 
+function mergeLayer(config: PluginConfig, data: Record<string, any>): PluginConfig {
+    return {
+        enabled: data.enabled ?? config.enabled,
+        debug: data.debug ?? config.debug,
+        pruneNotification: data.pruneNotification ?? config.pruneNotification,
+        pruneNotificationType: data.pruneNotificationType ?? config.pruneNotificationType,
+        commands: mergeCommands(config.commands, data.commands as any),
+        manualMode: mergeManualMode(config.manualMode, data.manualMode as any),
+        turnProtection: {
+            enabled: data.turnProtection?.enabled ?? config.turnProtection.enabled,
+            turns: data.turnProtection?.turns ?? config.turnProtection.turns,
+        },
+        protectedFilePatterns: [
+            ...new Set([...config.protectedFilePatterns, ...(data.protectedFilePatterns ?? [])]),
+        ],
+        tools: mergeTools(config.tools, data.tools as ToolOverride),
+        strategies: mergeStrategies(config.strategies, data.strategies as any),
+    }
+}
+
+function scheduleParseWarning(ctx: PluginInput, title: string, message: string): void {
+    setTimeout(() => {
+        try {
+            ctx.client.tui.showToast({
+                body: {
+                    title,
+                    message,
+                    variant: "warning",
+                    duration: 7000,
+                },
+            })
+        } catch {}
+    }, 7000)
+}
+
 export function getConfig(ctx: PluginInput): PluginConfig {
     let config = deepCloneConfig(defaultConfig)
     const configPaths = getConfigPaths(ctx)
 
-    // Load and merge global config
-    if (configPaths.global) {
-        const result = loadConfigFile(configPaths.global)
-        if (result.parseError) {
-            setTimeout(async () => {
-                try {
-                    ctx.client.tui.showToast({
-                        body: {
-                            title: "DCP: Invalid config",
-                            message: `${configPaths.global}\n${result.parseError}\nUsing default values`,
-                            variant: "warning",
-                            duration: 7000,
-                        },
-                    })
-                } catch {}
-            }, 7000)
-        } else if (result.data) {
-            // Validate config keys and types
-            showConfigValidationWarnings(ctx, configPaths.global, result.data, false)
-            config = {
-                enabled: result.data.enabled ?? config.enabled,
-                debug: result.data.debug ?? config.debug,
-                pruneNotification: result.data.pruneNotification ?? config.pruneNotification,
-                pruneNotificationType:
-                    result.data.pruneNotificationType ?? config.pruneNotificationType,
-                commands: mergeCommands(config.commands, result.data.commands as any),
-                manualMode: mergeManualMode(config.manualMode, result.data.manualMode as any),
-                turnProtection: {
-                    enabled: result.data.turnProtection?.enabled ?? config.turnProtection.enabled,
-                    turns: result.data.turnProtection?.turns ?? config.turnProtection.turns,
-                },
-                protectedFilePatterns: [
-                    ...new Set([
-                        ...config.protectedFilePatterns,
-                        ...(result.data.protectedFilePatterns ?? []),
-                    ]),
-                ],
-                tools: mergeTools(config.tools, result.data.tools as any),
-                strategies: mergeStrategies(config.strategies, result.data.strategies as any),
-            }
-        }
-    } else {
-        // No config exists, create default
+    if (!configPaths.global) {
         createDefaultConfig()
     }
 
-    // Load and merge $OPENCODE_CONFIG_DIR/dcp.jsonc|json (overrides global)
-    if (configPaths.configDir) {
-        const result = loadConfigFile(configPaths.configDir)
-        if (result.parseError) {
-            setTimeout(async () => {
-                try {
-                    ctx.client.tui.showToast({
-                        body: {
-                            title: "DCP: Invalid configDir config",
-                            message: `${configPaths.configDir}\n${result.parseError}\nUsing global/default values`,
-                            variant: "warning",
-                            duration: 7000,
-                        },
-                    })
-                } catch {}
-            }, 7000)
-        } else if (result.data) {
-            // Validate config keys and types
-            showConfigValidationWarnings(ctx, configPaths.configDir, result.data, true)
-            config = {
-                enabled: result.data.enabled ?? config.enabled,
-                debug: result.data.debug ?? config.debug,
-                pruneNotification: result.data.pruneNotification ?? config.pruneNotification,
-                pruneNotificationType:
-                    result.data.pruneNotificationType ?? config.pruneNotificationType,
-                commands: mergeCommands(config.commands, result.data.commands as any),
-                manualMode: mergeManualMode(config.manualMode, result.data.manualMode as any),
-                turnProtection: {
-                    enabled: result.data.turnProtection?.enabled ?? config.turnProtection.enabled,
-                    turns: result.data.turnProtection?.turns ?? config.turnProtection.turns,
-                },
-                protectedFilePatterns: [
-                    ...new Set([
-                        ...config.protectedFilePatterns,
-                        ...(result.data.protectedFilePatterns ?? []),
-                    ]),
-                ],
-                tools: mergeTools(config.tools, result.data.tools as any),
-                strategies: mergeStrategies(config.strategies, result.data.strategies as any),
-            }
-        }
-    }
+    const layers: Array<{ path: string | null; name: string; isProject: boolean }> = [
+        { path: configPaths.global, name: "config", isProject: false },
+        { path: configPaths.configDir, name: "configDir config", isProject: true },
+        { path: configPaths.project, name: "project config", isProject: true },
+    ]
 
-    // Load and merge project config (overrides global)
-    if (configPaths.project) {
-        const result = loadConfigFile(configPaths.project)
-        if (result.parseError) {
-            setTimeout(async () => {
-                try {
-                    ctx.client.tui.showToast({
-                        body: {
-                            title: "DCP: Invalid project config",
-                            message: `${configPaths.project}\n${result.parseError}\nUsing global/default values`,
-                            variant: "warning",
-                            duration: 7000,
-                        },
-                    })
-                } catch {}
-            }, 7000)
-        } else if (result.data) {
-            // Validate config keys and types
-            showConfigValidationWarnings(ctx, configPaths.project, result.data, true)
-            config = {
-                enabled: result.data.enabled ?? config.enabled,
-                debug: result.data.debug ?? config.debug,
-                pruneNotification: result.data.pruneNotification ?? config.pruneNotification,
-                pruneNotificationType:
-                    result.data.pruneNotificationType ?? config.pruneNotificationType,
-                commands: mergeCommands(config.commands, result.data.commands as any),
-                manualMode: mergeManualMode(config.manualMode, result.data.manualMode as any),
-                turnProtection: {
-                    enabled: result.data.turnProtection?.enabled ?? config.turnProtection.enabled,
-                    turns: result.data.turnProtection?.turns ?? config.turnProtection.turns,
-                },
-                protectedFilePatterns: [
-                    ...new Set([
-                        ...config.protectedFilePatterns,
-                        ...(result.data.protectedFilePatterns ?? []),
-                    ]),
-                ],
-                tools: mergeTools(config.tools, result.data.tools as any),
-                strategies: mergeStrategies(config.strategies, result.data.strategies as any),
-            }
+    for (const layer of layers) {
+        if (!layer.path) {
+            continue
         }
+
+        const result = loadConfigFile(layer.path)
+        if (result.parseError) {
+            scheduleParseWarning(
+                ctx,
+                `DCP: Invalid ${layer.name}`,
+                `${layer.path}\n${result.parseError}\nUsing previous/default values`,
+            )
+            continue
+        }
+
+        if (!result.data) {
+            continue
+        }
+
+        showConfigValidationWarnings(ctx, layer.path, result.data, layer.isProject)
+        config = mergeLayer(config, result.data)
     }
 
     return config

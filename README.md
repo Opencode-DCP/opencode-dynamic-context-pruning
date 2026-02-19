@@ -24,15 +24,15 @@ Restart OpenCode. The plugin will automatically start optimizing your sessions.
 
 ## How Pruning Works
 
-DCP uses multiple tools and strategies to reduce context size:
+DCP uses one user-facing tool and strategies to reduce context size:
 
-### Tools
+For model-facing behavior (prompts and tool calls), this capability is always addressed as `compress`.
 
-**Distill** — Exposes a `distill` tool that the AI can call to distill valuable context into concise summaries before removing the tool content.
+### Tool
 
-**Compress** — Exposes a `compress` tool that the AI can call to collapse a large section of conversation (messages and tools) into a single summary.
+**Compress** — Exposes a single `compress` tool with one method: select a conversation range using injected `startId` and `endId` (`mNNNN` or `bN`), then replace it with a technical summary.
 
-**Prune** — Exposes a `prune` tool that the AI can call to remove completed or noisy tool content from context.
+The model can use that same method at different scales: tiny ranges for noise cleanup, focused ranges for preserving key findings, and full chapters for completed work.
 
 ### Strategies
 
@@ -105,13 +105,10 @@ DCP uses its own config file:
 >     // Protect file operations from pruning via glob patterns
 >     // Patterns match tool parameters.filePath (e.g. read/write/edit)
 >     "protectedFilePatterns": [],
->     // LLM-driven context pruning tools
+>     // LLM-driven context management tool
 >     "tools": {
->         // Shared settings for all prune tools
+>         // Shared settings for context management
 >         "settings": {
->             // Nudge the LLM to use prune tools (every <nudgeFrequency> tool results)
->             "nudgeEnabled": true,
->             "nudgeFrequency": 10,
 >             // Token limit at which the model compresses session context
 >             // to keep the model in the "smart zone" (not a hard limit)
 >             // Accepts: number or "X%" (percentage of model's context window)
@@ -123,27 +120,15 @@ DCP uses its own config file:
 >             //     "openai/gpt-5": 120000,
 >             //     "anthropic/claude-3-7-sonnet": "80%"
 >             // },
->             // Additional tools to protect from pruning
->             "protectedTools": [],
+>             // How often the context-limit nudge fires (1 = every fetch, 5 = every 5th)
+>             "nudgeFrequency": 5,
 >         },
->         // Distills key findings into preserved knowledge before removing raw content
->         "distill": {
+>         // Unified context compression tool
+>         "compress": {
 >             // Permission mode: "allow" (no prompt), "ask" (prompt), "deny" (tool not registered)
 >             "permission": "allow",
->             // Show distillation content as an ignored message notification
->             "showDistillation": false,
->         },
->         // Collapses a range of conversation content into a single summary
->         "compress": {
->             // Permission mode: "deny" (tool not registered), "ask" (prompt), "allow" (no prompt)
->             "permission": "deny",
 >             // Show summary content as an ignored message notification
 >             "showCompression": false,
->         },
->         // Removes tool content from context without preservation (for completed tasks or noise)
->         "prune": {
->             // Permission mode: "allow" (no prompt), "ask" (prompt), "deny" (tool not registered)
->             "permission": "allow",
 >         },
 >     },
 >     // Automatic pruning strategies
@@ -181,16 +166,15 @@ DCP provides a `/dcp` slash command:
 - `/dcp stats` — Shows cumulative pruning statistics across all sessions.
 - `/dcp sweep` — Prunes all tools since the last user message. Accepts an optional count: `/dcp sweep 10` prunes the last 10 tools. Respects `commands.protectedTools`.
 - `/dcp manual [on|off]` — Toggle manual mode or set explicit state. When on, the AI will not autonomously use context management tools.
-- `/dcp prune [focus]` — Trigger a single prune tool execution. Optional focus text directs the AI's pruning decisions.
-- `/dcp distill [focus]` — Trigger a single distill tool execution. Optional focus text directs what to distill.
+
 - `/dcp compress [focus]` — Trigger a single compress tool execution. Optional focus text directs what range to compress.
 
 ### Protected Tools
 
 By default, these tools are always protected from pruning:
-`task`, `todowrite`, `todoread`, `distill`, `compress`, `prune`, `batch`, `plan_enter`, `plan_exit`
+`task`, `todowrite`, `todoread`, `compress`, `batch`, `plan_enter`, `plan_exit`
 
-The `protectedTools` arrays in each section add to this default list.
+The `protectedTools` arrays in `commands` and `strategies` add to this default list.
 
 ### Config Precedence
 

@@ -1,7 +1,7 @@
 import type { SessionState, WithParts, CompressSummary } from "../state"
 import { formatBlockRef, formatMessageIdTag, parseBoundaryId } from "../message-ids"
 import { isIgnoredUserMessage } from "../messages/utils"
-import { countMessageTextTokens } from "../strategies/utils"
+import { countAllMessageTokens } from "../strategies/utils"
 
 const BLOCK_PLACEHOLDER_REGEX = /\(b(\d+)\)|\{block_(\d+)\}/gi
 
@@ -50,13 +50,12 @@ export interface InjectedSummaryResult {
     consumedBlockIds: number[]
 }
 
-export function formatCompressedBlockHeader(_blockId: number): string {
-    return "[Compressed conversation section]"
+export interface AppliedCompressionResult {
+    compressedTokens: number
+    messageIds: string[]
 }
 
-export function formatCompressedBlockFooter(blockId: number): string {
-    return formatMessageIdTag(formatBlockRef(blockId))
-}
+export const COMPRESSED_BLOCK_HEADER = "[Compressed conversation section]"
 
 export function formatBlockPlaceholder(blockId: number): string {
     return `(b${blockId})`
@@ -139,21 +138,22 @@ export function resolveBoundaryIds(
         throwCombinedIssues(issues)
     }
 
-    const validStartId = parsedStartId as NonNullable<typeof parsedStartId>
-    const validEndId = parsedEndId as NonNullable<typeof parsedEndId>
+    if (!parsedStartId || !parsedEndId) {
+        throw new Error("Invalid boundary ID(s)")
+    }
 
-    const startReference = lookup.get(validStartId.ref)
-    const endReference = lookup.get(validEndId.ref)
+    const startReference = lookup.get(parsedStartId.ref)
+    const endReference = lookup.get(parsedEndId.ref)
 
     if (!startReference) {
         issues.push(
-            `startId ${validStartId.ref} is not available in the current conversation context. Choose an injected ID visible in context.`,
+            `startId ${parsedStartId.ref} is not available in the current conversation context. Choose an injected ID visible in context.`,
         )
     }
 
     if (!endReference) {
         issues.push(
-            `endId ${validEndId.ref} is not available in the current conversation context. Choose an injected ID visible in context.`,
+            `endId ${parsedEndId.ref} is not available in the current conversation context. Choose an injected ID visible in context.`,
         )
     }
 
@@ -167,7 +167,7 @@ export function resolveBoundaryIds(
 
     if (startReference.rawIndex > endReference.rawIndex) {
         throw new Error(
-            `startId ${validStartId.ref} appears after endId ${validEndId.ref} in the conversation. Start must come before end.`,
+            `startId ${parsedStartId.ref} appears after endId ${parsedEndId.ref} in the conversation. Start must come before end.`,
         )
     }
 
@@ -261,7 +261,7 @@ export function resolveRange(
         }
 
         if (!messageTokenById.has(messageId)) {
-            messageTokenById.set(messageId, countMessageTextTokens(rawMessage))
+            messageTokenById.set(messageId, countAllMessageTokens(rawMessage))
         }
 
         const parts = Array.isArray(rawMessage.parts) ? rawMessage.parts : []
@@ -422,9 +422,7 @@ export function validateSummaryPlaceholders(
 
     if (duplicateIds.size > 0) {
         issues.push(
-            `Duplicate block placeholders are not allowed: ${[...duplicateIds]
-                .map(formatBlockPlaceholder)
-                .join(", ")}`,
+            `Duplicate block placeholders are not allowed: ${[...duplicateIds].map(formatBlockPlaceholder).join(", ")}`,
         )
     }
 
@@ -505,9 +503,9 @@ export function allocateBlockId(summaries: CompressSummary[]): number {
     return max + 1
 }
 
-export function addCompressedBlockHeader(blockId: number, summary: string): string {
-    const header = formatCompressedBlockHeader(blockId)
-    const footer = formatCompressedBlockFooter(blockId)
+export function wrapCompressedSummary(blockId: number, summary: string): string {
+    const header = COMPRESSED_BLOCK_HEADER
+    const footer = formatMessageIdTag(formatBlockRef(blockId))
     const body = summary.trim()
     if (body.length === 0) {
         return `${header}\n${footer}`
@@ -515,21 +513,43 @@ export function addCompressedBlockHeader(blockId: number, summary: string): stri
     return `${header}\n${body}\n\n${footer}`
 }
 
-export function upsertCompressedSummary(
-    summaries: CompressSummary[],
-    blockId: number,
+export function applyCompressionState(
+    state: SessionState,
+    range: RangeResolution,
     anchorMessageId: string,
+    blockId: number,
     summary: string,
     consumedBlockIds: number[],
-): CompressSummary[] {
+): AppliedCompressionResult {
     const consumed = new Set(consumedBlockIds)
-    const next = summaries.filter((s) => !consumed.has(s.blockId))
-    next.push({
+    state.compressSummaries = (state.compressSummaries || []).filter(
+        (s) => !consumed.has(s.blockId),
+    )
+    state.compressSummaries.push({
         blockId,
         anchorMessageId,
         summary,
     })
-    return next
+
+    let compressedTokens = 0
+    for (const messageId of range.messageIds) {
+        if (state.prune.messages.has(messageId)) {
+            continue
+        }
+
+        const tokenCount = range.messageTokenById.get(messageId) || 0
+        state.prune.messages.set(messageId, tokenCount)
+        compressedTokens += tokenCount
+    }
+
+    state.stats.pruneTokenCounter += compressedTokens
+    state.stats.totalPruneTokens += state.stats.pruneTokenCounter
+    state.stats.pruneTokenCounter = 0
+
+    return {
+        compressedTokens,
+        messageIds: range.messageIds,
+    }
 }
 
 function restoreStoredCompressedSummary(summary: string): string {

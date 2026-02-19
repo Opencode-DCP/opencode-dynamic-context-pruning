@@ -1,41 +1,32 @@
 # DCP CLI
 
-Dev tool for previewing prompt outputs. Verify parsing works correctly and quickly check specific tool combinations.
+Dev tool for previewing prompt outputs.
 
 ## Usage
 
 ```bash
-bun run dcp [TYPE] [-p] [-d] [-c]
+bun run dcp [TYPE]
 ```
 
 ## Types
 
-| Flag                 | Description                 |
-| -------------------- | --------------------------- |
-| `--system`           | System prompt               |
-| `--nudge`            | Nudge prompt                |
-| `--prune-list`       | Example prunable tools list |
-| `--compress-context` | Example compress context    |
-
-## Tool Flags
-
-| Flag             | Description          |
-| ---------------- | -------------------- |
-| `-d, --distill`  | Enable distill tool  |
-| `-c, --compress` | Enable compress tool |
-| `-p, --prune`    | Enable prune tool    |
-
-If no tool flags specified, all are enabled.
+| Flag                 | Description                              |
+| -------------------- | ---------------------------------------- |
+| `--system`           | System prompt                            |
+| `--nudge`            | Standard nudge prompt                    |
+| `--compress-nudge`   | Context-limit compress nudge             |
+| `--context-tools`    | Example `<context-pressure-tools>` block |
+| `--compress-context` | Example `<compress-context>` block       |
+| `--cooldown`         | Cooldown context-info block              |
 
 ## Examples
 
 ```bash
-bun run dcp --system -p -d -c   # System prompt with all tools
-bun run dcp --system -p         # System prompt with prune only
-bun run dcp --nudge -d -c       # Nudge with distill and compress
-bun run dcp --prune-list        # Example prunable tools list
+bun run dcp --system
+bun run dcp --nudge
+bun run dcp --context-tools
 ```
 
 ## Purpose
 
-This CLI does NOT ship with the plugin. It's purely for DX - iterate on prompt templates and verify the `<tool></tool>` conditional parsing produces the expected output.
+This CLI does not ship with the plugin. It is for local DX while iterating on injected prompts.

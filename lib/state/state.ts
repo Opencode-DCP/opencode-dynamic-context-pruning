@@ -7,6 +7,7 @@ import {
     countTurns,
     resetOnCompaction,
     loadPruneMap,
+    collectSoftNudgeAnchors,
 } from "./utils"
 import { getLastUserMessage } from "../shared-utils"
 
@@ -69,6 +70,8 @@ export function createSessionState(): SessionState {
             messages: new Map<string, number>(),
         },
         compressSummaries: [],
+        contextLimitAnchors: new Set<string>(),
+        softNudgeAnchors: new Set<string>(),
         stats: {
             pruneTokenCounter: 0,
             totalPruneTokens: 0,
@@ -80,12 +83,11 @@ export function createSessionState(): SessionState {
             byRef: new Map<string, string>(),
             nextRef: 0,
         },
-        nudgeCounter: 0,
-        lastToolPrune: false,
         lastCompaction: 0,
         currentTurn: 0,
         variant: undefined,
         modelContextLimit: undefined,
+        systemPromptTokens: undefined,
     }
 }
 
@@ -99,6 +101,8 @@ export function resetSessionState(state: SessionState): void {
         messages: new Map<string, number>(),
     }
     state.compressSummaries = []
+    state.contextLimitAnchors = new Set<string>()
+    state.softNudgeAnchors = new Set<string>()
     state.stats = {
         pruneTokenCounter: 0,
         totalPruneTokens: 0,
@@ -110,12 +114,11 @@ export function resetSessionState(state: SessionState): void {
         byRef: new Map<string, string>(),
         nextRef: 0,
     }
-    state.nudgeCounter = 0
-    state.lastToolPrune = false
     state.lastCompaction = 0
     state.currentTurn = 0
     state.variant = undefined
     state.modelContextLimit = undefined
+    state.systemPromptTokens = undefined
 }
 
 export async function ensureSessionInitialized(
@@ -143,6 +146,7 @@ export async function ensureSessionInitialized(
 
     state.lastCompaction = findLastCompactionTimestamp(messages)
     state.currentTurn = countTurns(state, messages)
+    state.softNudgeAnchors = collectSoftNudgeAnchors(messages)
 
     const persisted = await loadSessionState(sessionId, logger)
     if (persisted === null) {
@@ -152,6 +156,11 @@ export async function ensureSessionInitialized(
     state.prune.tools = loadPruneMap(persisted.prune.tools, persisted.prune.toolIds)
     state.prune.messages = loadPruneMap(persisted.prune.messages, persisted.prune.messageIds)
     state.compressSummaries = persisted.compressSummaries || []
+    state.contextLimitAnchors = new Set<string>(persisted.contextLimitAnchors || [])
+    state.softNudgeAnchors = new Set<string>([
+        ...state.softNudgeAnchors,
+        ...(persisted.softNudgeAnchors || []),
+    ])
     state.stats = {
         pruneTokenCounter: persisted.stats?.pruneTokenCounter || 0,
         totalPruneTokens: persisted.stats?.totalPruneTokens || 0,
