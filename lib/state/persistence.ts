@@ -26,6 +26,7 @@ export interface PersistedSessionState {
     prune: PersistedPrune
     compressSummaries: CompressSummary[]
     contextLimitAnchors: string[]
+    softNudgeAnchors?: string[]
     stats: SessionStats
     lastUpdated: string
 }
@@ -68,6 +69,7 @@ export async function saveSessionState(
             },
             compressSummaries: sessionState.compressSummaries,
             contextLimitAnchors: Array.from(sessionState.contextLimitAnchors),
+            softNudgeAnchors: Array.from(sessionState.softNudgeAnchors),
             stats: sessionState.stats,
             lastUpdated: new Date().toISOString(),
         }
@@ -147,6 +149,22 @@ export async function loadSessionState(
             })
         }
         state.contextLimitAnchors = dedupedAnchors
+
+        const rawSoftNudgeAnchors = Array.isArray(state.softNudgeAnchors)
+            ? state.softNudgeAnchors
+            : []
+        const validSoftAnchors = rawSoftNudgeAnchors.filter(
+            (entry): entry is string => typeof entry === "string",
+        )
+        const dedupedSoftAnchors = [...new Set(validSoftAnchors)]
+        if (validSoftAnchors.length !== rawSoftNudgeAnchors.length) {
+            logger.warn("Filtered out malformed softNudgeAnchors entries", {
+                sessionId: sessionId,
+                original: rawSoftNudgeAnchors.length,
+                valid: validSoftAnchors.length,
+            })
+        }
+        state.softNudgeAnchors = dedupedSoftAnchors
 
         logger.info("Loaded session state from disk", {
             sessionId: sessionId,

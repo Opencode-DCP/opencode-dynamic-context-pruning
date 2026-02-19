@@ -2,6 +2,7 @@ import type { SessionState, WithParts } from "../../state"
 import type { Logger } from "../../logger"
 import type { PluginConfig } from "../../config"
 import { formatMessageIdTag } from "../../message-ids"
+import { saveSessionState } from "../../state/persistence"
 import {
     appendMessageIdTagToToolOutput,
     createSyntheticTextPart,
@@ -17,9 +18,8 @@ import {
     getModelInfo,
     isContextOverLimit,
     messageHasCompress,
-    persistAnchors,
 } from "./utils"
-import { renderNudge } from "../../prompts"
+import { CONTEXT_LIMIT_NUDGE, SOFT_NUDGE_PROMPT } from "../../prompts"
 
 export const insertCompressToolContext = (
     state: SessionState,
@@ -33,13 +33,22 @@ export const insertCompressToolContext = (
 
     const lastAssistantMessage = messages.findLast((message) => message.info.role === "assistant")
     if (lastAssistantMessage && messageHasCompress(lastAssistantMessage)) {
+        const hasPersistedNudgeAnchors =
+            state.contextLimitAnchors.size > 0 || state.softNudgeAnchors.size > 0
+        if (hasPersistedNudgeAnchors) {
+            state.contextLimitAnchors.clear()
+            state.softNudgeAnchors.clear()
+            void saveSessionState(state, logger)
+        }
         return
     }
 
     const { providerId, modelId } = getModelInfo(messages)
     let anchorsChanged = false
 
-    if (isContextOverLimit(config, state, providerId, modelId, messages)) {
+    const contextOverLimit = isContextOverLimit(config, state, providerId, modelId, messages)
+
+    if (contextOverLimit) {
         const lastNonIgnoredMessage = findLastNonIgnoredMessage(messages)
         if (lastNonIgnoredMessage) {
             const interval = getNudgeFrequency(config)
@@ -54,12 +63,26 @@ export const insertCompressToolContext = (
                 anchorsChanged = true
             }
         }
+
+        applyAnchoredNudge(state.contextLimitAnchors, messages, modelId, CONTEXT_LIMIT_NUDGE)
+    } else {
+        const lastMessage = messages[messages.length - 1]
+        const isLastMessageNonIgnoredUser =
+            lastMessage?.info.role === "user" && !isIgnoredUserMessage(lastMessage)
+
+        if (isLastMessageNonIgnoredUser && lastAssistantMessage) {
+            const previousSize = state.softNudgeAnchors.size
+            state.softNudgeAnchors.add(lastAssistantMessage.info.id)
+            if (state.softNudgeAnchors.size !== previousSize) {
+                anchorsChanged = true
+            }
+        }
+
+        applyAnchoredNudge(state.softNudgeAnchors, messages, modelId, SOFT_NUDGE_PROMPT)
     }
 
-    applyAnchoredNudge(state.contextLimitAnchors, messages, modelId, renderNudge("context-limit"))
-
     if (anchorsChanged) {
-        persistAnchors(state, logger)
+        void saveSessionState(state, logger)
     }
 }
 

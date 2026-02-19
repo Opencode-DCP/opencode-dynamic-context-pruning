@@ -1,7 +1,7 @@
-// Generated prompts (from .md files via scripts/generate-prompts.ts)
 import { SYSTEM as SYSTEM_PROMPT } from "./_codegen/system.generated"
-import { NUDGE } from "./_codegen/nudge.generated"
-import { COMPRESS } from "./_codegen/compress.generated"
+import { NUDGE } from "./nudge"
+import { COMPRESS } from "./compress"
+import { SOFT_NUDGE } from "./soft-nudge"
 
 export { COMPRESS as COMPRESS_TOOL_SPEC }
 
@@ -17,8 +17,6 @@ export function renderSystemPrompt(manual?: boolean): string {
     return result.replace(/\n([ \t]*\n)+/g, "\n\n").trim()
 }
 
-type NudgeMode = "frequency" | "context-limit"
-
 function extractInstruction(content: string, name: string): string {
     const regex = new RegExp(
         `<instruction\\s+name=(?:"${name}"|${name})[^>]*>[\\s\\S]*?<\\/instruction>`,
@@ -28,10 +26,5 @@ function extractInstruction(content: string, name: string): string {
     return match ? match[0] : content
 }
 
-export function renderNudge(mode: NudgeMode = "frequency"): string {
-    if (mode === "context-limit") {
-        return extractInstruction(NUDGE, "context_buildup_warning")
-    }
-
-    return extractInstruction(NUDGE, "context_management_required")
-}
+export const CONTEXT_LIMIT_NUDGE = extractInstruction(NUDGE, "context_buildup_warning")
+export const SOFT_NUDGE_PROMPT = extractInstruction(SOFT_NUDGE, "post_loop_soft_nudge")
