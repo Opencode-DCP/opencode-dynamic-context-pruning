@@ -5,8 +5,8 @@
  * This solves the issue where readFileSync with __dirname fails when the
  * package is bundled by Bun (see issue #222, PR #272, #327).
  *
- * The .md files are kept for convenient editing, and this script generates
- * .ts files with exported string constants that bundle correctly.
+ * Only system.md remains markdown-backed because it includes optional manual
+ * sections that are conditionally rendered. Other prompts are plain .ts files.
  */
 
 import { readFileSync, writeFileSync, readdirSync, mkdirSync, unlinkSync } from "node:fs"
@@ -27,11 +27,11 @@ for (const file of oldGeneratedFiles) {
     console.log(`Cleaned up old: ${file}`)
 }
 
-// Find all .md files in the prompts directory
-const mdFiles = readdirSync(PROMPTS_DIR).filter((f) => f.endsWith(".md"))
+const SYSTEM_PROMPT_FILE = "system.md"
+const mdFiles = [SYSTEM_PROMPT_FILE]
 
-// Remove stale generated files in _codegen that no longer have a source markdown file
-const expectedGenerated = new Set(mdFiles.map((f) => `${basename(f, ".md")}.generated.ts`))
+// Remove stale generated files in _codegen that are no longer generated
+const expectedGenerated = new Set([`${basename(SYSTEM_PROMPT_FILE, ".md")}.generated.ts`])
 const existingGenerated = readdirSync(CODEGEN_DIR).filter((f) => f.endsWith(".generated.ts"))
 for (const file of existingGenerated) {
     if (!expectedGenerated.has(file)) {

@@ -11,6 +11,7 @@ When multiple independent stale ranges exist, prefer several short compressions 
 Use `compress` as steady housekeeping while you work.
 
 CADENCE, SIGNALS, AND LATENCY
+
 - No fixed threshold mandates compression
 - Prioritize closedness and independence over raw range size
 - Prefer smaller, regular compressions over infrequent massive compressions for better latency and summary quality
