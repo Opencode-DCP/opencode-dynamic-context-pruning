@@ -1,7 +1,7 @@
 import type { SessionState, WithParts, CompressSummary } from "../state"
 import { formatBlockRef, formatMessageIdTag, parseBoundaryId } from "../message-ids"
 import { isIgnoredUserMessage } from "../messages/utils"
-import { countAllMessageTokens, countTokens } from "../strategies/utils"
+import { countAllMessageTokens } from "../strategies/utils"
 
 const BLOCK_PLACEHOLDER_REGEX = /\(b(\d+)\)|\{block_(\d+)\}/gi
 
@@ -55,13 +55,7 @@ export interface AppliedCompressionResult {
     messageIds: string[]
 }
 
-export function formatCompressedBlockHeader(blockId: number): string {
-    return "[Compressed conversation section]"
-}
-
-export function formatCompressedBlockFooter(blockId: number): string {
-    return formatMessageIdTag(formatBlockRef(blockId))
-}
+export const COMPRESSED_BLOCK_HEADER = "[Compressed conversation section]"
 
 export function formatBlockPlaceholder(blockId: number): string {
     return `(b${blockId})`
@@ -510,8 +504,8 @@ export function allocateBlockId(summaries: CompressSummary[]): number {
 }
 
 export function wrapCompressedSummary(blockId: number, summary: string): string {
-    const header = formatCompressedBlockHeader(blockId)
-    const footer = formatCompressedBlockFooter(blockId)
+    const header = COMPRESSED_BLOCK_HEADER
+    const footer = formatMessageIdTag(formatBlockRef(blockId))
     const body = summary.trim()
     if (body.length === 0) {
         return `${header}\n${footer}`
@@ -556,10 +550,6 @@ export function applyCompressionState(
         compressedTokens,
         messageIds: range.messageIds,
     }
-}
-
-export function countSummaryTokens(summary: string): number {
-    return countTokens(summary)
 }
 
 function restoreStoredCompressedSummary(summary: string): string {

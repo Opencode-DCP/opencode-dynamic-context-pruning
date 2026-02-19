@@ -7,9 +7,8 @@ import {
     allocateBlockId,
     applyCompressionState,
     buildSearchContext,
-    countSummaryTokens,
     fetchSessionMessages,
-    formatCompressedBlockHeader,
+    COMPRESSED_BLOCK_HEADER,
     injectBlockPlaceholders,
     parseBlockPlaceholders,
     resolveAnchorMessageId,
@@ -19,7 +18,7 @@ import {
     validateSummaryPlaceholders,
     type CompressToolArgs,
 } from "./compress-utils"
-import { getCurrentParams, getCurrentTokenUsage } from "../strategies/utils"
+import { getCurrentParams, getCurrentTokenUsage, countTokens } from "../strategies/utils"
 import { saveSessionState } from "../state/persistence"
 import { sendCompressNotification } from "../ui/notification"
 
@@ -103,7 +102,7 @@ export function createCompressTool(ctx: ToolContext): ReturnType<typeof tool> {
 
             const blockId = allocateBlockId(ctx.state.compressSummaries)
             const storedSummary = wrapCompressedSummary(blockId, injected.expandedSummary)
-            const summaryTokens = countSummaryTokens(storedSummary)
+            const summaryTokens = countTokens(storedSummary)
 
             const applied = applyCompressionState(
                 ctx.state,
@@ -138,7 +137,7 @@ export function createCompressTool(ctx: ToolContext): ReturnType<typeof tool> {
                 params,
             )
 
-            return `Compressed ${applied.messageIds.length} messages into ${formatCompressedBlockHeader(blockId)}.`
+            return `Compressed ${applied.messageIds.length} messages into ${COMPRESSED_BLOCK_HEADER}.`
         },
     })
 }
