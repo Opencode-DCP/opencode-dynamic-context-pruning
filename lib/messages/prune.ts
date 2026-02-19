@@ -179,33 +179,41 @@ const filterCompressedRanges = (
         const msgId = msg.info.id
 
         // Check if there's a summary to inject at this anchor point
-        const summary = state.compressSummaries?.find((s) => s.anchorMessageId === msgId)
+        const summary = state.compressSummaries?.find((s) => s?.anchorMessageId === msgId)
         if (summary) {
-            // Find user message for variant and as base for synthetic message
-            const msgIndex = messages.indexOf(msg)
-            const userMessage = getLastUserMessage(messages, msgIndex)
-
-            if (userMessage) {
-                const userInfo = userMessage.info as UserMessage
-                const summaryContent = summary.summary
-                const summarySeed = `${summary.blockId}:${summary.anchorMessageId}`
-                result.push(
-                    createSyntheticUserMessage(
-                        userMessage,
-                        summaryContent,
-                        userInfo.variant,
-                        summarySeed,
-                    ),
-                )
-
-                logger.info("Injected compress summary", {
+            const rawSummaryContent = (summary as { summary?: unknown }).summary
+            if (typeof rawSummaryContent !== "string" || rawSummaryContent.length === 0) {
+                logger.warn("Skipping malformed compress summary", {
                     anchorMessageId: msgId,
-                    summaryLength: summary.summary.length,
+                    blockId: (summary as { blockId?: unknown }).blockId,
                 })
             } else {
-                logger.warn("No user message found for compress summary", {
-                    anchorMessageId: msgId,
-                })
+                // Find user message for variant and as base for synthetic message
+                const msgIndex = messages.indexOf(msg)
+                const userMessage = getLastUserMessage(messages, msgIndex)
+
+                if (userMessage) {
+                    const userInfo = userMessage.info as UserMessage
+                    const summaryContent = rawSummaryContent
+                    const summarySeed = `${summary.blockId}:${summary.anchorMessageId}`
+                    result.push(
+                        createSyntheticUserMessage(
+                            userMessage,
+                            summaryContent,
+                            userInfo.variant,
+                            summarySeed,
+                        ),
+                    )
+
+                    logger.info("Injected compress summary", {
+                        anchorMessageId: msgId,
+                        summaryLength: summaryContent.length,
+                    })
+                } else {
+                    logger.warn("No user message found for compress summary", {
+                        anchorMessageId: msgId,
+                    })
+                }
             }
         }
 
