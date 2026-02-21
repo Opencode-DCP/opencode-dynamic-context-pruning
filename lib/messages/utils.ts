@@ -80,7 +80,7 @@ export const createSyntheticToolPart = (
     const partId = generateStableId("prt_dcp_tool", deterministicSeed)
     const callId = generateStableId("call_dcp_tool", deterministicSeed)
 
-    const finalContent = `[System: This tool was called by the environment and is not available to the LLM]\n${content}`
+    const finalContent = `<system-reminder>\nThis tool was called by the environment and is not available to the LLM.\n</system-reminder>\n${content}`
 
     // Gemini requires a thought signature on synthetic function calls.
     // Keep this metadata both on the part and on state so whichever
