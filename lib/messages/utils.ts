@@ -80,10 +80,15 @@ export const createSyntheticToolPart = (
     const partId = generateStableId("prt_dcp_tool", deterministicSeed)
     const callId = generateStableId("call_dcp_tool", deterministicSeed)
 
-    // Gemini requires thoughtSignature bypass to accept synthetic tool parts
+    // Gemini requires a thought signature on synthetic function calls.
+    // Keep this metadata both on the part and on state so whichever
+    // conversion path is used can forward it to providerOptions.
     const toolPartMetadata = isGeminiModel(modelID)
-        ? { google: { thoughtSignature: "skip_thought_signature_validator" } }
-        : {}
+        ? {
+              google: { thoughtSignature: "skip_thought_signature_validator" },
+              vertex: { thoughtSignature: "skip_thought_signature_validator" },
+          }
+        : undefined
 
     return {
         id: partId,
@@ -92,14 +97,15 @@ export const createSyntheticToolPart = (
         type: "tool" as const,
         callID: callId,
         tool: "context_info",
+        ...(toolPartMetadata ? { metadata: toolPartMetadata } : {}),
         state: {
             status: "completed" as const,
             input: {},
             output: content,
             title: "Context Info",
-            metadata: toolPartMetadata,
+            ...(toolPartMetadata ? { metadata: toolPartMetadata } : {}),
             time: { start: now, end: now },
-        },
+        } as any,
     }
 }
 
