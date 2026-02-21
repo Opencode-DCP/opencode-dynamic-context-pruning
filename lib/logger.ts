@@ -180,6 +180,12 @@ export class Logger {
                             if (part.state?.error) {
                                 toolPart.error = part.state.error
                             }
+                            if (part.metadata) {
+                                toolPart.metadata = part.metadata
+                            }
+                            if (part.state?.title) {
+                                toolPart.title = part.state.title
+                            }
 
                             return toolPart
                         }
