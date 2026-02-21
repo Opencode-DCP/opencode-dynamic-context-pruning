@@ -134,11 +134,28 @@ def analyze_session(client, session: dict) -> dict:
         total_context = step["input"] + step["cache_read"]
         step["cache_hit_rate"] = (step["cache_read"] / total_context * 100) if total_context > 0 else 0
 
+    total_input = sum(s["input"] for s in steps)
+    total_output = sum(s["output"] for s in steps)
+    total_cache_read = sum(s["cache_read"] for s in steps)
+    total_cost = sum(s["cost"] for s in steps)
+    total_duration_ms = sum((s["duration_ms"] or 0) for s in steps)
+    total_dcp_tools = sum(len(s["dcp_tools_used"]) for s in steps)
+    
+    total_context = total_input + total_cache_read
+    avg_cache_hit_rate = (total_cache_read / total_context * 100) if total_context > 0 else 0
+
     return {
         "session_id": session_id,
         "title": title,
         "steps": steps,
         "total_steps": len(steps),
+        "total_input": total_input,
+        "total_output": total_output,
+        "total_cache_read": total_cache_read,
+        "total_cost": total_cost,
+        "total_duration_ms": total_duration_ms,
+        "total_dcp_tools": total_dcp_tools,
+        "avg_cache_hit_rate": avg_cache_hit_rate,
     }
 
 
@@ -186,6 +203,24 @@ def print_timeline(result: dict, colors: Colors):
         )
 
     print("-" * 130)
+
+    print(f"\n{c.BOLD}SESSION SUMMARY{c.RESET}")
+    print(f"  Total Input Tokens:  {result.get('total_input', 0):,}")
+    print(f"  Total Output Tokens: {result.get('total_output', 0):,}")
+    print(f"  Total Cache Read:    {result.get('total_cache_read', 0):,}")
+    
+    avg_pct = result.get('avg_cache_hit_rate', 0)
+    if avg_pct >= 80:
+        avg_pct_str = f"{c.GREEN}{avg_pct:.1f}%{c.RESET}"
+    elif avg_pct >= 50:
+        avg_pct_str = f"{c.YELLOW}{avg_pct:.1f}%{c.RESET}"
+    else:
+        avg_pct_str = f"{c.RED}{avg_pct:.1f}%{c.RESET}"
+        
+    print(f"  Avg Cache Hit Rate:  {avg_pct_str}")
+    print(f"  Total Cost:          ${result.get('total_cost', 0):.4f}")
+    print(f"  Total Duration:      {format_duration(result.get('total_duration_ms', 0))}")
+    print(f"  Total DCP Uses:      {result.get('total_dcp_tools', 0)}")
 
 
 def main():
