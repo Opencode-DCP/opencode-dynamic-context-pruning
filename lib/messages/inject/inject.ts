@@ -9,6 +9,7 @@ import {
     createSyntheticToolPart,
     findLastToolPart,
     isIgnoredUserMessage,
+    acceptsTextParts,
 } from "../utils"
 import {
     addAnchor,
@@ -124,6 +125,10 @@ export const insertMessageIdContext = (
             continue
         }
 
-        message.parts.push(createSyntheticToolPart(message, tag, toolModelId))
+        if (!acceptsTextParts(toolModelId)) {
+            message.parts.push(createSyntheticToolPart(message, tag, toolModelId))
+        } else {
+            message.parts.push(createSyntheticTextPart(message, tag))
+        }
     }
 }

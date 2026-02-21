@@ -1,7 +1,12 @@
 import type { SessionState, WithParts } from "../../state"
 import type { PluginConfig } from "../../config"
 import type { UserMessage } from "@opencode-ai/sdk/v2"
-import { createSyntheticTextPart, createSyntheticToolPart, isIgnoredUserMessage } from "../utils"
+import {
+    createSyntheticTextPart,
+    createSyntheticToolPart,
+    isIgnoredUserMessage,
+    acceptsTextParts,
+} from "../utils"
 import { getLastUserMessage } from "../../shared-utils"
 import { getCurrentTokenUsage } from "../../strategies/utils"
 
@@ -169,6 +174,10 @@ export function applyAnchoredNudge(
         }
 
         const toolModelId = modelId || ""
-        message.parts.push(createSyntheticToolPart(message, hintText, toolModelId))
+        if (!acceptsTextParts(toolModelId)) {
+            message.parts.push(createSyntheticToolPart(message, hintText, toolModelId))
+        } else {
+            message.parts.push(createSyntheticTextPart(message, hintText))
+        }
     }
 }
