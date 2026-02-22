@@ -21,12 +21,17 @@ export interface PersistedPrune {
     messageIds?: string[]
 }
 
+export interface PersistedNudges {
+    contextLimitAnchors: string[]
+    turnNudgeAnchors?: string[]
+    iterationNudgeAnchors?: string[]
+}
+
 export interface PersistedSessionState {
     sessionName?: string
     prune: PersistedPrune
     compressSummaries: CompressSummary[]
-    contextLimitAnchors: string[]
-    turnNudgeAnchors?: string[]
+    nudges: PersistedNudges
     stats: SessionStats
     lastUpdated: string
 }
@@ -68,8 +73,11 @@ export async function saveSessionState(
                 messages: Object.fromEntries(sessionState.prune.messages),
             },
             compressSummaries: sessionState.compressSummaries,
-            contextLimitAnchors: Array.from(sessionState.contextLimitAnchors),
-            turnNudgeAnchors: Array.from(sessionState.turnNudgeAnchors),
+            nudges: {
+                contextLimitAnchors: Array.from(sessionState.nudges.contextLimitAnchors),
+                turnNudgeAnchors: Array.from(sessionState.nudges.turnNudgeAnchors),
+                iterationNudgeAnchors: Array.from(sessionState.nudges.iterationNudgeAnchors),
+            },
             stats: sessionState.stats,
             lastUpdated: new Date().toISOString(),
         }
@@ -106,7 +114,14 @@ export async function loadSessionState(
 
         const hasNewFormat = state?.prune?.tools && typeof state.prune.tools === "object"
         const hasLegacyFormat = Array.isArray(state?.prune?.toolIds)
-        if (!state || !state.prune || (!hasNewFormat && !hasLegacyFormat) || !state.stats) {
+        const hasNudgeFormat = state?.nudges && typeof state.nudges === "object"
+        if (
+            !state ||
+            !state.prune ||
+            (!hasNewFormat && !hasLegacyFormat) ||
+            !state.stats ||
+            !hasNudgeFormat
+        ) {
             logger.warn("Invalid session state file, ignoring", {
                 sessionId: sessionId,
             })
@@ -134,8 +149,8 @@ export async function loadSessionState(
             state.compressSummaries = []
         }
 
-        const rawContextLimitAnchors = Array.isArray(state.contextLimitAnchors)
-            ? state.contextLimitAnchors
+        const rawContextLimitAnchors = Array.isArray(state.nudges.contextLimitAnchors)
+            ? state.nudges.contextLimitAnchors
             : []
         const validAnchors = rawContextLimitAnchors.filter(
             (entry): entry is string => typeof entry === "string",
@@ -148,10 +163,10 @@ export async function loadSessionState(
                 valid: validAnchors.length,
             })
         }
-        state.contextLimitAnchors = dedupedAnchors
+        state.nudges.contextLimitAnchors = dedupedAnchors
 
-        const rawTurnNudgeAnchors = Array.isArray(state.turnNudgeAnchors)
-            ? state.turnNudgeAnchors
+        const rawTurnNudgeAnchors = Array.isArray(state.nudges.turnNudgeAnchors)
+            ? state.nudges.turnNudgeAnchors
             : []
         const validSoftAnchors = rawTurnNudgeAnchors.filter(
             (entry): entry is string => typeof entry === "string",
@@ -164,7 +179,23 @@ export async function loadSessionState(
                 valid: validSoftAnchors.length,
             })
         }
-        state.turnNudgeAnchors = dedupedSoftAnchors
+        state.nudges.turnNudgeAnchors = dedupedSoftAnchors
+
+        const rawIterationNudgeAnchors = Array.isArray(state.nudges.iterationNudgeAnchors)
+            ? state.nudges.iterationNudgeAnchors
+            : []
+        const validIterationAnchors = rawIterationNudgeAnchors.filter(
+            (entry): entry is string => typeof entry === "string",
+        )
+        const dedupedIterationAnchors = [...new Set(validIterationAnchors)]
+        if (validIterationAnchors.length !== rawIterationNudgeAnchors.length) {
+            logger.warn("Filtered out malformed iterationNudgeAnchors entries", {
+                sessionId: sessionId,
+                original: rawIterationNudgeAnchors.length,
+                valid: validIterationAnchors.length,
+            })
+        }
+        state.nudges.iterationNudgeAnchors = dedupedIterationAnchors
 
         logger.info("Loaded session state from disk", {
             sessionId: sessionId,

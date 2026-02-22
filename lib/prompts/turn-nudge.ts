@@ -1,4 +1,4 @@
-export const TURN_NUDGE = `<instruction name=post_loop_turn_nudge>
+export const TURN_NUDGE = `<instruction name=turn_nudge>
 Agentic loop completed. Evaluate the just-finished portion against the next user message.
 
 At this stage, prefer one or more small, closed-range compressions over one broad compression.

@@ -18,6 +18,7 @@ export interface CompressTool {
 
 export interface ToolSettings {
     nudgeFrequency: number
+    iterationNudgeThreshold: number
     contextLimit: number | `${number}%`
     modelLimits?: Record<string, number | `${number}%`>
 }
@@ -101,6 +102,7 @@ export const VALID_CONFIG_KEYS = new Set([
     "tools",
     "tools.settings",
     "tools.settings.nudgeFrequency",
+    "tools.settings.iterationNudgeThreshold",
     "tools.settings.contextLimit",
     "tools.settings.modelLimits",
     "tools.compress",
@@ -307,6 +309,29 @@ export function validateConfigTypes(config: Record<string, any>): ValidationErro
                     actual: `${tools.settings.nudgeFrequency} (will be clamped to 1)`,
                 })
             }
+
+            if (
+                tools.settings.iterationNudgeThreshold !== undefined &&
+                typeof tools.settings.iterationNudgeThreshold !== "number"
+            ) {
+                errors.push({
+                    key: "tools.settings.iterationNudgeThreshold",
+                    expected: "number",
+                    actual: typeof tools.settings.iterationNudgeThreshold,
+                })
+            }
+
+            if (
+                typeof tools.settings.iterationNudgeThreshold === "number" &&
+                tools.settings.iterationNudgeThreshold < 1
+            ) {
+                errors.push({
+                    key: "tools.settings.iterationNudgeThreshold",
+                    expected: "positive number (>= 1)",
+                    actual: `${tools.settings.iterationNudgeThreshold} (will be clamped to 1)`,
+                })
+            }
+
             if (tools.settings.contextLimit !== undefined) {
                 const isValidNumber = typeof tools.settings.contextLimit === "number"
                 const isPercentString =
@@ -530,6 +555,7 @@ const defaultConfig: PluginConfig = {
     tools: {
         settings: {
             nudgeFrequency: 5,
+            iterationNudgeThreshold: 15,
             contextLimit: 100000,
         },
         compress: {
@@ -693,6 +719,8 @@ function mergeTools(base: PluginConfig["tools"], override?: ToolOverride): Plugi
     return {
         settings: {
             nudgeFrequency: override.settings?.nudgeFrequency ?? base.settings.nudgeFrequency,
+            iterationNudgeThreshold:
+                override.settings?.iterationNudgeThreshold ?? base.settings.iterationNudgeThreshold,
             contextLimit: override.settings?.contextLimit ?? base.settings.contextLimit,
             modelLimits: override.settings?.modelLimits ?? base.settings.modelLimits,
         },

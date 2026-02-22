@@ -2,6 +2,7 @@ import type { SessionState, WithParts } from "../../state"
 import type { Logger } from "../../logger"
 import type { PluginConfig } from "../../config"
 import { formatMessageIdTag } from "../../message-ids"
+import { getLastUserMessage } from "../../shared-utils"
 import { saveSessionState } from "../../state/persistence"
 import {
     appendMessageIdTagToToolOutput,
@@ -14,13 +15,15 @@ import {
 import {
     addAnchor,
     applyAnchoredNudge,
+    countMessagesAfterIndex,
     findLastNonIgnoredMessage,
+    getIterationNudgeThreshold,
     getNudgeFrequency,
     getModelInfo,
     isContextOverLimit,
     messageHasCompress,
 } from "./utils"
-import { CONTEXT_LIMIT_NUDGE, TURN_NUDGE_PROMPT } from "../../prompts"
+import { CONTEXT_LIMIT_NUDGE, ITERATION_NUDGE_PROMPT, TURN_NUDGE_PROMPT } from "../../prompts"
 
 export const insertCompressToolContext = (
     state: SessionState,
@@ -32,15 +35,14 @@ export const insertCompressToolContext = (
         return
     }
 
+    const lastMessage = findLastNonIgnoredMessage(messages)
     const lastAssistantMessage = messages.findLast((message) => message.info.role === "assistant")
+
     if (lastAssistantMessage && messageHasCompress(lastAssistantMessage)) {
-        const hasPersistedNudgeAnchors =
-            state.contextLimitAnchors.size > 0 || state.turnNudgeAnchors.size > 0
-        if (hasPersistedNudgeAnchors) {
-            state.contextLimitAnchors.clear()
-            state.turnNudgeAnchors.clear()
-            void saveSessionState(state, logger)
-        }
+        state.nudges.contextLimitAnchors.clear()
+        state.nudges.turnNudgeAnchors.clear()
+        state.nudges.iterationNudgeAnchors.clear()
+        void saveSessionState(state, logger)
         return
     }
 
@@ -50,13 +52,12 @@ export const insertCompressToolContext = (
     const contextOverLimit = isContextOverLimit(config, state, providerId, modelId, messages)
 
     if (contextOverLimit) {
-        const lastNonIgnoredMessage = findLastNonIgnoredMessage(messages)
-        if (lastNonIgnoredMessage) {
+        if (lastMessage) {
             const interval = getNudgeFrequency(config)
             const added = addAnchor(
-                state.contextLimitAnchors,
-                lastNonIgnoredMessage.message.info.id,
-                lastNonIgnoredMessage.index,
+                state.nudges.contextLimitAnchors,
+                lastMessage.message.info.id,
+                lastMessage.index,
                 messages,
                 interval,
             )
@@ -65,21 +66,54 @@ export const insertCompressToolContext = (
             }
         }
 
-        applyAnchoredNudge(state.contextLimitAnchors, messages, modelId, CONTEXT_LIMIT_NUDGE)
+        applyAnchoredNudge(state.nudges.contextLimitAnchors, messages, modelId, CONTEXT_LIMIT_NUDGE)
     } else {
-        const lastMessage = messages[messages.length - 1]
-        const isLastMessageNonIgnoredUser =
-            lastMessage?.info.role === "user" && !isIgnoredUserMessage(lastMessage)
+        const isLastMessageUser = lastMessage?.message.info.role === "user"
 
-        if (isLastMessageNonIgnoredUser && lastAssistantMessage) {
-            const previousSize = state.turnNudgeAnchors.size
-            state.turnNudgeAnchors.add(lastAssistantMessage.info.id)
-            if (state.turnNudgeAnchors.size !== previousSize) {
+        if (isLastMessageUser && lastAssistantMessage) {
+            const previousSize = state.nudges.turnNudgeAnchors.size
+            state.nudges.turnNudgeAnchors.add(lastAssistantMessage.info.id)
+            if (state.nudges.turnNudgeAnchors.size !== previousSize) {
                 anchorsChanged = true
             }
         }
 
-        applyAnchoredNudge(state.turnNudgeAnchors, messages, modelId, TURN_NUDGE_PROMPT)
+        const lastUserMessage = getLastUserMessage(messages)
+        if (lastUserMessage && lastMessage) {
+            const lastUserMessageIndex = messages.findIndex(
+                (message) => message.info.id === lastUserMessage.info.id,
+            )
+            if (lastUserMessageIndex >= 0) {
+                const messagesSinceUser = countMessagesAfterIndex(messages, lastUserMessageIndex)
+                const iterationThreshold = getIterationNudgeThreshold(config)
+
+                if (
+                    lastMessage.index > lastUserMessageIndex &&
+                    messagesSinceUser >= iterationThreshold
+                ) {
+                    const interval = getNudgeFrequency(config)
+                    const added = addAnchor(
+                        state.nudges.iterationNudgeAnchors,
+                        lastMessage.message.info.id,
+                        lastMessage.index,
+                        messages,
+                        interval,
+                    )
+
+                    if (added) {
+                        anchorsChanged = true
+                    }
+                }
+            }
+        }
+
+        applyAnchoredNudge(state.nudges.turnNudgeAnchors, messages, modelId, TURN_NUDGE_PROMPT)
+        applyAnchoredNudge(
+            state.nudges.iterationNudgeAnchors,
+            messages,
+            modelId,
+            ITERATION_NUDGE_PROMPT,
+        )
     }
 
     if (anchorsChanged) {
@@ -87,7 +121,7 @@ export const insertCompressToolContext = (
     }
 }
 
-export const insertMessageIdContext = (
+export const insertMessageIds = (
     state: SessionState,
     config: PluginConfig,
     messages: WithParts[],

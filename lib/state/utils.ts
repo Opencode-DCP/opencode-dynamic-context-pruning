@@ -90,6 +90,9 @@ export function resetOnCompaction(state: SessionState): void {
     state.prune.tools = new Map<string, number>()
     state.prune.messages = new Map<string, number>()
     state.compressSummaries = []
-    state.contextLimitAnchors = new Set<string>()
-    state.turnNudgeAnchors = new Set<string>()
+    state.nudges = {
+        contextLimitAnchors: new Set<string>(),
+        turnNudgeAnchors: new Set<string>(),
+        iterationNudgeAnchors: new Set<string>(),
+    }
 }

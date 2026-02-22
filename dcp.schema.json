@@ -22,13 +22,20 @@
         },
         "pruneNotification": {
             "type": "string",
-            "enum": ["off", "minimal", "detailed"],
+            "enum": [
+                "off",
+                "minimal",
+                "detailed"
+            ],
             "default": "detailed",
             "description": "Level of notification shown when context management occurs"
         },
         "pruneNotificationType": {
             "type": "string",
-            "enum": ["chat", "toast"],
+            "enum": [
+                "chat",
+                "toast"
+            ],
             "default": "chat",
             "description": "Where to display notifications (chat message or toast notification)"
         },
@@ -118,6 +125,12 @@
                             "minimum": 1,
                             "description": "How often the context-limit nudge fires when above contextLimit (1 = every fetch, 5 = every 5th fetch)"
                         },
+                        "iterationNudgeThreshold": {
+                            "type": "number",
+                            "default": 15,
+                            "minimum": 1,
+                            "description": "Number of messages after the last user message before iteration nudges begin"
+                        },
                         "contextLimit": {
                             "description": "When session tokens exceed this limit, a compress nudge is injected (\"X%\" uses percentage of the model's context window)",
                             "default": 100000,
@@ -155,7 +168,11 @@
                     "properties": {
                         "permission": {
                             "type": "string",
-                            "enum": ["ask", "allow", "deny"],
+                            "enum": [
+                                "ask",
+                                "allow",
+                                "deny"
+                            ],
                             "default": "allow",
                             "description": "Permission mode (deny disables the tool)"
                         },

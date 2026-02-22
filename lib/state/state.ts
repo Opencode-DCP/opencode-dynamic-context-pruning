@@ -70,8 +70,11 @@ export function createSessionState(): SessionState {
             messages: new Map<string, number>(),
         },
         compressSummaries: [],
-        contextLimitAnchors: new Set<string>(),
-        turnNudgeAnchors: new Set<string>(),
+        nudges: {
+            contextLimitAnchors: new Set<string>(),
+            turnNudgeAnchors: new Set<string>(),
+            iterationNudgeAnchors: new Set<string>(),
+        },
         stats: {
             pruneTokenCounter: 0,
             totalPruneTokens: 0,
@@ -101,8 +104,11 @@ export function resetSessionState(state: SessionState): void {
         messages: new Map<string, number>(),
     }
     state.compressSummaries = []
-    state.contextLimitAnchors = new Set<string>()
-    state.turnNudgeAnchors = new Set<string>()
+    state.nudges = {
+        contextLimitAnchors: new Set<string>(),
+        turnNudgeAnchors: new Set<string>(),
+        iterationNudgeAnchors: new Set<string>(),
+    }
     state.stats = {
         pruneTokenCounter: 0,
         totalPruneTokens: 0,
@@ -146,7 +152,7 @@ export async function ensureSessionInitialized(
 
     state.lastCompaction = findLastCompactionTimestamp(messages)
     state.currentTurn = countTurns(state, messages)
-    state.turnNudgeAnchors = collectTurnNudgeAnchors(messages)
+    state.nudges.turnNudgeAnchors = collectTurnNudgeAnchors(messages)
 
     const persisted = await loadSessionState(sessionId, logger)
     if (persisted === null) {
@@ -156,11 +162,14 @@ export async function ensureSessionInitialized(
     state.prune.tools = loadPruneMap(persisted.prune.tools, persisted.prune.toolIds)
     state.prune.messages = loadPruneMap(persisted.prune.messages, persisted.prune.messageIds)
     state.compressSummaries = persisted.compressSummaries || []
-    state.contextLimitAnchors = new Set<string>(persisted.contextLimitAnchors || [])
-    state.turnNudgeAnchors = new Set<string>([
-        ...state.turnNudgeAnchors,
-        ...(persisted.turnNudgeAnchors || []),
+    state.nudges.contextLimitAnchors = new Set<string>(persisted.nudges.contextLimitAnchors || [])
+    state.nudges.turnNudgeAnchors = new Set<string>([
+        ...state.nudges.turnNudgeAnchors,
+        ...(persisted.nudges.turnNudgeAnchors || []),
     ])
+    state.nudges.iterationNudgeAnchors = new Set<string>(
+        persisted.nudges.iterationNudgeAnchors || [],
+    )
     state.stats = {
         pruneTokenCounter: persisted.stats?.pruneTokenCounter || 0,
         totalPruneTokens: persisted.stats?.totalPruneTokens || 0,

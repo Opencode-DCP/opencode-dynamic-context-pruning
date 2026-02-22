@@ -43,6 +43,12 @@ export interface MessageIdState {
     nextRef: number
 }
 
+export interface Nudges {
+    contextLimitAnchors: Set<string>
+    turnNudgeAnchors: Set<string>
+    iterationNudgeAnchors: Set<string>
+}
+
 export interface SessionState {
     sessionId: string | null
     isSubAgent: boolean
@@ -50,8 +56,7 @@ export interface SessionState {
     pendingManualTrigger: PendingManualTrigger | null
     prune: Prune
     compressSummaries: CompressSummary[]
-    contextLimitAnchors: Set<string>
-    turnNudgeAnchors: Set<string>
+    nudges: Nudges
     stats: SessionStats
     toolParameters: Map<string, ToolParameterEntry>
     toolIdList: string[]

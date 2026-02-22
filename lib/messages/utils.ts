@@ -5,8 +5,9 @@ import type { UserMessage } from "@opencode-ai/sdk/v2"
 
 const SUMMARY_ID_HASH_LENGTH = 16
 const DCP_MESSAGE_ID_TAG_REGEX = /<dcp-message-id>(?:m\d+|b\d+)<\/dcp-message-id>/g
-const TURN_NUDGE_BLOCK_REGEX =
-    /<instruction\s+name=post_loop_turn_nudge\b[^>]*>[\s\S]*?<\/instruction>/g
+const TURN_NUDGE_BLOCK_REGEX = /<instruction\s+name=turn_nudge\b[^>]*>[\s\S]*?<\/instruction>/g
+const ITERATION_NUDGE_BLOCK_REGEX =
+    /<instruction\s+name=iteration_nudge\b[^>]*>[\s\S]*?<\/instruction>/g
 
 const generateStableId = (prefix: string, seed: string): string => {
     const hash = createHash("sha256").update(seed).digest("hex").slice(0, SUMMARY_ID_HASH_LENGTH)
@@ -186,6 +187,7 @@ export const stripHallucinations = (messages: WithParts[]): void => {
             if (part.type === "text" && typeof part.text === "string") {
                 part.text = part.text
                     .replace(TURN_NUDGE_BLOCK_REGEX, "")
+                    .replace(ITERATION_NUDGE_BLOCK_REGEX, "")
                     .replace(DCP_MESSAGE_ID_TAG_REGEX, "")
             }
 
@@ -196,6 +198,7 @@ export const stripHallucinations = (messages: WithParts[]): void => {
             ) {
                 part.state.output = part.state.output
                     .replace(TURN_NUDGE_BLOCK_REGEX, "")
+                    .replace(ITERATION_NUDGE_BLOCK_REGEX, "")
                     .replace(DCP_MESSAGE_ID_TAG_REGEX, "")
             }
         }

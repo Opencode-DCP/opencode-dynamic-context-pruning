@@ -24,6 +24,10 @@ export function getNudgeFrequency(config: PluginConfig): number {
     return Math.max(1, Math.floor(config.tools.settings.nudgeFrequency || 1))
 }
 
+export function getIterationNudgeThreshold(config: PluginConfig): number {
+    return Math.max(1, Math.floor(config.tools.settings.iterationNudgeThreshold || 1))
+}
+
 export function findLastNonIgnoredMessage(messages: WithParts[]): LastNonIgnoredMessage | null {
     for (let i = messages.length - 1; i >= 0; i--) {
         const message = messages[i]
@@ -34,6 +38,20 @@ export function findLastNonIgnoredMessage(messages: WithParts[]): LastNonIgnored
     }
 
     return null
+}
+
+export function countMessagesAfterIndex(messages: WithParts[], index: number): number {
+    let count = 0
+
+    for (let i = index + 1; i < messages.length; i++) {
+        const message = messages[i]
+        if (message.info.role === "user" && isIgnoredUserMessage(message)) {
+            continue
+        }
+        count++
+    }
+
+    return count
 }
 
 export function messageHasCompress(message: WithParts): boolean {

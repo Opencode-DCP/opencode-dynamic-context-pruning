@@ -2,6 +2,7 @@ import { SYSTEM as SYSTEM_PROMPT } from "./_codegen/system.generated"
 import { NUDGE } from "./nudge"
 import { COMPRESS } from "./compress"
 import { TURN_NUDGE } from "./turn-nudge"
+import { ITERATION_NUDGE } from "./iteration-nudge"
 
 export { COMPRESS as COMPRESS_TOOL_SPEC }
 
@@ -27,4 +28,5 @@ function extractInstruction(content: string, name: string): string {
 }
 
 export const CONTEXT_LIMIT_NUDGE = extractInstruction(NUDGE, "context_buildup_warning")
-export const TURN_NUDGE_PROMPT = extractInstruction(TURN_NUDGE, "post_loop_turn_nudge")
+export const TURN_NUDGE_PROMPT = extractInstruction(TURN_NUDGE, "turn_nudge")
+export const ITERATION_NUDGE_PROMPT = extractInstruction(ITERATION_NUDGE, "iteration_nudge")

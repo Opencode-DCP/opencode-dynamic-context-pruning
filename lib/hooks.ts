@@ -4,7 +4,7 @@ import type { PluginConfig } from "./config"
 import { assignMessageRefs } from "./message-ids"
 import { syncToolCache } from "./state/tool-cache"
 import { deduplicate, supersedeWrites, purgeErrors } from "./strategies"
-import { prune, insertCompressToolContext, insertMessageIdContext } from "./messages"
+import { prune, insertCompressToolContext, insertMessageIds } from "./messages"
 import { buildToolIdList, isIgnoredUserMessage, stripHallucinations } from "./messages/utils"
 import { checkSession } from "./state"
 import { renderSystemPrompt } from "./prompts"
@@ -23,8 +23,9 @@ const INTERNAL_AGENT_SIGNATURES = [
 ]
 
 const DCP_MESSAGE_ID_TAG_REGEX = /<dcp-message-id>(?:m\d+|b\d+)<\/dcp-message-id>/g
-const TURN_NUDGE_BLOCK_REGEX =
-    /<instruction\s+name=post_loop_turn_nudge\b[^>]*>[\s\S]*?<\/instruction>/g
+const TURN_NUDGE_BLOCK_REGEX = /<instruction\s+name=turn_nudge\b[^>]*>[\s\S]*?<\/instruction>/g
+const ITERATION_NUDGE_BLOCK_REGEX =
+    /<instruction\s+name=iteration_nudge\b[^>]*>[\s\S]*?<\/instruction>/g
 
 function applyPendingManualTriggerPrompt(
     state: SessionState,
@@ -117,7 +118,7 @@ export function createChatMessageTransformHandler(
         purgeErrors(state, logger, config, output.messages)
         prune(state, logger, config, output.messages)
         insertCompressToolContext(state, config, logger, output.messages)
-        insertMessageIdContext(state, config, output.messages)
+        insertMessageIds(state, config, output.messages)
         applyPendingManualTriggerPrompt(state, output.messages, logger)
 
         if (state.sessionId) {
@@ -226,6 +227,7 @@ export function createTextCompleteHandler() {
     ) => {
         output.text = output.text
             .replace(TURN_NUDGE_BLOCK_REGEX, "")
+            .replace(ITERATION_NUDGE_BLOCK_REGEX, "")
             .replace(DCP_MESSAGE_ID_TAG_REGEX, "")
     }
 }
