@@ -34,6 +34,10 @@ export const insertCompressNudges = (
         return
     }
 
+    if (state.manualMode) {
+        return
+    }
+
     const lastMessage = findLastNonIgnoredMessage(messages)
     const lastAssistantMessage = messages.findLast((message) => message.info.role === "assistant")
 
