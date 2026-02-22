@@ -32,7 +32,7 @@ const TOOL_COMMANDS: Record<string, [string, string]> = {
 function getVisibleCommands(config: PluginConfig): [string, string][] {
     const commands = [...BASE_COMMANDS]
 
-    if (config.tools.compress.permission !== "deny") {
+    if (config.compress.permission !== "deny") {
         commands.push(TOOL_COMMANDS.compress)
     }
 

@@ -31,7 +31,7 @@ export const insertCompressToolContext = (
     logger: Logger,
     messages: WithParts[],
 ): void => {
-    if (config.tools.compress.permission === "deny") {
+    if (config.compress.permission === "deny") {
         return
     }
 
@@ -126,7 +126,7 @@ export const insertMessageIds = (
     config: PluginConfig,
     messages: WithParts[],
 ): void => {
-    if (config.tools.compress.permission === "deny") {
+    if (config.compress.permission === "deny") {
         return
     }
 

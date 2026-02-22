@@ -105,34 +105,28 @@ DCP uses its own config file:
 >     // Protect file operations from pruning via glob patterns
 >     // Patterns match tool parameters.filePath (e.g. read/write/edit)
 >     "protectedFilePatterns": [],
->     // LLM-driven context management tool
->     "tools": {
->         // Shared settings for context management
->         "settings": {
->             // Token limit at which the model compresses session context
->             // to keep the model in the "smart zone" (not a hard limit)
->             // Accepts: number or "X%" (percentage of model's context window)
->             "contextLimit": 100000,
->             // Optional per-model overrides by exact providerID/modelID
->             // Accepts: number or "X%"
->             // Example:
->             // "modelLimits": {
->             //     "openai/gpt-5": 120000,
->             //     "anthropic/claude-3-7-sonnet": "80%"
->             // },
->             // How often the context-limit nudge fires (1 = every fetch, 5 = every 5th)
->             "nudgeFrequency": 5,
->             // Start iteration nudges after this many messages
->             // have occurred since the last user message
->             "iterationNudgeThreshold": 15,
->         },
->         // Unified context compression tool
->         "compress": {
->             // Permission mode: "allow" (no prompt), "ask" (prompt), "deny" (tool not registered)
->             "permission": "allow",
->             // Show summary content as an ignored message notification
->             "showCompression": false,
->         },
+>     // Unified context compression tool and behavior settings
+>     "compress": {
+>         // Permission mode: "allow" (no prompt), "ask" (prompt), "deny" (tool not registered)
+>         "permission": "allow",
+>         // Show summary content in a chat notification
+>         "showCompression": false,
+>         // Token limit at which the model compresses session context
+>         // to keep the model in the "smart zone" (not a hard limit)
+>         // Accepts: number or "X%" (percentage of model's context window)
+>         "contextLimit": 100000,
+>         // Optional per-model overrides by exact providerID/modelID
+>         // Accepts: number or "X%"
+>         // Example:
+>         // "modelLimits": {
+>         //     "openai/gpt-5": 120000,
+>         //     "anthropic/claude-3-7-sonnet": "80%"
+>         // },
+>         // How often the context-limit nudge fires (1 = every fetch, 5 = every 5th)
+>         "nudgeFrequency": 5,
+>         // Start iteration nudges after this many messages
+>         // have occurred since the last user message
+>         "iterationNudgeThreshold": 15,
 >     },
 >     // Automatic pruning strategies
 >     "strategies": {

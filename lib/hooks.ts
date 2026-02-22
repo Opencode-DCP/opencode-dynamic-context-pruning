@@ -87,7 +87,7 @@ export function createSystemPromptHandler(
             return
         }
 
-        if (config.tools.compress.permission === "deny") {
+        if (config.compress.permission === "deny") {
             return
         }
 
@@ -194,7 +194,7 @@ export function createCommandExecuteHandler(
                 throw new Error("__DCP_MANUAL_HANDLED__")
             }
 
-            if (subcommand === "compress" && config.tools.compress.permission !== "deny") {
+            if (subcommand === "compress" && config.compress.permission !== "deny") {
                 const userFocus = subArgs.join(" ").trim()
                 const prompt = await handleManualTriggerCommand(commandCtx, "compress", userFocus)
                 if (!prompt) {

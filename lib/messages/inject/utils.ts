@@ -21,11 +21,11 @@ export interface LastNonIgnoredMessage {
 }
 
 export function getNudgeFrequency(config: PluginConfig): number {
-    return Math.max(1, Math.floor(config.tools.settings.nudgeFrequency || 1))
+    return Math.max(1, Math.floor(config.compress.nudgeFrequency || 1))
 }
 
 export function getIterationNudgeThreshold(config: PluginConfig): number {
-    return Math.max(1, Math.floor(config.tools.settings.iterationNudgeThreshold || 1))
+    return Math.max(1, Math.floor(config.compress.iterationNudgeThreshold || 1))
 }
 
 export function findLastNonIgnoredMessage(messages: WithParts[]): LastNonIgnoredMessage | null {
@@ -107,7 +107,7 @@ function resolveContextLimit(
         return Math.round((clampedPercent / 100) * state.modelContextLimit)
     }
 
-    const modelLimits = config.tools.settings.modelLimits
+    const modelLimits = config.compress.modelLimits
     if (modelLimits && providerId !== undefined && modelId !== undefined) {
         const providerModelId = `${providerId}/${modelId}`
         const modelLimit = modelLimits[providerModelId]
@@ -116,7 +116,7 @@ function resolveContextLimit(
         }
     }
 
-    return parseLimitValue(config.tools.settings.contextLimit)
+    return parseLimitValue(config.compress.contextLimit)
 }
 
 export function isContextOverLimit(

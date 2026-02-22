@@ -180,14 +180,14 @@ export async function sendCompressNotification(
         } else {
             message += ` condensed`
         }
-        if (config.tools.compress.showCompression) {
+        if (config.compress.showCompression) {
             message += `\n→ Compression (~${summaryTokensStr}): ${summary}`
         }
     }
 
     if (config.pruneNotificationType === "toast") {
         let toastMessage = message
-        if (config.tools.compress.showCompression) {
+        if (config.compress.showCompression) {
             const truncatedSummary = truncateToastSummary(summary)
             if (truncatedSummary !== summary) {
                 toastMessage = toastMessage.replace(

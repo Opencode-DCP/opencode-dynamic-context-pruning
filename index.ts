@@ -63,7 +63,7 @@ const plugin: Plugin = (async (ctx) => {
             ctx.directory,
         ),
         tool: {
-            ...(config.tools.compress.permission !== "deny" && {
+            ...(config.compress.permission !== "deny" && {
                 compress: createCompressTool({
                     client: ctx.client,
                     state,
@@ -83,7 +83,7 @@ const plugin: Plugin = (async (ctx) => {
             }
 
             const toolsToAdd: string[] = []
-            if (config.tools.compress.permission !== "deny") toolsToAdd.push("compress")
+            if (config.compress.permission !== "deny") toolsToAdd.push("compress")
 
             if (toolsToAdd.length > 0) {
                 const existingPrimaryTools = opencodeConfig.experimental?.primary_tools ?? []
@@ -100,7 +100,7 @@ const plugin: Plugin = (async (ctx) => {
             const permission = opencodeConfig.permission ?? {}
             opencodeConfig.permission = {
                 ...permission,
-                compress: config.tools.compress.permission,
+                compress: config.compress.permission,
             } as typeof permission
         },
     }

@@ -22,20 +22,13 @@
         },
         "pruneNotification": {
             "type": "string",
-            "enum": [
-                "off",
-                "minimal",
-                "detailed"
-            ],
+            "enum": ["off", "minimal", "detailed"],
             "default": "detailed",
             "description": "Level of notification shown when context management occurs"
         },
         "pruneNotificationType": {
             "type": "string",
-            "enum": [
-                "chat",
-                "toast"
-            ],
+            "enum": ["chat", "toast"],
             "default": "chat",
             "description": "Where to display notifications (chat message or toast notification)"
         },
@@ -109,79 +102,61 @@
             "default": [],
             "description": "Glob patterns for files that should be protected from pruning (e.g., '**/*.config.ts')"
         },
-        "tools": {
+        "compress": {
             "type": "object",
-            "description": "Configuration for context-management tools",
+            "description": "Configuration for the unified compress tool",
             "additionalProperties": false,
             "properties": {
-                "settings": {
-                    "type": "object",
-                    "description": "General tool settings",
-                    "additionalProperties": false,
-                    "properties": {
-                        "nudgeFrequency": {
-                            "type": "number",
-                            "default": 5,
-                            "minimum": 1,
-                            "description": "How often the context-limit nudge fires when above contextLimit (1 = every fetch, 5 = every 5th fetch)"
+                "permission": {
+                    "type": "string",
+                    "enum": ["ask", "allow", "deny"],
+                    "default": "allow",
+                    "description": "Permission mode (deny disables the tool)"
+                },
+                "showCompression": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Show compression summaries in notifications"
+                },
+                "contextLimit": {
+                    "description": "When session tokens exceed this limit, a compress nudge is injected (\"X%\" uses percentage of the model's context window)",
+                    "default": 100000,
+                    "oneOf": [
+                        {
+                            "type": "number"
                         },
-                        "iterationNudgeThreshold": {
-                            "type": "number",
-                            "default": 15,
-                            "minimum": 1,
-                            "description": "Number of messages after the last user message before iteration nudges begin"
-                        },
-                        "contextLimit": {
-                            "description": "When session tokens exceed this limit, a compress nudge is injected (\"X%\" uses percentage of the model's context window)",
-                            "default": 100000,
-                            "oneOf": [
-                                {
-                                    "type": "number"
-                                },
-                                {
-                                    "type": "string",
-                                    "pattern": "^\\d+(?:\\.\\d+)?%$"
-                                }
-                            ]
-                        },
-                        "modelLimits": {
-                            "description": "Model-specific context limits by exact provider/model key. Examples: \"openai/gpt-5\", \"anthropic/claude-3-7-sonnet\", \"ollama/llama3.1\"",
-                            "type": "object",
-                            "additionalProperties": {
-                                "oneOf": [
-                                    {
-                                        "type": "number"
-                                    },
-                                    {
-                                        "type": "string",
-                                        "pattern": "^\\d+(?:\\.\\d+)?%$"
-                                    }
-                                ]
-                            }
+                        {
+                            "type": "string",
+                            "pattern": "^\\d+(?:\\.\\d+)?%$"
                         }
+                    ]
+                },
+                "modelLimits": {
+                    "description": "Model-specific context limits by exact provider/model key. Examples: \"openai/gpt-5\", \"anthropic/claude-3-7-sonnet\", \"ollama/llama3.1\"",
+                    "type": "object",
+                    "additionalProperties": {
+                        "oneOf": [
+                            {
+                                "type": "number"
+                            },
+                            {
+                                "type": "string",
+                                "pattern": "^\\d+(?:\\.\\d+)?%$"
+                            }
+                        ]
                     }
                 },
-                "compress": {
-                    "type": "object",
-                    "description": "Configuration for the unified compress tool",
-                    "additionalProperties": false,
-                    "properties": {
-                        "permission": {
-                            "type": "string",
-                            "enum": [
-                                "ask",
-                                "allow",
-                                "deny"
-                            ],
-                            "default": "allow",
-                            "description": "Permission mode (deny disables the tool)"
-                        },
-                        "showCompression": {
-                            "type": "boolean",
-                            "default": false,
-                            "description": "Show compression summaries in notifications"
-                        }
-                    }
+                "nudgeFrequency": {
+                    "type": "number",
+                    "default": 5,
+                    "minimum": 1,
+                    "description": "How often the context-limit nudge fires when above contextLimit (1 = every fetch, 5 = every 5th fetch)"
+                },
+                "iterationNudgeThreshold": {
+                    "type": "number",
+                    "default": 15,
+                    "minimum": 1,
+                    "description": "Number of messages after the last user message before iteration nudges begin"
                 }
             }
         },

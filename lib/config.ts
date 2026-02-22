@@ -14,18 +14,10 @@ export interface Deduplication {
 export interface CompressTool {
     permission: Permission
     showCompression: boolean
-}
-
-export interface ToolSettings {
-    nudgeFrequency: number
-    iterationNudgeThreshold: number
     contextLimit: number | `${number}%`
     modelLimits?: Record<string, number | `${number}%`>
-}
-
-export interface Tools {
-    settings: ToolSettings
-    compress: CompressTool
+    nudgeFrequency: number
+    iterationNudgeThreshold: number
 }
 
 export interface Commands {
@@ -62,7 +54,7 @@ export interface PluginConfig {
     manualMode: ManualModeConfig
     turnProtection: TurnProtection
     protectedFilePatterns: string[]
-    tools: Tools
+    compress: CompressTool
     strategies: {
         deduplication: Deduplication
         supersedeWrites: SupersedeWrites
@@ -70,7 +62,7 @@ export interface PluginConfig {
     }
 }
 
-type ToolOverride = Partial<Tools>
+type CompressOverride = Partial<CompressTool>
 
 const DEFAULT_PROTECTED_TOOLS = [
     "task",
@@ -99,15 +91,13 @@ export const VALID_CONFIG_KEYS = new Set([
     "manualMode",
     "manualMode.enabled",
     "manualMode.automaticStrategies",
-    "tools",
-    "tools.settings",
-    "tools.settings.nudgeFrequency",
-    "tools.settings.iterationNudgeThreshold",
-    "tools.settings.contextLimit",
-    "tools.settings.modelLimits",
-    "tools.compress",
-    "tools.compress.permission",
-    "tools.compress.showCompression",
+    "compress",
+    "compress.permission",
+    "compress.showCompression",
+    "compress.contextLimit",
+    "compress.modelLimits",
+    "compress.nudgeFrequency",
+    "compress.iterationNudgeThreshold",
     "strategies",
     "strategies.deduplication",
     "strategies.deduplication.enabled",
@@ -127,7 +117,7 @@ function getConfigKeyPaths(obj: Record<string, any>, prefix = ""): string[] {
         keys.push(fullKey)
 
         // modelLimits is a dynamic map keyed by providerID/modelID; do not recurse into arbitrary IDs.
-        if (fullKey === "tools.settings.modelLimits") {
+        if (fullKey === "compress.modelLimits") {
             continue
         }
 
@@ -285,89 +275,89 @@ export function validateConfigTypes(config: Record<string, any>): ValidationErro
         }
     }
 
-    const tools = config.tools
-    if (tools) {
-        if (tools.settings) {
+    const compress = config.compress
+    if (compress !== undefined) {
+        if (typeof compress !== "object" || compress === null || Array.isArray(compress)) {
+            errors.push({
+                key: "compress",
+                expected: "object",
+                actual: typeof compress,
+            })
+        } else {
             if (
-                tools.settings.nudgeFrequency !== undefined &&
-                typeof tools.settings.nudgeFrequency !== "number"
+                compress.nudgeFrequency !== undefined &&
+                typeof compress.nudgeFrequency !== "number"
             ) {
                 errors.push({
-                    key: "tools.settings.nudgeFrequency",
+                    key: "compress.nudgeFrequency",
                     expected: "number",
-                    actual: typeof tools.settings.nudgeFrequency,
+                    actual: typeof compress.nudgeFrequency,
                 })
             }
 
-            if (
-                typeof tools.settings.nudgeFrequency === "number" &&
-                tools.settings.nudgeFrequency < 1
-            ) {
+            if (typeof compress.nudgeFrequency === "number" && compress.nudgeFrequency < 1) {
                 errors.push({
-                    key: "tools.settings.nudgeFrequency",
+                    key: "compress.nudgeFrequency",
                     expected: "positive number (>= 1)",
-                    actual: `${tools.settings.nudgeFrequency} (will be clamped to 1)`,
+                    actual: `${compress.nudgeFrequency} (will be clamped to 1)`,
                 })
             }
 
             if (
-                tools.settings.iterationNudgeThreshold !== undefined &&
-                typeof tools.settings.iterationNudgeThreshold !== "number"
+                compress.iterationNudgeThreshold !== undefined &&
+                typeof compress.iterationNudgeThreshold !== "number"
             ) {
                 errors.push({
-                    key: "tools.settings.iterationNudgeThreshold",
+                    key: "compress.iterationNudgeThreshold",
                     expected: "number",
-                    actual: typeof tools.settings.iterationNudgeThreshold,
+                    actual: typeof compress.iterationNudgeThreshold,
                 })
             }
 
             if (
-                typeof tools.settings.iterationNudgeThreshold === "number" &&
-                tools.settings.iterationNudgeThreshold < 1
+                typeof compress.iterationNudgeThreshold === "number" &&
+                compress.iterationNudgeThreshold < 1
             ) {
                 errors.push({
-                    key: "tools.settings.iterationNudgeThreshold",
+                    key: "compress.iterationNudgeThreshold",
                     expected: "positive number (>= 1)",
-                    actual: `${tools.settings.iterationNudgeThreshold} (will be clamped to 1)`,
+                    actual: `${compress.iterationNudgeThreshold} (will be clamped to 1)`,
                 })
             }
 
-            if (tools.settings.contextLimit !== undefined) {
-                const isValidNumber = typeof tools.settings.contextLimit === "number"
+            if (compress.contextLimit !== undefined) {
+                const isValidNumber = typeof compress.contextLimit === "number"
                 const isPercentString =
-                    typeof tools.settings.contextLimit === "string" &&
-                    tools.settings.contextLimit.endsWith("%")
+                    typeof compress.contextLimit === "string" && compress.contextLimit.endsWith("%")
 
                 if (!isValidNumber && !isPercentString) {
                     errors.push({
-                        key: "tools.settings.contextLimit",
+                        key: "compress.contextLimit",
                         expected: 'number | "${number}%"',
-                        actual: JSON.stringify(tools.settings.contextLimit),
+                        actual: JSON.stringify(compress.contextLimit),
                     })
                 }
             }
 
-            if (tools.settings.modelLimits !== undefined) {
+            if (compress.modelLimits !== undefined) {
                 if (
-                    typeof tools.settings.modelLimits !== "object" ||
-                    tools.settings.modelLimits === null ||
-                    Array.isArray(tools.settings.modelLimits)
+                    typeof compress.modelLimits !== "object" ||
+                    compress.modelLimits === null ||
+                    Array.isArray(compress.modelLimits)
                 ) {
                     errors.push({
-                        key: "tools.settings.modelLimits",
+                        key: "compress.modelLimits",
                         expected: "Record<string, number | ${number}%>",
-                        actual: typeof tools.settings.modelLimits,
+                        actual: typeof compress.modelLimits,
                     })
                 } else {
-                    for (const [providerModelKey, limit] of Object.entries(
-                        tools.settings.modelLimits,
-                    )) {
+                    for (const [providerModelKey, limit] of Object.entries(compress.modelLimits)) {
                         const isValidNumber = typeof limit === "number"
                         const isPercentString =
                             typeof limit === "string" && /^\d+(?:\.\d+)?%$/.test(limit)
                         if (!isValidNumber && !isPercentString) {
                             errors.push({
-                                key: `tools.settings.modelLimits.${providerModelKey}`,
+                                key: `compress.modelLimits.${providerModelKey}`,
                                 expected: 'number | "${number}%"',
                                 actual: JSON.stringify(limit),
                             })
@@ -375,29 +365,24 @@ export function validateConfigTypes(config: Record<string, any>): ValidationErro
                     }
                 }
             }
-        }
 
-        if (tools.compress) {
             const validValues = ["ask", "allow", "deny"]
-            if (
-                tools.compress.permission !== undefined &&
-                !validValues.includes(tools.compress.permission)
-            ) {
+            if (compress.permission !== undefined && !validValues.includes(compress.permission)) {
                 errors.push({
-                    key: "tools.compress.permission",
+                    key: "compress.permission",
                     expected: '"ask" | "allow" | "deny"',
-                    actual: JSON.stringify(tools.compress.permission),
+                    actual: JSON.stringify(compress.permission),
                 })
             }
 
             if (
-                tools.compress.showCompression !== undefined &&
-                typeof tools.compress.showCompression !== "boolean"
+                compress.showCompression !== undefined &&
+                typeof compress.showCompression !== "boolean"
             ) {
                 errors.push({
-                    key: "tools.compress.showCompression",
+                    key: "compress.showCompression",
                     expected: "boolean",
-                    actual: typeof tools.compress.showCompression,
+                    actual: typeof compress.showCompression,
                 })
             }
         }
@@ -552,16 +537,12 @@ const defaultConfig: PluginConfig = {
         turns: 4,
     },
     protectedFilePatterns: [],
-    tools: {
-        settings: {
-            nudgeFrequency: 5,
-            iterationNudgeThreshold: 15,
-            contextLimit: 100000,
-        },
-        compress: {
-            permission: "allow",
-            showCompression: false,
-        },
+    compress: {
+        permission: "allow",
+        showCompression: false,
+        contextLimit: 100000,
+        nudgeFrequency: 5,
+        iterationNudgeThreshold: 15,
     },
     strategies: {
         deduplication: {
@@ -711,23 +692,21 @@ function mergeStrategies(
     }
 }
 
-function mergeTools(base: PluginConfig["tools"], override?: ToolOverride): PluginConfig["tools"] {
+function mergeCompress(
+    base: PluginConfig["compress"],
+    override?: CompressOverride,
+): PluginConfig["compress"] {
     if (!override) {
         return base
     }
 
     return {
-        settings: {
-            nudgeFrequency: override.settings?.nudgeFrequency ?? base.settings.nudgeFrequency,
-            iterationNudgeThreshold:
-                override.settings?.iterationNudgeThreshold ?? base.settings.iterationNudgeThreshold,
-            contextLimit: override.settings?.contextLimit ?? base.settings.contextLimit,
-            modelLimits: override.settings?.modelLimits ?? base.settings.modelLimits,
-        },
-        compress: {
-            permission: override.compress?.permission ?? base.compress.permission,
-            showCompression: override.compress?.showCompression ?? base.compress.showCompression,
-        },
+        permission: override.permission ?? base.permission,
+        showCompression: override.showCompression ?? base.showCompression,
+        contextLimit: override.contextLimit ?? base.contextLimit,
+        modelLimits: override.modelLimits ?? base.modelLimits,
+        nudgeFrequency: override.nudgeFrequency ?? base.nudgeFrequency,
+        iterationNudgeThreshold: override.iterationNudgeThreshold ?? base.iterationNudgeThreshold,
     }
 }
 
@@ -770,12 +749,9 @@ function deepCloneConfig(config: PluginConfig): PluginConfig {
         },
         turnProtection: { ...config.turnProtection },
         protectedFilePatterns: [...config.protectedFilePatterns],
-        tools: {
-            settings: {
-                ...config.tools.settings,
-                modelLimits: { ...config.tools.settings.modelLimits },
-            },
-            compress: { ...config.tools.compress },
+        compress: {
+            ...config.compress,
+            modelLimits: { ...config.compress.modelLimits },
         },
         strategies: {
             deduplication: {
@@ -806,7 +782,7 @@ function mergeLayer(config: PluginConfig, data: Record<string, any>): PluginConf
         protectedFilePatterns: [
             ...new Set([...config.protectedFilePatterns, ...(data.protectedFilePatterns ?? [])]),
         ],
-        tools: mergeTools(config.tools, data.tools as ToolOverride),
+        compress: mergeCompress(config.compress, data.compress as CompressOverride),
         strategies: mergeStrategies(config.strategies, data.strategies as any),
     }
 }
