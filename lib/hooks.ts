@@ -5,7 +5,7 @@ import { assignMessageRefs } from "./message-ids"
 import { syncToolCache } from "./state/tool-cache"
 import { deduplicate, supersedeWrites, purgeErrors } from "./strategies"
 import { prune, insertCompressToolContext, insertMessageIdContext } from "./messages"
-import { buildToolIdList, isIgnoredUserMessage } from "./messages/utils"
+import { buildToolIdList, isIgnoredUserMessage, stripHallucinations } from "./messages/utils"
 import { checkSession } from "./state"
 import { renderSystemPrompt } from "./prompts"
 import { handleStatsCommand } from "./commands/stats"
@@ -21,6 +21,10 @@ const INTERNAL_AGENT_SIGNATURES = [
     "You are a helpful AI assistant tasked with summarizing conversations",
     "Summarize what was done in this conversation",
 ]
+
+const DCP_MESSAGE_ID_TAG_REGEX = /<dcp-message-id>(?:m\d+|b\d+)<\/dcp-message-id>/g
+const TURN_NUDGE_BLOCK_REGEX =
+    /<instruction\s+name=post_loop_turn_nudge\b[^>]*>[\s\S]*?<\/instruction>/g
 
 function applyPendingManualTriggerPrompt(
     state: SessionState,
@@ -103,23 +107,17 @@ export function createChatMessageTransformHandler(
             return
         }
 
+        stripHallucinations(output.messages)
         cacheSystemPromptTokens(state, output.messages)
-
         assignMessageRefs(state, output.messages)
-
         syncToolCache(state, config, logger, output.messages)
         buildToolIdList(state, output.messages)
-
         deduplicate(state, logger, config, output.messages)
         supersedeWrites(state, logger, config, output.messages)
         purgeErrors(state, logger, config, output.messages)
-
         prune(state, logger, config, output.messages)
-
         insertCompressToolContext(state, config, logger, output.messages)
-
         insertMessageIdContext(state, config, output.messages)
-
         applyPendingManualTriggerPrompt(state, output.messages, logger)
 
         if (state.sessionId) {
@@ -218,5 +216,16 @@ export function createCommandExecuteHandler(
             await handleHelpCommand(commandCtx)
             throw new Error("__DCP_HELP_HANDLED__")
         }
+    }
+}
+
+export function createTextCompleteHandler() {
+    return async (
+        _input: { sessionID: string; messageID: string; partID: string },
+        output: { text: string },
+    ) => {
+        output.text = output.text
+            .replace(TURN_NUDGE_BLOCK_REGEX, "")
+            .replace(DCP_MESSAGE_ID_TAG_REGEX, "")
     }
 }
