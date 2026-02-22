@@ -14,7 +14,7 @@ import {
 } from "../utils"
 import {
     addAnchor,
-    applyAnchoredNudge,
+    applyAnchoredNudges,
     countMessagesAfterIndex,
     findLastNonIgnoredMessage,
     getIterationNudgeThreshold,
@@ -23,9 +23,8 @@ import {
     isContextOverLimit,
     messageHasCompress,
 } from "./utils"
-import { CONTEXT_LIMIT_NUDGE, ITERATION_NUDGE_PROMPT, TURN_NUDGE_PROMPT } from "../../prompts"
 
-export const insertCompressToolContext = (
+export const insertCompressNudges = (
     state: SessionState,
     config: PluginConfig,
     logger: Logger,
@@ -65,8 +64,6 @@ export const insertCompressToolContext = (
                 anchorsChanged = true
             }
         }
-
-        applyAnchoredNudge(state.nudges.contextLimitAnchors, messages, modelId, CONTEXT_LIMIT_NUDGE)
     } else {
         const isLastMessageUser = lastMessage?.message.info.role === "user"
 
@@ -106,15 +103,9 @@ export const insertCompressToolContext = (
                 }
             }
         }
-
-        applyAnchoredNudge(state.nudges.turnNudgeAnchors, messages, modelId, TURN_NUDGE_PROMPT)
-        applyAnchoredNudge(
-            state.nudges.iterationNudgeAnchors,
-            messages,
-            modelId,
-            ITERATION_NUDGE_PROMPT,
-        )
     }
+
+    applyAnchoredNudges(state, messages, modelId)
 
     if (anchorsChanged) {
         void saveSessionState(state, logger)

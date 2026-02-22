@@ -9,6 +9,7 @@ import {
 } from "../utils"
 import { getLastUserMessage } from "../../shared-utils"
 import { getCurrentTokenUsage } from "../../strategies/utils"
+import { CONTEXT_LIMIT_NUDGE, ITERATION_NUDGE_PROMPT, TURN_NUDGE_PROMPT } from "../../prompts"
 
 export interface LastUserModelContext {
     providerId: string | undefined
@@ -165,7 +166,7 @@ export function addAnchor(
     return anchorMessageIds.size !== previousSize
 }
 
-export function applyAnchoredNudge(
+function applyAnchoredNudge(
     anchorMessageIds: Set<string>,
     messages: WithParts[],
     modelId: string | undefined,
@@ -198,4 +199,19 @@ export function applyAnchoredNudge(
             message.parts.push(createSyntheticTextPart(message, hintText))
         }
     }
+}
+
+export function applyAnchoredNudges(
+    state: SessionState,
+    messages: WithParts[],
+    modelId: string | undefined,
+): void {
+    applyAnchoredNudge(state.nudges.contextLimitAnchors, messages, modelId, CONTEXT_LIMIT_NUDGE)
+    applyAnchoredNudge(state.nudges.turnNudgeAnchors, messages, modelId, TURN_NUDGE_PROMPT)
+    applyAnchoredNudge(
+        state.nudges.iterationNudgeAnchors,
+        messages,
+        modelId,
+        ITERATION_NUDGE_PROMPT,
+    )
 }
