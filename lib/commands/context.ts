@@ -60,6 +60,7 @@ interface TokenBreakdown {
     assistant: number
     tools: number
     toolCount: number
+    toolsInContextCount: number
     prunedTokens: number
     prunedToolCount: number
     prunedMessageCount: number
@@ -73,9 +74,10 @@ function analyzeTokens(state: SessionState, messages: WithParts[]): TokenBreakdo
         assistant: 0,
         tools: 0,
         toolCount: 0,
+        toolsInContextCount: 0,
         prunedTokens: state.stats.totalPruneTokens,
-        prunedToolCount: state.prune.tools.size,
-        prunedMessageCount: state.prune.messages.size,
+        prunedToolCount: 0,
+        prunedMessageCount: 0,
         total: 0,
     }
 
@@ -114,19 +116,29 @@ function analyzeTokens(state: SessionState, messages: WithParts[]): TokenBreakdo
     const toolOutputParts: string[] = []
     let firstUserText = ""
     let foundFirstUser = false
-    const foundToolIds = new Set<string>()
+    const allToolIds = new Set<string>()
+    const activeToolIds = new Set<string>()
+    const prunedByMessageToolIds = new Set<string>()
+    const allMessageIds = new Set<string>()
 
     for (const msg of messages) {
+        allMessageIds.add(msg.info.id)
         const parts = Array.isArray(msg.parts) ? msg.parts : []
         const isCompacted = isMessageCompacted(state, msg)
+        const isMessagePruned = state.prune.messages.has(msg.info.id)
         const isIgnoredUser = msg.info.role === "user" && isIgnoredUserMessage(msg)
 
         for (const part of parts) {
             if (part.type === "tool") {
                 const toolPart = part as ToolPart
-                if (toolPart.callID && !foundToolIds.has(toolPart.callID)) {
-                    breakdown.toolCount++
-                    foundToolIds.add(toolPart.callID)
+                if (toolPart.callID) {
+                    allToolIds.add(toolPart.callID)
+                    if (!isCompacted) {
+                        activeToolIds.add(toolPart.callID)
+                    }
+                    if (isMessagePruned) {
+                        prunedByMessageToolIds.add(toolPart.callID)
+                    }
                 }
 
                 const isPruned = toolPart.callID && state.prune.tools.has(toolPart.callID)
@@ -167,6 +179,28 @@ function analyzeTokens(state: SessionState, messages: WithParts[]): TokenBreakdo
         }
     }
 
+    const prunedByToolIds = new Set<string>()
+    for (const id of allToolIds) {
+        if (state.prune.tools.has(id)) {
+            prunedByToolIds.add(id)
+        }
+    }
+
+    const prunedToolIds = new Set<string>([...prunedByToolIds, ...prunedByMessageToolIds])
+    const toolsInContextCount = [...activeToolIds].filter((id) => !prunedByToolIds.has(id)).length
+
+    let prunedMessageCount = 0
+    for (const id of state.prune.messages.keys()) {
+        if (allMessageIds.has(id)) {
+            prunedMessageCount++
+        }
+    }
+
+    breakdown.toolCount = allToolIds.size
+    breakdown.toolsInContextCount = toolsInContextCount
+    breakdown.prunedToolCount = prunedToolIds.size
+    breakdown.prunedMessageCount = prunedMessageCount
+
     const firstUserTokens = countTokens(firstUserText)
     breakdown.user = countTokens(userTextParts.join("\n"))
     const toolInputTokens = countTokens(toolInputParts.join("\n"))
@@ -198,8 +232,7 @@ function formatContextMessage(breakdown: TokenBreakdown): string {
     const lines: string[] = []
     const barWidth = 30
 
-    const toolsInContext = breakdown.toolCount - breakdown.prunedToolCount
-    const toolsLabel = `Tools (${toolsInContext})`
+    const toolsLabel = `Tools (${breakdown.toolsInContextCount})`
 
     const categories = [
         { label: "System", value: breakdown.system, char: "█" },
