@@ -22,6 +22,11 @@ Using `@latest` ensures you always get the newest version automatically when Ope
 
 Restart OpenCode. The plugin will automatically start optimizing your sessions.
 
+## Beta Notice (v2.2.0-beta0)
+
+- Strategy shift to a single user-facing context tool: `compress`.
+- Context management is now less surgical and more focused on preserving high-signal work grouped by task.
+
 ## How Pruning Works
 
 DCP uses one user-facing tool and strategies to reduce context size:
@@ -69,90 +74,93 @@ DCP uses its own config file:
 - Custom config directory: `$OPENCODE_CONFIG_DIR/dcp.jsonc` (or `dcp.json`), if `OPENCODE_CONFIG_DIR` is set
 - Project: `.opencode/dcp.jsonc` (or `dcp.json`) in your project's `.opencode` directory
 
-> <details>
-> <summary><strong>Default Configuration</strong> (click to expand)</summary>
->
-> ```jsonc
-> {
->     "$schema": "https://raw.githubusercontent.com/Opencode-DCP/opencode-dynamic-context-pruning/master/dcp.schema.json",
->     // Enable or disable the plugin
->     "enabled": true,
->     // Enable debug logging to ~/.config/opencode/logs/dcp/
->     "debug": false,
->     // Notification display: "off", "minimal", or "detailed"
->     "pruneNotification": "detailed",
->     // Notification type: "chat" (in-conversation) or "toast" (system toast)
->     "pruneNotificationType": "chat",
->     // Slash commands configuration
->     "commands": {
->         "enabled": true,
->         // Additional tools to protect from pruning via commands (e.g., /dcp sweep)
->         "protectedTools": [],
->     },
->     // Manual mode: disables autonomous context management,
->     // tools only run when explicitly triggered via /dcp commands
->     "manualMode": {
->         "enabled": false,
->         // When true, automatic strategies (deduplication, supersedeWrites, purgeErrors)
->         // still run even in manual mode
->         "automaticStrategies": true,
->     },
->     // Protect from pruning for <turns> message turns past tool invocation
->     "turnProtection": {
->         "enabled": false,
->         "turns": 4,
->     },
->     // Protect file operations from pruning via glob patterns
->     // Patterns match tool parameters.filePath (e.g. read/write/edit)
->     "protectedFilePatterns": [],
->     // Unified context compression tool and behavior settings
->     "compress": {
->         // Permission mode: "allow" (no prompt), "ask" (prompt), "deny" (tool not registered)
->         "permission": "allow",
->         // Show summary content in a chat notification
->         "showCompression": false,
->         // Token limit at which the model compresses session context
->         // to keep the model in the "smart zone" (not a hard limit)
->         // Accepts: number or "X%" (percentage of model's context window)
->         "contextLimit": 100000,
->         // Optional per-model overrides by exact providerID/modelID
->         // Accepts: number or "X%"
->         // Example:
->         // "modelLimits": {
->         //     "openai/gpt-5": 120000,
->         //     "anthropic/claude-3-7-sonnet": "80%"
->         // },
->         // How often the context-limit nudge fires (1 = every fetch, 5 = every 5th)
->         "nudgeFrequency": 5,
->         // Start iteration nudges after this many messages
->         // have occurred since the last user message
->         "iterationNudgeThreshold": 15,
->     },
->     // Automatic pruning strategies
->     "strategies": {
->         // Remove duplicate tool calls (same tool with same arguments)
->         "deduplication": {
->             "enabled": true,
->             // Additional tools to protect from pruning
->             "protectedTools": [],
->         },
->         // Prune write tool inputs when the file has been subsequently read
->         "supersedeWrites": {
->             "enabled": true,
->         },
->         // Prune tool inputs for errored tools after X turns
->         "purgeErrors": {
->             "enabled": true,
->             // Number of turns before errored tool inputs are pruned
->             "turns": 4,
->             // Additional tools to protect from pruning
->             "protectedTools": [],
->         },
->     },
-> }
-> ```
->
-> </details>
+> [!IMPORTANT]
+> Defaults are applied automatically. Expand this if you want to review or override settings.
+
+<details open>
+<summary><strong>Default Configuration</strong> (click to collapse)</summary>
+
+```jsonc
+{
+    "$schema": "https://raw.githubusercontent.com/Opencode-DCP/opencode-dynamic-context-pruning/master/dcp.schema.json",
+    // Enable or disable the plugin
+    "enabled": true,
+    // Enable debug logging to ~/.config/opencode/logs/dcp/
+    "debug": false,
+    // Notification display: "off", "minimal", or "detailed"
+    "pruneNotification": "detailed",
+    // Notification type: "chat" (in-conversation) or "toast" (system toast)
+    "pruneNotificationType": "chat",
+    // Slash commands configuration
+    "commands": {
+        "enabled": true,
+        // Additional tools to protect from pruning via commands (e.g., /dcp sweep)
+        "protectedTools": [],
+    },
+    // Manual mode: disables autonomous context management,
+    // tools only run when explicitly triggered via /dcp commands
+    "manualMode": {
+        "enabled": false,
+        // When true, automatic strategies (deduplication, supersedeWrites, purgeErrors)
+        // still run even in manual mode
+        "automaticStrategies": true,
+    },
+    // Protect from pruning for <turns> message turns past tool invocation
+    "turnProtection": {
+        "enabled": false,
+        "turns": 4,
+    },
+    // Protect file operations from pruning via glob patterns
+    // Patterns match tool parameters.filePath (e.g. read/write/edit)
+    "protectedFilePatterns": [],
+    // Unified context compression tool and behavior settings
+    "compress": {
+        // Permission mode: "allow" (no prompt), "ask" (prompt), "deny" (tool not registered)
+        "permission": "allow",
+        // Show summary content in a chat notification
+        "showCompression": false,
+        // Token limit at which the model compresses session context
+        // to keep the model in the "smart zone" (not a hard limit)
+        // Accepts: number or "X%" (percentage of model's context window)
+        "contextLimit": 100000,
+        // Optional per-model overrides by exact providerID/modelID
+        // Accepts: number or "X%"
+        // Example:
+        // "modelLimits": {
+        //     "openai/gpt-5": 120000,
+        //     "anthropic/claude-3-7-sonnet": "80%"
+        // },
+        // How often the context-limit nudge fires (1 = every fetch, 5 = every 5th)
+        "nudgeFrequency": 5,
+        // Start iteration nudges after this many messages
+        // have occurred since the last user message
+        "iterationNudgeThreshold": 15,
+    },
+    // Automatic pruning strategies
+    "strategies": {
+        // Remove duplicate tool calls (same tool with same arguments)
+        "deduplication": {
+            "enabled": true,
+            // Additional tools to protect from pruning
+            "protectedTools": [],
+        },
+        // Prune write tool inputs when the file has been subsequently read
+        "supersedeWrites": {
+            "enabled": true,
+        },
+        // Prune tool inputs for errored tools after X turns
+        "purgeErrors": {
+            "enabled": true,
+            // Number of turns before errored tool inputs are pruned
+            "turns": 4,
+            // Additional tools to protect from pruning
+            "protectedTools": [],
+        },
+    },
+}
+```
+
+</details>
 
 ### Commands
 
