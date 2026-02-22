@@ -8,9 +8,10 @@ import {
     extractParameterKey,
     createSyntheticTextPart,
     createSyntheticToolPart,
-    isIgnoredUserMessage,
     appendMessageIdTagToToolOutput,
     findLastToolPart,
+    isIgnoredUserMessage,
+    rejectsTextParts,
 } from "./utils"
 import { getFilePathsFromParameters, isProtected } from "../protected-file-patterns"
 import { getLastUserMessage, isMessageCompacted } from "../shared-utils"
@@ -314,13 +315,22 @@ export const insertPruneToolContext = (
         )
         lastNonIgnoredMessage.parts.push(textPart)
     } else {
-        const toolPart = createSyntheticToolPart(
-            lastNonIgnoredMessage,
-            combinedContent,
-            modelId ?? "",
-            `${lastNonIgnoredMessage.info.id}:context`,
-        )
-        lastNonIgnoredMessage.parts.push(toolPart)
+        if (rejectsTextParts(modelId ?? "")) {
+            const toolPart = createSyntheticToolPart(
+                lastNonIgnoredMessage,
+                combinedContent,
+                modelId ?? "",
+                `${lastNonIgnoredMessage.info.id}:context`,
+            )
+            lastNonIgnoredMessage.parts.push(toolPart)
+        } else {
+            const textPart = createSyntheticTextPart(
+                lastNonIgnoredMessage,
+                combinedContent,
+                `${lastNonIgnoredMessage.info.id}:context`,
+            )
+            lastNonIgnoredMessage.parts.push(textPart)
+        }
     }
 }
 
@@ -365,6 +375,10 @@ export const insertMessageIdContext = (
             continue
         }
 
-        message.parts.push(createSyntheticToolPart(message, tag, toolModelId, messageIdSeed))
+        if (rejectsTextParts(toolModelId)) {
+            message.parts.push(createSyntheticToolPart(message, tag, toolModelId, messageIdSeed))
+        } else {
+            message.parts.push(createSyntheticTextPart(message, tag, messageIdSeed))
+        }
     }
 }
