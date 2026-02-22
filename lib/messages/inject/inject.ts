@@ -9,7 +9,7 @@ import {
     createSyntheticToolPart,
     findLastToolPart,
     isIgnoredUserMessage,
-    acceptsTextParts,
+    rejectsTextParts,
 } from "../utils"
 import {
     addAnchor,
@@ -20,7 +20,7 @@ import {
     isContextOverLimit,
     messageHasCompress,
 } from "./utils"
-import { CONTEXT_LIMIT_NUDGE, SOFT_NUDGE_PROMPT } from "../../prompts"
+import { CONTEXT_LIMIT_NUDGE, TURN_NUDGE_PROMPT } from "../../prompts"
 
 export const insertCompressToolContext = (
     state: SessionState,
@@ -35,10 +35,10 @@ export const insertCompressToolContext = (
     const lastAssistantMessage = messages.findLast((message) => message.info.role === "assistant")
     if (lastAssistantMessage && messageHasCompress(lastAssistantMessage)) {
         const hasPersistedNudgeAnchors =
-            state.contextLimitAnchors.size > 0 || state.softNudgeAnchors.size > 0
+            state.contextLimitAnchors.size > 0 || state.turnNudgeAnchors.size > 0
         if (hasPersistedNudgeAnchors) {
             state.contextLimitAnchors.clear()
-            state.softNudgeAnchors.clear()
+            state.turnNudgeAnchors.clear()
             void saveSessionState(state, logger)
         }
         return
@@ -72,14 +72,14 @@ export const insertCompressToolContext = (
             lastMessage?.info.role === "user" && !isIgnoredUserMessage(lastMessage)
 
         if (isLastMessageNonIgnoredUser && lastAssistantMessage) {
-            const previousSize = state.softNudgeAnchors.size
-            state.softNudgeAnchors.add(lastAssistantMessage.info.id)
-            if (state.softNudgeAnchors.size !== previousSize) {
+            const previousSize = state.turnNudgeAnchors.size
+            state.turnNudgeAnchors.add(lastAssistantMessage.info.id)
+            if (state.turnNudgeAnchors.size !== previousSize) {
                 anchorsChanged = true
             }
         }
 
-        applyAnchoredNudge(state.softNudgeAnchors, messages, modelId, SOFT_NUDGE_PROMPT)
+        applyAnchoredNudge(state.turnNudgeAnchors, messages, modelId, TURN_NUDGE_PROMPT)
     }
 
     if (anchorsChanged) {
@@ -125,7 +125,7 @@ export const insertMessageIdContext = (
             continue
         }
 
-        if (!acceptsTextParts(toolModelId)) {
+        if (rejectsTextParts(toolModelId)) {
             message.parts.push(createSyntheticToolPart(message, tag, toolModelId))
         } else {
             message.parts.push(createSyntheticTextPart(message, tag))

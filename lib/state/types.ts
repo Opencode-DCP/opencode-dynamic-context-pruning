@@ -51,7 +51,7 @@ export interface SessionState {
     prune: Prune
     compressSummaries: CompressSummary[]
     contextLimitAnchors: Set<string>
-    softNudgeAnchors: Set<string>
+    turnNudgeAnchors: Set<string>
     stats: SessionStats
     toolParameters: Map<string, ToolParameterEntry>
     toolIdList: string[]

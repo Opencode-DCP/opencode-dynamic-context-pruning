@@ -26,7 +26,7 @@ export interface PersistedSessionState {
     prune: PersistedPrune
     compressSummaries: CompressSummary[]
     contextLimitAnchors: string[]
-    softNudgeAnchors?: string[]
+    turnNudgeAnchors?: string[]
     stats: SessionStats
     lastUpdated: string
 }
@@ -69,7 +69,7 @@ export async function saveSessionState(
             },
             compressSummaries: sessionState.compressSummaries,
             contextLimitAnchors: Array.from(sessionState.contextLimitAnchors),
-            softNudgeAnchors: Array.from(sessionState.softNudgeAnchors),
+            turnNudgeAnchors: Array.from(sessionState.turnNudgeAnchors),
             stats: sessionState.stats,
             lastUpdated: new Date().toISOString(),
         }
@@ -150,21 +150,21 @@ export async function loadSessionState(
         }
         state.contextLimitAnchors = dedupedAnchors
 
-        const rawSoftNudgeAnchors = Array.isArray(state.softNudgeAnchors)
-            ? state.softNudgeAnchors
+        const rawTurnNudgeAnchors = Array.isArray(state.turnNudgeAnchors)
+            ? state.turnNudgeAnchors
             : []
-        const validSoftAnchors = rawSoftNudgeAnchors.filter(
+        const validSoftAnchors = rawTurnNudgeAnchors.filter(
             (entry): entry is string => typeof entry === "string",
         )
         const dedupedSoftAnchors = [...new Set(validSoftAnchors)]
-        if (validSoftAnchors.length !== rawSoftNudgeAnchors.length) {
-            logger.warn("Filtered out malformed softNudgeAnchors entries", {
+        if (validSoftAnchors.length !== rawTurnNudgeAnchors.length) {
+            logger.warn("Filtered out malformed turnNudgeAnchors entries", {
                 sessionId: sessionId,
-                original: rawSoftNudgeAnchors.length,
+                original: rawTurnNudgeAnchors.length,
                 valid: validSoftAnchors.length,
             })
         }
-        state.softNudgeAnchors = dedupedSoftAnchors
+        state.turnNudgeAnchors = dedupedSoftAnchors
 
         logger.info("Loaded session state from disk", {
             sessionId: sessionId,

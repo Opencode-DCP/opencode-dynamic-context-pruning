@@ -5,7 +5,7 @@ import {
     createSyntheticTextPart,
     createSyntheticToolPart,
     isIgnoredUserMessage,
-    acceptsTextParts,
+    rejectsTextParts,
 } from "../utils"
 import { getLastUserMessage } from "../../shared-utils"
 import { getCurrentTokenUsage } from "../../strategies/utils"
@@ -174,7 +174,7 @@ export function applyAnchoredNudge(
         }
 
         const toolModelId = modelId || ""
-        if (!acceptsTextParts(toolModelId)) {
+        if (rejectsTextParts(toolModelId)) {
             message.parts.push(createSyntheticToolPart(message, hintText, toolModelId))
         } else {
             message.parts.push(createSyntheticTextPart(message, hintText))

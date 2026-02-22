@@ -58,7 +58,7 @@ function hasCompletedCompress(message: WithParts): boolean {
     )
 }
 
-export function collectSoftNudgeAnchors(messages: WithParts[]): Set<string> {
+export function collectTurnNudgeAnchors(messages: WithParts[]): Set<string> {
     const anchors = new Set<string>()
     let pendingUserMessage = false
 
@@ -91,5 +91,5 @@ export function resetOnCompaction(state: SessionState): void {
     state.prune.messages = new Map<string, number>()
     state.compressSummaries = []
     state.contextLimitAnchors = new Set<string>()
-    state.softNudgeAnchors = new Set<string>()
+    state.turnNudgeAnchors = new Set<string>()
 }
