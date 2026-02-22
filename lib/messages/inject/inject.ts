@@ -69,7 +69,7 @@ export const insertCompressNudges = (
 
         if (isLastMessageUser && lastAssistantMessage) {
             const previousSize = state.nudges.turnNudgeAnchors.size
-            state.nudges.turnNudgeAnchors.add(lastAssistantMessage.info.id)
+            state.nudges.turnNudgeAnchors.add(lastMessage.message.info.id)
             if (state.nudges.turnNudgeAnchors.size !== previousSize) {
                 anchorsChanged = true
             }

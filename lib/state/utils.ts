@@ -60,7 +60,7 @@ function hasCompletedCompress(message: WithParts): boolean {
 
 export function collectTurnNudgeAnchors(messages: WithParts[]): Set<string> {
     const anchors = new Set<string>()
-    let pendingUserMessage = false
+    let pendingUserMessageId: string | null = null
 
     for (let i = messages.length - 1; i >= 0; i--) {
         const message = messages[i]
@@ -71,14 +71,14 @@ export function collectTurnNudgeAnchors(messages: WithParts[]): Set<string> {
 
         if (message.info.role === "user") {
             if (!isIgnoredUserMessage(message)) {
-                pendingUserMessage = true
+                pendingUserMessageId = message.info.id
             }
             continue
         }
 
-        if (message.info.role === "assistant" && pendingUserMessage) {
-            anchors.add(message.info.id)
-            pendingUserMessage = false
+        if (message.info.role === "assistant" && pendingUserMessageId) {
+            anchors.add(pendingUserMessageId)
+            pendingUserMessageId = null
         }
     }
 
