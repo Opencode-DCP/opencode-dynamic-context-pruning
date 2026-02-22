@@ -77,8 +77,8 @@ DCP uses its own config file:
 > [!IMPORTANT]
 > Defaults are applied automatically. Expand this if you want to review or override settings.
 
-<details open>
-<summary><strong>Default Configuration</strong> (click to collapse)</summary>
+<details>
+<summary><strong>Default Configuration</strong> (click to expand)</summary>
 
 ```jsonc
 {
