@@ -111,7 +111,7 @@ export const insertMessageIdContext = (
 
         const tag = formatMessageIdTag(messageRef)
 
-        if (message.info.role === "user" && !isIgnoredUserMessage(message)) {
+        if (message.info.role === "user") {
             message.parts.push(createSyntheticTextPart(message, tag))
             continue
         }
