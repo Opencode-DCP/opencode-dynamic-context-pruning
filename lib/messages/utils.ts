@@ -21,7 +21,7 @@ const isGeminiModel = (modelID: string): boolean => {
 
 export const rejectsTextParts = (modelID: string): boolean => {
     const lowerModelID = modelID.toLowerCase()
-    return lowerModelID.includes("claude")
+    return lowerModelID.includes("claude") || lowerModelID.includes("deepseek")
 }
 
 export const createSyntheticUserMessage = (
