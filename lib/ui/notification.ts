@@ -8,7 +8,6 @@ import {
 } from "./utils"
 import { ToolParameterEntry } from "../state"
 import { PluginConfig } from "../config"
-import { clog, C } from "../compress-logger"
 
 export type PruneReason = "completion" | "noise" | "extraction"
 export const PRUNE_REASON_LABELS: Record<PruneReason, string> = {
@@ -158,14 +157,6 @@ export async function sendCompressNotification(
         message = formatStatsHeader(state.stats.totalPruneTokens, state.stats.pruneTokenCounter)
 
         const pruneTokenCounterStr = `~${formatTokenCount(compressedTokens)}`
-
-        clog.info(C.COMPRESS, `sendCompressNotification inputs`, {
-            summaryTokens,
-            totalSessionTokens,
-            compressedTokens,
-            ratio:
-                totalSessionTokens > 0 ? (compressedTokens / totalSessionTokens).toFixed(4) : "N/A",
-        })
 
         const progressBar = formatSessionMap(sessionMessageIds, state.prune.messages, 50)
         const reduction =
