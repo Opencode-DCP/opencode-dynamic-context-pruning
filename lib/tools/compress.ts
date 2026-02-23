@@ -73,7 +73,7 @@ export function createCompressTool(ctx: ToolContext): ReturnType<typeof tool> {
             )
 
             deduplicate(ctx.state, ctx.logger, ctx.config, rawMessages)
-            supersedeWrites(ctx.state, ctx.logger, ctx.config, rawMessages)
+            // supersedeWrites(ctx.state, ctx.logger, ctx.config, rawMessages)
             purgeErrors(ctx.state, ctx.logger, ctx.config, rawMessages)
 
             const searchContext = buildSearchContext(ctx.state, rawMessages)
