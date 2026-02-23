@@ -18,6 +18,7 @@ import {
     validateSummaryPlaceholders,
     type CompressToolArgs,
 } from "./compress-utils"
+import { isIgnoredUserMessage } from "../messages/utils"
 import { getCurrentParams, getCurrentTokenUsage, countTokens } from "../strategies/utils"
 import { deduplicate, supersedeWrites, purgeErrors } from "../strategies"
 import { saveSessionState } from "../state/persistence"
@@ -122,7 +123,9 @@ export function createCompressTool(ctx: ToolContext): ReturnType<typeof tool> {
 
             const params = getCurrentParams(ctx.state, rawMessages, ctx.logger)
             const totalSessionTokens = getCurrentTokenUsage(rawMessages)
-            const sessionMessageIds = rawMessages.map((msg) => msg.info.id)
+            const sessionMessageIds = rawMessages
+                .filter((msg) => !(msg.info.role === "user" && isIgnoredUserMessage(msg)))
+                .map((msg) => msg.info.id)
 
             await sendCompressNotification(
                 ctx.client,
