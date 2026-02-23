@@ -26,11 +26,7 @@ const TURN_NUDGE_BLOCK_REGEX = /<instruction\s+name=turn_nudge\b[^>]*>[\s\S]*?<\
 const ITERATION_NUDGE_BLOCK_REGEX =
     /<instruction\s+name=iteration_nudge\b[^>]*>[\s\S]*?<\/instruction>/g
 
-function applyPendingManualTriggerPrompt(
-    state: SessionState,
-    messages: WithParts[],
-    logger: Logger,
-): void {
+function applyManualPrompt(state: SessionState, messages: WithParts[], logger: Logger): void {
     const pending = state.pendingManualTrigger
     if (!pending) {
         return
@@ -54,7 +50,7 @@ function applyPendingManualTriggerPrompt(
 
             part.text = pending.prompt
             state.pendingManualTrigger = null
-            logger.debug("Applied pending manual trigger prompt", { sessionId: pending.sessionId })
+            logger.debug("Applied manual prompt", { sessionId: pending.sessionId })
             return
         }
     }
@@ -115,7 +111,7 @@ export function createChatMessageTransformHandler(
         prune(state, logger, config, output.messages)
         insertCompressNudges(state, config, logger, output.messages)
         insertMessageIds(state, config, output.messages)
-        applyPendingManualTriggerPrompt(state, output.messages, logger)
+        applyManualPrompt(state, output.messages, logger)
 
         if (state.sessionId) {
             await logger.saveContext(state.sessionId, output.messages)
