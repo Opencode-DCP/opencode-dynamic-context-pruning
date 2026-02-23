@@ -19,6 +19,7 @@ import {
     type CompressToolArgs,
 } from "./compress-utils"
 import { getCurrentParams, getCurrentTokenUsage, countTokens } from "../strategies/utils"
+import { deduplicate, supersedeWrites, purgeErrors } from "../strategies"
 import { saveSessionState } from "../state/persistence"
 import { sendCompressNotification } from "../ui/notification"
 
@@ -70,6 +71,10 @@ export function createCompressTool(ctx: ToolContext): ReturnType<typeof tool> {
                 rawMessages,
                 ctx.config.manualMode.enabled,
             )
+
+            deduplicate(ctx.state, ctx.logger, ctx.config, rawMessages)
+            supersedeWrites(ctx.state, ctx.logger, ctx.config, rawMessages)
+            purgeErrors(ctx.state, ctx.logger, ctx.config, rawMessages)
 
             const searchContext = buildSearchContext(ctx.state, rawMessages)
 
