@@ -132,10 +132,11 @@ DCP uses its own config file:
         // },
         // How often the context-limit nudge fires (1 = every fetch, 5 = every 5th)
         "nudgeFrequency": 5,
-        // Start iteration nudges after this many messages
-        // have occurred since the last user message
+        // Start adding compression reminders after this many
+        // messages have happened since the last user message
         "iterationNudgeThreshold": 15,
-        // Controls how turn nudges are anchored ("strong" = user messages, "soft" = assistant messages)
+        // Controls how likely compression is after user messages
+        // ("strong" = more likely, "soft" = less likely)
         "nudgeForce": "soft",
     },
     // Automatic pruning strategies

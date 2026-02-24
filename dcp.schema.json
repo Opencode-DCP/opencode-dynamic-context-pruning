@@ -156,13 +156,13 @@
                     "type": "number",
                     "default": 15,
                     "minimum": 1,
-                    "description": "Number of messages after the last user message before iteration nudges begin"
+                    "description": "How many messages to wait after a user message before adding compression reminders."
                 },
                 "nudgeForce": {
                     "type": "string",
                     "enum": ["strong", "soft"],
                     "default": "soft",
-                    "description": "Controls how turn nudges are anchored. 'strong' attaches to user messages, 'soft' to assistant messages."
+                    "description": "Controls how likely compression is after user messages. 'strong' is more likely, 'soft' is less likely."
                 }
             }
         },
