@@ -135,6 +135,8 @@ DCP uses its own config file:
         // Start iteration nudges after this many messages
         // have occurred since the last user message
         "iterationNudgeThreshold": 15,
+        // Controls how turn nudges are anchored ("strong" = user messages, "soft" = assistant messages)
+        "nudgeForce": "soft",
     },
     // Automatic pruning strategies
     "strategies": {

@@ -9,7 +9,9 @@ import {
 } from "../utils"
 import { getLastUserMessage } from "../../shared-utils"
 import { getCurrentTokenUsage } from "../../strategies/utils"
-import { CONTEXT_LIMIT_NUDGE, ITERATION_NUDGE_PROMPT, TURN_NUDGE_PROMPT } from "../../prompts"
+import { CONTEXT_LIMIT_NUDGE } from "../../prompts/nudge"
+import { USER_TURN_NUDGE, ASSISTANT_TURN_NUDGE } from "../../prompts/turn-nudge"
+import { ITERATION_NUDGE } from "../../prompts/iteration-nudge"
 
 export interface LastUserModelContext {
     providerId: string | undefined
@@ -203,15 +205,25 @@ function applyAnchoredNudge(
 
 export function applyAnchoredNudges(
     state: SessionState,
+    config: PluginConfig,
     messages: WithParts[],
     modelId: string | undefined,
 ): void {
     applyAnchoredNudge(state.nudges.contextLimitAnchors, messages, modelId, CONTEXT_LIMIT_NUDGE)
-    applyAnchoredNudge(state.nudges.turnNudgeAnchors, messages, modelId, TURN_NUDGE_PROMPT)
-    applyAnchoredNudge(
-        state.nudges.iterationNudgeAnchors,
-        messages,
-        modelId,
-        ITERATION_NUDGE_PROMPT,
-    )
+
+    const turnNudgeAnchors = new Set<string>()
+    const targetRole = config.compress.nudgeForce === "strong" ? "user" : "assistant"
+    const promptToUse =
+        config.compress.nudgeForce === "strong" ? USER_TURN_NUDGE : ASSISTANT_TURN_NUDGE
+
+    for (const message of messages) {
+        if (!state.nudges.turnNudgeAnchors.has(message.info.id)) continue
+
+        if (message.info.role === targetRole) {
+            turnNudgeAnchors.add(message.info.id)
+        }
+    }
+
+    applyAnchoredNudge(turnNudgeAnchors, messages, modelId, promptToUse)
+    applyAnchoredNudge(state.nudges.iterationNudgeAnchors, messages, modelId, ITERATION_NUDGE)
 }

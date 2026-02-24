@@ -77,6 +77,7 @@ export function collectTurnNudgeAnchors(messages: WithParts[]): Set<string> {
         }
 
         if (message.info.role === "assistant" && pendingUserMessageId) {
+            anchors.add(message.info.id)
             anchors.add(pendingUserMessageId)
             pendingUserMessageId = null
         }

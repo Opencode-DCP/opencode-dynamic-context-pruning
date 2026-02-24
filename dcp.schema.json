@@ -157,6 +157,12 @@
                     "default": 15,
                     "minimum": 1,
                     "description": "Number of messages after the last user message before iteration nudges begin"
+                },
+                "nudgeForce": {
+                    "type": "string",
+                    "enum": ["strong", "soft"],
+                    "default": "soft",
+                    "description": "Controls how turn nudges are anchored. 'strong' attaches to user messages, 'soft' to assistant messages."
                 }
             }
         },

@@ -18,6 +18,7 @@ export interface CompressTool {
     modelLimits?: Record<string, number | `${number}%`>
     nudgeFrequency: number
     iterationNudgeThreshold: number
+    nudgeForce: "strong" | "soft"
 }
 
 export interface Commands {
@@ -98,6 +99,7 @@ export const VALID_CONFIG_KEYS = new Set([
     "compress.modelLimits",
     "compress.nudgeFrequency",
     "compress.iterationNudgeThreshold",
+    "compress.nudgeForce",
     "strategies",
     "strategies.deduplication",
     "strategies.deduplication.enabled",
@@ -311,6 +313,18 @@ export function validateConfigTypes(config: Record<string, any>): ValidationErro
                     key: "compress.iterationNudgeThreshold",
                     expected: "number",
                     actual: typeof compress.iterationNudgeThreshold,
+                })
+            }
+
+            if (
+                compress.nudgeForce !== undefined &&
+                compress.nudgeForce !== "strong" &&
+                compress.nudgeForce !== "soft"
+            ) {
+                errors.push({
+                    key: "compress.nudgeForce",
+                    expected: '"strong" | "soft"',
+                    actual: JSON.stringify(compress.nudgeForce),
                 })
             }
 
@@ -543,6 +557,7 @@ const defaultConfig: PluginConfig = {
         contextLimit: 100000,
         nudgeFrequency: 5,
         iterationNudgeThreshold: 15,
+        nudgeForce: "soft",
     },
     strategies: {
         deduplication: {
@@ -707,6 +722,7 @@ function mergeCompress(
         modelLimits: override.modelLimits ?? base.modelLimits,
         nudgeFrequency: override.nudgeFrequency ?? base.nudgeFrequency,
         iterationNudgeThreshold: override.iterationNudgeThreshold ?? base.iterationNudgeThreshold,
+        nudgeForce: override.nudgeForce ?? base.nudgeForce,
     }
 }
 
