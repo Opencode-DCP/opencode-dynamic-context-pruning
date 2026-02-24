@@ -117,7 +117,7 @@ DCP uses its own config file:
     "compress": {
         // Permission mode: "allow" (no prompt), "ask" (prompt), "deny" (tool not registered)
         "permission": "allow",
-        // Show summary content in a chat notification
+        // Show compression content in a chat notification
         "showCompression": false,
         // Token limit at which the model compresses session context
         // to keep the model in the "smart zone" (not a hard limit)
@@ -138,6 +138,8 @@ DCP uses its own config file:
         // Controls how likely compression is after user messages
         // ("strong" = more likely, "soft" = less likely)
         "nudgeForce": "soft",
+        // Tool names whose completed outputs are appended to the compression
+        "protectedTools": [],
     },
     // Automatic pruning strategies
     "strategies": {
@@ -183,6 +185,8 @@ By default, these tools are always protected from pruning:
 `task`, `todowrite`, `todoread`, `compress`, `batch`, `plan_enter`, `plan_exit`
 
 The `protectedTools` arrays in `commands` and `strategies` add to this default list.
+
+For the `compress` tool, `compress.protectedTools` ensures specific tool outputs are appended to the compressed summary. It defaults to an empty array `[]` but always inherently protects `task`, `todowrite`, and `todoread`.
 
 ### Config Precedence
 

@@ -163,6 +163,14 @@
                     "enum": ["strong", "soft"],
                     "default": "soft",
                     "description": "Controls how likely compression is after user messages. 'strong' is more likely, 'soft' is less likely."
+                },
+                "protectedTools": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "default": [],
+                    "description": "Tool names whose completed outputs should be appended to the compression summary"
                 }
             }
         },
