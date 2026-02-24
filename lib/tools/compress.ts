@@ -1,6 +1,6 @@
 import { tool } from "@opencode-ai/plugin"
 import type { ToolContext } from "./types"
-import { COMPRESS_TOOL_SPEC } from "../prompts"
+import { COMPRESS } from "../prompts/compress"
 import { ensureSessionInitialized } from "../state"
 import {
     wrapCompressedSummary,
@@ -26,7 +26,7 @@ import { sendCompressNotification } from "../ui/notification"
 
 export function createCompressTool(ctx: ToolContext): ReturnType<typeof tool> {
     return tool({
-        description: COMPRESS_TOOL_SPEC,
+        description: COMPRESS,
         args: {
             topic: tool.schema
                 .string()
