@@ -3,7 +3,7 @@ CRITICAL WARNING: CONTEXT BUILD-UP
 
 The context window is filling-up. You've reached a point where performance may increasingly degrade. Active context management is now strategically relevant. Mind your context footprint as the conversation grows
 
-YOU MUST COMPRESS NOW TO AVOID CONTEXT ROT. THIS IS CRITICAL. Do not delay context management any further.
+YOU MUST USE THE COMPRESS TOOL NOW TO AVOID CONTEXT ROT. THIS IS CRITICAL. Do not delay context management any further.
 
 DOOOOO IT!!!
 
