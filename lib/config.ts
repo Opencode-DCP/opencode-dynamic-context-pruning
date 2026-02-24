@@ -474,7 +474,7 @@ export function validateConfigTypes(config: Record<string, any>): ValidationErro
     return errors
 }
 
-function showConfigValidationWarnings(
+function showConfigWarnings(
     ctx: PluginInput,
     configPath: string,
     configData: Record<string, any>,
@@ -835,7 +835,7 @@ export function getConfig(ctx: PluginInput): PluginConfig {
             continue
         }
 
-        showConfigValidationWarnings(ctx, layer.path, result.data, layer.isProject)
+        showConfigWarnings(ctx, layer.path, result.data, layer.isProject)
         config = mergeLayer(config, result.data)
     }
 

@@ -454,7 +454,7 @@ export function injectBlockPlaceholders(
             }
 
             expanded += summary.slice(cursor, placeholder.startIndex)
-            expanded += restoreStoredCompressedSummary(target.summary)
+            expanded += restoreSummary(target.summary)
             cursor = placeholder.endIndex
 
             if (!consumedSeen.has(placeholder.blockId)) {
@@ -552,7 +552,7 @@ export function applyCompressionState(
     }
 }
 
-function restoreStoredCompressedSummary(summary: string): string {
+function restoreSummary(summary: string): string {
     const headerMatch = summary.match(/^\s*\[Compressed conversation(?: section)?(?: b\d+)?\]/i)
     if (!headerMatch) {
         return summary
@@ -585,7 +585,7 @@ function injectBoundarySummaryIfMissing(
         throw new Error(`Compressed block not found: ${formatBlockPlaceholder(reference.blockId)}`)
     }
 
-    const injectedBody = restoreStoredCompressedSummary(target.summary)
+    const injectedBody = restoreSummary(target.summary)
     const next =
         position === "start"
             ? mergeWithSpacing(injectedBody, summary)

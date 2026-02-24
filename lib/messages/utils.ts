@@ -121,7 +121,7 @@ export const createSyntheticToolPart = (
 type MessagePart = WithParts["parts"][number]
 type ToolPart = Extract<MessagePart, { type: "tool" }>
 
-export const appendMessageIdTagToToolOutput = (part: ToolPart, tag: string): boolean => {
+export const appendIdToTool = (part: ToolPart, tag: string): boolean => {
     if (part.type !== "tool") {
         return false
     }

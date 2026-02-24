@@ -5,7 +5,7 @@ import { formatMessageIdTag } from "../../message-ids"
 import { getLastUserMessage } from "../../shared-utils"
 import { saveSessionState } from "../../state/persistence"
 import {
-    appendMessageIdTagToToolOutput,
+    appendIdToTool,
     createSyntheticTextPart,
     createSyntheticToolPart,
     findLastToolPart,
@@ -150,7 +150,7 @@ export const insertMessageIds = (
         }
 
         const lastToolPart = findLastToolPart(message)
-        if (lastToolPart && appendMessageIdTagToToolOutput(lastToolPart, tag)) {
+        if (lastToolPart && appendIdToTool(lastToolPart, tag)) {
             continue
         }
 

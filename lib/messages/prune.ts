@@ -9,8 +9,6 @@ const PRUNED_TOOL_OUTPUT_REPLACEMENT =
     "[Output removed to save context - information superseded or no longer needed]"
 const PRUNED_TOOL_ERROR_INPUT_REPLACEMENT = "[input removed due to failed tool call]"
 const PRUNED_QUESTION_INPUT_REPLACEMENT = "[questions removed - see output for user's answers]"
-const PRUNED_COMPRESS_SUMMARY_REPLACEMENT =
-    "[summary removed to save context - see injected compressed block]"
 
 export const prune = (
     state: SessionState,
@@ -19,7 +17,7 @@ export const prune = (
     messages: WithParts[],
 ): void => {
     filterCompressedRanges(state, logger, messages)
-    pruneFullTool(state, logger, messages)
+    // pruneFullTool(state, logger, messages)
     pruneToolOutputs(state, logger, messages)
     pruneToolInputs(state, logger, messages)
     pruneToolErrors(state, logger, messages)
