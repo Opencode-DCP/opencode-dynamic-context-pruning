@@ -112,6 +112,7 @@ export function createCompressTool(ctx: ToolContext): ReturnType<typeof tool> {
                 range,
                 searchContext,
                 ctx.config.compress.protectedTools,
+                ctx.config.protectedFilePatterns,
             )
 
             const blockId = allocateBlockId(ctx.state.compressSummaries)

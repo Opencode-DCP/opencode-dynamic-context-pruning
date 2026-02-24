@@ -2,6 +2,7 @@ import type { SessionState, WithParts, CompressSummary } from "../state"
 import { formatBlockRef, formatMessageIdTag, parseBoundaryId } from "../message-ids"
 import { isIgnoredUserMessage } from "../messages/utils"
 import { countAllMessageTokens } from "../strategies/utils"
+import { getFilePathsFromParameters, isProtected } from "../protected-file-patterns"
 
 const BLOCK_PLACEHOLDER_REGEX = /\(b(\d+)\)|\{block_(\d+)\}/gi
 
@@ -614,11 +615,8 @@ export function appendProtectedTools(
     range: RangeResolution,
     searchContext: SearchContext,
     protectedTools: string[],
+    protectedFilePatterns: string[] = [],
 ): string {
-    if (!protectedTools || protectedTools.length === 0) {
-        return summary
-    }
-
     const protectedSet = new Set(protectedTools)
     const protectedOutputs: string[] = []
 
@@ -629,7 +627,16 @@ export function appendProtectedTools(
         const parts = Array.isArray(message.parts) ? message.parts : []
         for (const part of parts) {
             if (part.type === "tool" && part.callID) {
-                if (protectedSet.has(part.tool)) {
+                let isToolProtected = protectedSet.has(part.tool)
+
+                if (!isToolProtected && protectedFilePatterns.length > 0) {
+                    const filePaths = getFilePathsFromParameters(part.tool, part.state?.input)
+                    if (isProtected(filePaths, protectedFilePatterns)) {
+                        isToolProtected = true
+                    }
+                }
+
+                if (isToolProtected) {
                     const title = `Tool: ${part.tool}`
                     let output = ""
 
