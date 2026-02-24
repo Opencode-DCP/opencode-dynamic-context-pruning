@@ -3,6 +3,7 @@ import type { ToolContext } from "./types"
 import { COMPRESS } from "../prompts/compress"
 import { ensureSessionInitialized } from "../state"
 import {
+    appendProtectedTools,
     wrapCompressedSummary,
     allocateBlockId,
     applyCompressionState,
@@ -106,8 +107,15 @@ export function createCompressTool(ctx: ToolContext): ReturnType<typeof tool> {
                 range.endReference,
             )
 
+            const finalSummary = appendProtectedTools(
+                injected.expandedSummary,
+                range,
+                searchContext,
+                ctx.config.compress.protectedTools,
+            )
+
             const blockId = allocateBlockId(ctx.state.compressSummaries)
-            const storedSummary = wrapCompressedSummary(blockId, injected.expandedSummary)
+            const storedSummary = wrapCompressedSummary(blockId, finalSummary)
             const summaryTokens = countTokens(storedSummary)
 
             const applied = applyCompressionState(
@@ -136,7 +144,7 @@ export function createCompressTool(ctx: ToolContext): ReturnType<typeof tool> {
                 range.toolIds,
                 applied.messageIds,
                 compressArgs.topic,
-                injected.expandedSummary,
+                finalSummary,
                 summaryTokens,
                 totalSessionTokens,
                 applied.compressedTokens,

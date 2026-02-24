@@ -609,6 +609,53 @@ function mergeWithSpacing(left: string, right: string): string {
     return `${l}\n\n${r}`
 }
 
+export function appendProtectedTools(
+    summary: string,
+    range: RangeResolution,
+    searchContext: SearchContext,
+    protectedTools: string[],
+): string {
+    if (!protectedTools || protectedTools.length === 0) {
+        return summary
+    }
+
+    const protectedSet = new Set(protectedTools)
+    const protectedOutputs: string[] = []
+
+    for (const messageId of range.messageIds) {
+        const message = searchContext.rawMessagesById.get(messageId)
+        if (!message) continue
+
+        const parts = Array.isArray(message.parts) ? message.parts : []
+        for (const part of parts) {
+            if (part.type === "tool" && part.callID) {
+                if (protectedSet.has(part.tool)) {
+                    const title = `Tool: ${part.tool}`
+                    let output = ""
+
+                    if (part.state?.status === "completed" && part.state?.output) {
+                        output =
+                            typeof part.state.output === "string"
+                                ? part.state.output
+                                : JSON.stringify(part.state.output)
+                    }
+
+                    if (output) {
+                        protectedOutputs.push(`\n### ${title}\n${output}`)
+                    }
+                }
+            }
+        }
+    }
+
+    if (protectedOutputs.length === 0) {
+        return summary
+    }
+
+    const heading = "\n\nThe following protected tools were used in this conversation as well:"
+    return summary + heading + protectedOutputs.join("")
+}
+
 function throwCombinedIssues(issues: string[]): never {
     if (issues.length === 1) {
         throw new Error(issues[0])

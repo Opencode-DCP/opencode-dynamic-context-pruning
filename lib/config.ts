@@ -19,6 +19,7 @@ export interface CompressTool {
     nudgeFrequency: number
     iterationNudgeThreshold: number
     nudgeForce: "strong" | "soft"
+    protectedTools: string[]
 }
 
 export interface Commands {
@@ -75,6 +76,8 @@ const DEFAULT_PROTECTED_TOOLS = [
     "plan_exit",
 ]
 
+const COMPRESS_DEFAULT_PROTECTED_TOOLS = ["task", "todowrite", "todoread"]
+
 export const VALID_CONFIG_KEYS = new Set([
     "$schema",
     "enabled",
@@ -100,6 +103,7 @@ export const VALID_CONFIG_KEYS = new Set([
     "compress.nudgeFrequency",
     "compress.iterationNudgeThreshold",
     "compress.nudgeForce",
+    "compress.protectedTools",
     "strategies",
     "strategies.deduplication",
     "strategies.deduplication.enabled",
@@ -325,6 +329,14 @@ export function validateConfigTypes(config: Record<string, any>): ValidationErro
                     key: "compress.nudgeForce",
                     expected: '"strong" | "soft"',
                     actual: JSON.stringify(compress.nudgeForce),
+                })
+            }
+
+            if (compress.protectedTools !== undefined && !Array.isArray(compress.protectedTools)) {
+                errors.push({
+                    key: "compress.protectedTools",
+                    expected: "string[]",
+                    actual: typeof compress.protectedTools,
                 })
             }
 
@@ -558,6 +570,7 @@ const defaultConfig: PluginConfig = {
         nudgeFrequency: 5,
         iterationNudgeThreshold: 15,
         nudgeForce: "soft",
+        protectedTools: [...COMPRESS_DEFAULT_PROTECTED_TOOLS],
     },
     strategies: {
         deduplication: {
@@ -723,6 +736,7 @@ function mergeCompress(
         nudgeFrequency: override.nudgeFrequency ?? base.nudgeFrequency,
         iterationNudgeThreshold: override.iterationNudgeThreshold ?? base.iterationNudgeThreshold,
         nudgeForce: override.nudgeForce ?? base.nudgeForce,
+        protectedTools: [...new Set([...base.protectedTools, ...(override.protectedTools ?? [])])],
     }
 }
 
@@ -768,6 +782,7 @@ function deepCloneConfig(config: PluginConfig): PluginConfig {
         compress: {
             ...config.compress,
             modelLimits: { ...config.compress.modelLimits },
+            protectedTools: [...config.compress.protectedTools],
         },
         strategies: {
             deduplication: {
