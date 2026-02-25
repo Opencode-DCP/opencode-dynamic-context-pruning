@@ -811,7 +811,9 @@ function mergeTools(
             ],
             contextLimit: override.settings?.contextLimit ?? base.settings.contextLimit,
             modelLimits: override.settings?.modelLimits ?? base.settings.modelLimits,
-            prunableToolsInjectionFrequency: override.settings?.prunableToolsInjectionFrequency ?? base.settings.prunableToolsInjectionFrequency,
+            prunableToolsInjectionFrequency:
+                override.settings?.prunableToolsInjectionFrequency ??
+                base.settings.prunableToolsInjectionFrequency,
         },
         distill: {
             permission: override.distill?.permission ?? base.distill.permission,

@@ -126,7 +126,7 @@ DCP uses its own config file:
 >             //     "anthropic/claude-3-7-sonnet": "80%"
 >             // },
 >             // Additional tools to protect from pruning
-            >             "protectedTools": [],
+>             "protectedTools": [],
 >             // Minimum number of new tool calls AND prunable items before injecting
 >             // the prunable-tools list. Reduces cache invalidation on providers
 >             // with prefix-based or breakpoint-based caching (e.g. Anthropic, Vertex AI).
