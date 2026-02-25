@@ -264,8 +264,11 @@ export const insertPruneToolContext = (
         : undefined
 
     if (state.lastToolPrune) {
-        logger.debug("Last tool was prune - injecting cooldown message")
-        contentParts.push(getCooldownMessage(config))
+        const threshold = config.tools.settings.prunableToolsInjectionFrequency ?? 0
+        if (threshold === 0) {
+            logger.debug("Last tool was prune - injecting cooldown message")
+            contentParts.push(getCooldownMessage(config))
+        }
     } else {
         let listInjected = false
         if (pruneOrDistillEnabled) {
