@@ -52,7 +52,7 @@ LLM providers like Anthropic and OpenAI cache prompts based on exact prefix matc
 
 > **Note:** In testing, cache hit rates were approximately 80% with DCP enabled vs 85% without for most providers.
 
-**Tip:** If you use Anthropic or Vertex AI and want to preserve more cache hits, set `prunableToolsInjectionFrequency` to a value like `20`. This delays the prunable-tools list injection until enough new tool calls accumulate, reducing how often the injected context changes and invalidates the prefix cache.
+**Tip:** Set `prunableToolsInjectionFrequency` to a value like `20` to delay prunable-tools list injection until enough new tool calls accumulate. This reduces how often the injected context changes, preserving prompt cache across providers that use prefix matching or cache breakpoints (e.g. Anthropic, Vertex AI, OpenAI). It also causes prune/distill operations to be batched, reducing the number of conversation history mutations that invalidate cache.
 
 **Best use case:** Providers that count usage in requests, such as Github Copilot and Google Antigravity, have no negative price impact.
 
