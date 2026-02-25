@@ -347,25 +347,21 @@ export function validateConfigTypes(config: Record<string, any>): ValidationErro
                     actual: `${tools.settings.nudgeFrequency} (will be clamped to 1)`,
                 })
             }
-            if (
-                tools.settings.prunableToolsInjectionFrequency !== undefined &&
-                typeof tools.settings.prunableToolsInjectionFrequency !== "number"
-            ) {
-                errors.push({
-                    key: "tools.settings.prunableToolsInjectionFrequency",
-                    expected: "number",
-                    actual: typeof tools.settings.prunableToolsInjectionFrequency,
-                })
-            }
-            if (
-                typeof tools.settings.prunableToolsInjectionFrequency === "number" &&
-                tools.settings.prunableToolsInjectionFrequency < 0
-            ) {
-                errors.push({
-                    key: "tools.settings.prunableToolsInjectionFrequency",
-                    expected: "non-negative number (>= 0)",
-                    actual: `${tools.settings.prunableToolsInjectionFrequency}`,
-                })
+            if (tools.settings.prunableToolsInjectionFrequency !== undefined) {
+                const freq = tools.settings.prunableToolsInjectionFrequency
+                if (typeof freq !== "number") {
+                    errors.push({
+                        key: "tools.settings.prunableToolsInjectionFrequency",
+                        expected: "number",
+                        actual: typeof freq,
+                    })
+                } else if (freq < 0) {
+                    errors.push({
+                        key: "tools.settings.prunableToolsInjectionFrequency",
+                        expected: "non-negative number (>= 0)",
+                        actual: `${freq}`,
+                    })
+                }
             }
             if (
                 tools.settings.protectedTools !== undefined &&

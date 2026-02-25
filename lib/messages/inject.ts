@@ -267,12 +267,20 @@ export const insertPruneToolContext = (
         logger.debug("Last tool was prune - injecting cooldown message")
         contentParts.push(getCooldownMessage(config))
     } else {
+        let listInjected = false
         if (pruneOrDistillEnabled) {
             const threshold = config.tools.settings.prunableToolsInjectionFrequency ?? 0
-            if (threshold === 0 || state.nudgeCounter >= threshold) {
+            if (threshold === 0) {
+                const prunableToolsList = buildPrunableToolsList(state, config, logger)
+                if (prunableToolsList) {
+                    contentParts.push(prunableToolsList)
+                    listInjected = true
+                }
+            } else if (state.nudgeCounter >= threshold) {
                 const lines = buildPrunableToolsLines(state, config, logger)
-                if (lines.length > 0 && (threshold === 0 || lines.length >= threshold)) {
+                if (lines.length >= threshold) {
                     contentParts.push(wrapPrunableTools(lines.join("\n")))
+                    listInjected = true
                 }
             }
         }
@@ -287,6 +295,7 @@ export const insertPruneToolContext = (
             logger.info("Inserting compress nudge - token usage exceeds contextLimit")
             contentParts.push(renderCompressNudge())
         } else if (
+            listInjected &&
             config.tools.settings.nudgeEnabled &&
             state.nudgeCounter >= Math.max(1, config.tools.settings.nudgeFrequency)
         ) {
