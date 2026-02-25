@@ -86,7 +86,12 @@ export function createSystemPromptHandler(
             return
         }
 
-        output.system.push(renderSystemPrompt(state.manualMode))
+        const newPrompt = renderSystemPrompt(state.manualMode)
+        if (output.system.length > 0) {
+            output.system[output.system.length - 1] += "\n\n" + newPrompt
+        } else {
+            output.system.push(newPrompt)
+        }
     }
 }
 
