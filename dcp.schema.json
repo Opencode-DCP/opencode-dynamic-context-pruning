@@ -157,6 +157,11 @@
                                     }
                                 ]
                             }
+                        },
+                        "prunableToolsInjectionFrequency": {
+                            "type": "number",
+                            "default": 0,
+                            "description": "Minimum number of new tool calls (since last prune/distill/compress) AND minimum number of prunable tool outputs required before injecting the prunable-tools list. 0 = inject every turn (default, backward-compatible). Higher values reduce Anthropic/Vertex AI prefix cache invalidation by injecting less frequently."
                         }
                     }
                 },

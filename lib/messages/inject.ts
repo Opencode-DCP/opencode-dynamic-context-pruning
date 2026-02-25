@@ -172,11 +172,11 @@ const buildCompressContext = (state: SessionState, messages: WithParts[]): strin
     return wrapCompressContext(messageCount)
 }
 
-export const buildPrunableToolsList = (
+export const buildPrunableToolsLines = (
     state: SessionState,
     config: PluginConfig,
     logger: Logger,
-): string => {
+): string[] => {
     const lines: string[] = []
     const toolIdList = state.toolIdList
 
@@ -220,10 +220,18 @@ export const buildPrunableToolsList = (
         )
     })
 
+    return lines
+}
+
+export const buildPrunableToolsList = (
+    state: SessionState,
+    config: PluginConfig,
+    logger: Logger,
+): string => {
+    const lines = buildPrunableToolsLines(state, config, logger)
     if (lines.length === 0) {
         return ""
     }
-
     return wrapPrunableTools(lines.join("\n"))
 }
 
@@ -260,10 +268,12 @@ export const insertPruneToolContext = (
         contentParts.push(getCooldownMessage(config))
     } else {
         if (pruneOrDistillEnabled) {
-            const prunableToolsList = buildPrunableToolsList(state, config, logger)
-            if (prunableToolsList) {
-                // logger.debug("prunable-tools: \n" + prunableToolsList)
-                contentParts.push(prunableToolsList)
+            const threshold = config.tools.settings.prunableToolsInjectionFrequency ?? 0
+            if (threshold === 0 || state.nudgeCounter >= threshold) {
+                const lines = buildPrunableToolsLines(state, config, logger)
+                if (lines.length > 0 && (threshold === 0 || lines.length >= threshold)) {
+                    contentParts.push(wrapPrunableTools(lines.join("\n")))
+                }
             }
         }
 

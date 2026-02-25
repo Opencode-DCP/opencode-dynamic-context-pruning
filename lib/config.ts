@@ -29,6 +29,7 @@ export interface ToolSettings {
     protectedTools: string[]
     contextLimit: number | `${number}%`
     modelLimits?: Record<string, number | `${number}%`>
+    prunableToolsInjectionFrequency?: number
 }
 
 export interface Tools {
@@ -120,6 +121,7 @@ export const VALID_CONFIG_KEYS = new Set([
     "tools.settings.protectedTools",
     "tools.settings.contextLimit",
     "tools.settings.modelLimits",
+    "tools.settings.prunableToolsInjectionFrequency",
     "tools.distill",
     "tools.distill.permission",
     "tools.distill.showDistillation",
@@ -343,6 +345,26 @@ export function validateConfigTypes(config: Record<string, any>): ValidationErro
                     key: "tools.settings.nudgeFrequency",
                     expected: "positive number (>= 1)",
                     actual: `${tools.settings.nudgeFrequency} (will be clamped to 1)`,
+                })
+            }
+            if (
+                tools.settings.prunableToolsInjectionFrequency !== undefined &&
+                typeof tools.settings.prunableToolsInjectionFrequency !== "number"
+            ) {
+                errors.push({
+                    key: "tools.settings.prunableToolsInjectionFrequency",
+                    expected: "number",
+                    actual: typeof tools.settings.prunableToolsInjectionFrequency,
+                })
+            }
+            if (
+                typeof tools.settings.prunableToolsInjectionFrequency === "number" &&
+                tools.settings.prunableToolsInjectionFrequency < 0
+            ) {
+                errors.push({
+                    key: "tools.settings.prunableToolsInjectionFrequency",
+                    expected: "non-negative number (>= 0)",
+                    actual: `${tools.settings.prunableToolsInjectionFrequency}`,
                 })
             }
             if (
@@ -793,6 +815,7 @@ function mergeTools(
             ],
             contextLimit: override.settings?.contextLimit ?? base.settings.contextLimit,
             modelLimits: override.settings?.modelLimits ?? base.settings.modelLimits,
+            prunableToolsInjectionFrequency: override.settings?.prunableToolsInjectionFrequency ?? base.settings.prunableToolsInjectionFrequency,
         },
         distill: {
             permission: override.distill?.permission ?? base.distill.permission,
