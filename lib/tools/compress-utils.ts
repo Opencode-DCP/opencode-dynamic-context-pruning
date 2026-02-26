@@ -1,4 +1,4 @@
-import type { SessionState, WithParts, CompressSummary } from "../state"
+import type { CompressionBlock, SessionState, WithParts } from "../state"
 import { formatBlockRef, formatMessageIdTag, parseBoundaryId } from "../message-ids"
 import { isIgnoredUserMessage } from "../messages/utils"
 import { countAllMessageTokens } from "../strategies/utils"
@@ -27,7 +27,7 @@ export interface SearchContext {
     rawMessages: WithParts[]
     rawMessagesById: Map<string, WithParts>
     rawIndexById: Map<string, number>
-    summaryByBlockId: Map<number, CompressSummary>
+    summaryByBlockId: Map<number, CompressionBlock>
 }
 
 export interface RangeResolution {
@@ -54,6 +54,13 @@ export interface InjectedSummaryResult {
 export interface AppliedCompressionResult {
     compressedTokens: number
     messageIds: string[]
+}
+
+export interface CompressionStateInput {
+    topic: string
+    startId: string
+    endId: string
+    compressMessageId: string
 }
 
 export const COMPRESSED_BLOCK_HEADER = "[Compressed conversation section]"
@@ -103,9 +110,12 @@ export function buildSearchContext(state: SessionState, rawMessages: WithParts[]
         rawIndexById.set(message.info.id, index)
     }
 
-    const summaryByBlockId = new Map<number, CompressSummary>()
-    for (const summary of state.compressSummaries || []) {
-        summaryByBlockId.set(summary.blockId, summary)
+    const summaryByBlockId = new Map<number, CompressionBlock>()
+    for (const [blockId, block] of state.prune.messages.blocksById) {
+        if (!block.active) {
+            continue
+        }
+        summaryByBlockId.set(blockId, block)
     }
 
     return {
@@ -364,7 +374,7 @@ export function validateSummaryPlaceholders(
     requiredBlockIds: number[],
     startReference: BoundaryReference,
     endReference: BoundaryReference,
-    summaryByBlockId: Map<number, CompressSummary>,
+    summaryByBlockId: Map<number, CompressionBlock>,
 ): void {
     const issues: string[] = []
 
@@ -435,7 +445,7 @@ export function validateSummaryPlaceholders(
 export function injectBlockPlaceholders(
     summary: string,
     placeholders: ParsedBlockPlaceholder[],
-    summaryByBlockId: Map<number, CompressSummary>,
+    summaryByBlockId: Map<number, CompressionBlock>,
     startReference: BoundaryReference,
     endReference: BoundaryReference,
 ): InjectedSummaryResult {
@@ -490,18 +500,15 @@ export function injectBlockPlaceholders(
     }
 }
 
-export function allocateBlockId(summaries: CompressSummary[]): number {
-    if (summaries.length === 0) {
+export function allocateBlockId(state: SessionState): number {
+    const next = state.prune.messages.nextBlockId
+    if (!Number.isInteger(next) || next < 1) {
+        state.prune.messages.nextBlockId = 2
         return 1
     }
 
-    let max = 0
-    for (const summary of summaries) {
-        if (summary.blockId > max) {
-            max = summary.blockId
-        }
-    }
-    return max + 1
+    state.prune.messages.nextBlockId = next + 1
+    return next
 }
 
 export function wrapCompressedSummary(blockId: number, summary: string): string {
@@ -516,31 +523,164 @@ export function wrapCompressedSummary(blockId: number, summary: string): string 
 
 export function applyCompressionState(
     state: SessionState,
+    input: CompressionStateInput,
     range: RangeResolution,
     anchorMessageId: string,
     blockId: number,
     summary: string,
     consumedBlockIds: number[],
 ): AppliedCompressionResult {
-    const consumed = new Set(consumedBlockIds)
-    state.compressSummaries = (state.compressSummaries || []).filter(
-        (s) => !consumed.has(s.blockId),
-    )
-    state.compressSummaries.push({
-        blockId,
-        anchorMessageId,
-        summary,
-    })
+    const messagesState = state.prune.messages
+    const consumed = [...new Set(consumedBlockIds.filter((id) => Number.isInteger(id) && id > 0))]
+    const included = [...consumed]
 
-    let compressedTokens = 0
-    for (const messageId of range.messageIds) {
-        if (state.prune.messages.has(messageId)) {
+    const effectiveMessageIds = new Set<string>(range.messageIds)
+    const effectiveToolIds = new Set<string>(range.toolIds)
+
+    for (const consumedBlockId of consumed) {
+        const consumedBlock = messagesState.blocksById.get(consumedBlockId)
+        if (!consumedBlock) {
+            continue
+        }
+        for (const messageId of consumedBlock.effectiveMessageIds) {
+            effectiveMessageIds.add(messageId)
+        }
+        for (const toolId of consumedBlock.effectiveToolIds) {
+            effectiveToolIds.add(toolId)
+        }
+    }
+
+    const initiallyActiveMessages = new Set<string>()
+    for (const messageId of effectiveMessageIds) {
+        const entry = messagesState.byMessageId.get(messageId)
+        if (entry && entry.activeBlockIds.length > 0) {
+            initiallyActiveMessages.add(messageId)
+        }
+    }
+
+    const createdAt = Date.now()
+    const block: CompressionBlock = {
+        blockId,
+        active: true,
+        topic: input.topic,
+        startId: input.startId,
+        endId: input.endId,
+        anchorMessageId,
+        compressMessageId: input.compressMessageId,
+        includedBlockIds: included,
+        consumedBlockIds: consumed,
+        parentBlockIds: [],
+        directMessageIds: [...range.messageIds],
+        directToolIds: [...range.toolIds],
+        effectiveMessageIds: [...effectiveMessageIds],
+        effectiveToolIds: [...effectiveToolIds],
+        createdAt,
+        summary,
+    }
+
+    messagesState.blocksById.set(blockId, block)
+    messagesState.activeBlockIds.add(blockId)
+    messagesState.activeByAnchorMessageId.set(anchorMessageId, blockId)
+
+    const deactivatedAt = Date.now()
+    for (const consumedBlockId of consumed) {
+        const consumedBlock = messagesState.blocksById.get(consumedBlockId)
+        if (!consumedBlock || !consumedBlock.active) {
             continue
         }
 
+        consumedBlock.active = false
+        consumedBlock.deactivatedAt = deactivatedAt
+        consumedBlock.deactivatedByBlockId = blockId
+        if (!consumedBlock.parentBlockIds.includes(blockId)) {
+            consumedBlock.parentBlockIds.push(blockId)
+        }
+
+        messagesState.activeBlockIds.delete(consumedBlockId)
+        const mappedBlockId = messagesState.activeByAnchorMessageId.get(
+            consumedBlock.anchorMessageId,
+        )
+        if (mappedBlockId === consumedBlockId) {
+            messagesState.activeByAnchorMessageId.delete(consumedBlock.anchorMessageId)
+        }
+    }
+
+    const removeActiveBlockId = (
+        entry: { activeBlockIds: number[] },
+        blockIdToRemove: number,
+    ): void => {
+        if (entry.activeBlockIds.length === 0) {
+            return
+        }
+        entry.activeBlockIds = entry.activeBlockIds.filter((id) => id !== blockIdToRemove)
+    }
+
+    for (const consumedBlockId of consumed) {
+        const consumedBlock = messagesState.blocksById.get(consumedBlockId)
+        if (!consumedBlock) {
+            continue
+        }
+        for (const messageId of consumedBlock.effectiveMessageIds) {
+            const entry = messagesState.byMessageId.get(messageId)
+            if (!entry) {
+                continue
+            }
+            removeActiveBlockId(entry, consumedBlockId)
+        }
+    }
+
+    for (const messageId of range.messageIds) {
         const tokenCount = range.messageTokenById.get(messageId) || 0
-        state.prune.messages.set(messageId, tokenCount)
-        compressedTokens += tokenCount
+        const existing = messagesState.byMessageId.get(messageId)
+
+        if (!existing) {
+            messagesState.byMessageId.set(messageId, {
+                tokenCount,
+                allBlockIds: [blockId],
+                activeBlockIds: [blockId],
+            })
+            continue
+        }
+
+        existing.tokenCount = Math.max(existing.tokenCount, tokenCount)
+        if (!existing.allBlockIds.includes(blockId)) {
+            existing.allBlockIds.push(blockId)
+        }
+        if (!existing.activeBlockIds.includes(blockId)) {
+            existing.activeBlockIds.push(blockId)
+        }
+    }
+
+    for (const messageId of block.effectiveMessageIds) {
+        if (range.messageTokenById.has(messageId)) {
+            continue
+        }
+
+        const existing = messagesState.byMessageId.get(messageId)
+        if (!existing) {
+            continue
+        }
+        if (!existing.allBlockIds.includes(blockId)) {
+            existing.allBlockIds.push(blockId)
+        }
+        if (!existing.activeBlockIds.includes(blockId)) {
+            existing.activeBlockIds.push(blockId)
+        }
+    }
+
+    let compressedTokens = 0
+    for (const messageId of effectiveMessageIds) {
+        const entry = messagesState.byMessageId.get(messageId)
+        if (!entry) {
+            continue
+        }
+
+        const isNowActive = entry.activeBlockIds.length > 0
+        const wasActive = initiallyActiveMessages.has(messageId)
+
+        if (isNowActive && !wasActive) {
+            compressedTokens += entry.tokenCount
+        }
     }
 
     state.stats.pruneTokenCounter += compressedTokens
@@ -570,7 +710,7 @@ function injectBoundarySummaryIfMissing(
     summary: string,
     reference: BoundaryReference,
     position: "start" | "end",
-    summaryByBlockId: Map<number, CompressSummary>,
+    summaryByBlockId: Map<number, CompressionBlock>,
     consumed: number[],
     consumedSeen: Set<number>,
 ): string {

@@ -125,7 +125,8 @@ function analyzeTokens(state: SessionState, messages: WithParts[]): TokenBreakdo
         allMessageIds.add(msg.info.id)
         const parts = Array.isArray(msg.parts) ? msg.parts : []
         const isCompacted = isMessageCompacted(state, msg)
-        const isMessagePruned = state.prune.messages.has(msg.info.id)
+        const pruneEntry = state.prune.messages.byMessageId.get(msg.info.id)
+        const isMessagePruned = !!pruneEntry && pruneEntry.activeBlockIds.length > 0
         const isIgnoredUser = msg.info.role === "user" && isIgnoredUserMessage(msg)
 
         for (const part of parts) {
@@ -190,8 +191,8 @@ function analyzeTokens(state: SessionState, messages: WithParts[]): TokenBreakdo
     const toolsInContextCount = [...activeToolIds].filter((id) => !prunedByToolIds.has(id)).length
 
     let prunedMessageCount = 0
-    for (const id of state.prune.messages.keys()) {
-        if (allMessageIds.has(id)) {
+    for (const [id, entry] of state.prune.messages.byMessageId) {
+        if (allMessageIds.has(id) && entry.activeBlockIds.length > 0) {
             prunedMessageCount++
         }
     }

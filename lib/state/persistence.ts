@@ -8,17 +8,21 @@ import * as fs from "fs/promises"
 import { existsSync } from "fs"
 import { homedir } from "os"
 import { join } from "path"
-import type { SessionState, SessionStats, CompressSummary } from "./types"
+import type { CompressionBlock, PrunedMessageEntry, SessionState, SessionStats } from "./types"
 import type { Logger } from "../logger"
 
 /** Prune state as stored on disk */
+export interface PersistedPruneMessagesState {
+    byMessageId: Record<string, PrunedMessageEntry>
+    blocksById: Record<string, CompressionBlock>
+    activeBlockIds: number[]
+    activeByAnchorMessageId: Record<string, number>
+    nextBlockId: number
+}
+
 export interface PersistedPrune {
-    // New format: tool/message IDs with token counts
     tools?: Record<string, number>
-    messages?: Record<string, number>
-    // Legacy format: plain ID arrays (backward compatibility)
-    toolIds?: string[]
-    messageIds?: string[]
+    messages?: PersistedPruneMessagesState
 }
 
 export interface PersistedNudges {
@@ -30,7 +34,6 @@ export interface PersistedNudges {
 export interface PersistedSessionState {
     sessionName?: string
     prune: PersistedPrune
-    compressSummaries: CompressSummary[]
     nudges: PersistedNudges
     stats: SessionStats
     lastUpdated: string
@@ -70,9 +73,20 @@ export async function saveSessionState(
             sessionName: sessionName,
             prune: {
                 tools: Object.fromEntries(sessionState.prune.tools),
-                messages: Object.fromEntries(sessionState.prune.messages),
+                messages: {
+                    byMessageId: Object.fromEntries(sessionState.prune.messages.byMessageId),
+                    blocksById: Object.fromEntries(
+                        Array.from(sessionState.prune.messages.blocksById.entries()).map(
+                            ([blockId, block]) => [String(blockId), block],
+                        ),
+                    ),
+                    activeBlockIds: Array.from(sessionState.prune.messages.activeBlockIds),
+                    activeByAnchorMessageId: Object.fromEntries(
+                        sessionState.prune.messages.activeByAnchorMessageId,
+                    ),
+                    nextBlockId: sessionState.prune.messages.nextBlockId,
+                },
             },
-            compressSummaries: sessionState.compressSummaries,
             nudges: {
                 contextLimitAnchors: Array.from(sessionState.nudges.contextLimitAnchors),
                 turnNudgeAnchors: Array.from(sessionState.nudges.turnNudgeAnchors),
@@ -112,13 +126,14 @@ export async function loadSessionState(
         const content = await fs.readFile(filePath, "utf-8")
         const state = JSON.parse(content) as PersistedSessionState
 
-        const hasNewFormat = state?.prune?.tools && typeof state.prune.tools === "object"
-        const hasLegacyFormat = Array.isArray(state?.prune?.toolIds)
+        const hasPruneTools = state?.prune?.tools && typeof state.prune.tools === "object"
+        const hasPruneMessages = state?.prune?.messages && typeof state.prune.messages === "object"
         const hasNudgeFormat = state?.nudges && typeof state.nudges === "object"
         if (
             !state ||
             !state.prune ||
-            (!hasNewFormat && !hasLegacyFormat) ||
+            !hasPruneTools ||
+            !hasPruneMessages ||
             !state.stats ||
             !hasNudgeFormat
         ) {
@@ -126,27 +141,6 @@ export async function loadSessionState(
                 sessionId: sessionId,
             })
             return null
-        }
-
-        if (Array.isArray(state.compressSummaries)) {
-            const validSummaries = state.compressSummaries.filter(
-                (s): s is CompressSummary =>
-                    s !== null &&
-                    typeof s === "object" &&
-                    typeof s.blockId === "number" &&
-                    typeof s.anchorMessageId === "string" &&
-                    typeof s.summary === "string",
-            )
-            if (validSummaries.length !== state.compressSummaries.length) {
-                logger.warn("Filtered out malformed compressSummaries entries", {
-                    sessionId: sessionId,
-                    original: state.compressSummaries.length,
-                    valid: validSummaries.length,
-                })
-            }
-            state.compressSummaries = validSummaries
-        } else {
-            state.compressSummaries = []
         }
 
         const rawContextLimitAnchors = Array.isArray(state.nudges.contextLimitAnchors)
@@ -244,10 +238,10 @@ export async function loadAllSessionStats(logger: Logger): Promise<AggregatedSta
                     result.totalTokens += state.stats.totalPruneTokens
                     result.totalTools += state.prune.tools
                         ? Object.keys(state.prune.tools).length
-                        : (state.prune.toolIds?.length ?? 0)
-                    result.totalMessages += state.prune.messages
-                        ? Object.keys(state.prune.messages).length
-                        : (state.prune.messageIds?.length ?? 0)
+                        : 0
+                    result.totalMessages += state.prune.messages?.byMessageId
+                        ? Object.keys(state.prune.messages.byMessageId).length
+                        : 0
                     result.sessionCount++
                 }
             } catch {

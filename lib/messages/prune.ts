@@ -168,7 +168,10 @@ const filterCompressedRanges = (
     logger: Logger,
     messages: WithParts[],
 ): void => {
-    if (!state.prune.messages?.size) {
+    if (
+        state.prune.messages.byMessageId.size === 0 &&
+        state.prune.messages.activeByAnchorMessageId.size === 0
+    ) {
         return
     }
 
@@ -178,10 +181,16 @@ const filterCompressedRanges = (
         const msgId = msg.info.id
 
         // Check if there's a summary to inject at this anchor point
-        const summary = state.compressSummaries?.find((s) => s?.anchorMessageId === msgId)
+        const blockId = state.prune.messages.activeByAnchorMessageId.get(msgId)
+        const summary =
+            blockId !== undefined ? state.prune.messages.blocksById.get(blockId) : undefined
         if (summary) {
             const rawSummaryContent = (summary as { summary?: unknown }).summary
-            if (typeof rawSummaryContent !== "string" || rawSummaryContent.length === 0) {
+            if (
+                summary.active !== true ||
+                typeof rawSummaryContent !== "string" ||
+                rawSummaryContent.length === 0
+            ) {
                 logger.warn("Skipping malformed compress summary", {
                     anchorMessageId: msgId,
                     blockId: (summary as { blockId?: unknown }).blockId,
@@ -217,7 +226,8 @@ const filterCompressedRanges = (
         }
 
         // Skip messages that are in the prune list
-        if (state.prune.messages.has(msgId)) {
+        const pruneEntry = state.prune.messages.byMessageId.get(msgId)
+        if (pruneEntry && pruneEntry.activeBlockIds.length > 0) {
             continue
         }
 

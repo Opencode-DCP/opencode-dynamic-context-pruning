@@ -3,7 +3,7 @@ import type { Logger } from "./logger"
 import type { PluginConfig } from "./config"
 import { assignMessageRefs } from "./message-ids"
 import { syncToolCache } from "./state/tool-cache"
-import { prune, insertCompressNudges, insertMessageIds } from "./messages"
+import { prune, syncCompressionBlocks, insertCompressNudges, insertMessageIds } from "./messages"
 import { buildToolIdList, isIgnoredUserMessage, stripHallucinations } from "./messages/utils"
 import { checkSession } from "./state"
 import { renderSystemPrompt } from "./prompts"
@@ -113,6 +113,7 @@ export function createChatMessageTransformHandler(
         assignMessageRefs(state, output.messages)
         syncToolCache(state, config, logger, output.messages)
         buildToolIdList(state, output.messages)
+        syncCompressionBlocks(state, logger, output.messages)
         prune(state, logger, config, output.messages)
         insertCompressNudges(state, config, logger, output.messages)
         insertMessageIds(state, config, output.messages)
