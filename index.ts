@@ -83,7 +83,9 @@ const plugin: Plugin = (async (ctx) => {
             }
 
             const toolsToAdd: string[] = []
-            if (config.compress.permission !== "deny") toolsToAdd.push("compress")
+            if (config.compress.permission !== "deny" && !config.experimental.allowSubAgents) {
+                toolsToAdd.push("compress")
+            }
 
             if (toolsToAdd.length > 0) {
                 const existingPrimaryTools = opencodeConfig.experimental?.primary_tools ?? []
@@ -91,9 +93,6 @@ const plugin: Plugin = (async (ctx) => {
                     ...opencodeConfig.experimental,
                     primary_tools: [...existingPrimaryTools, ...toolsToAdd],
                 }
-                logger.info(
-                    `Added ${toolsToAdd.map((t) => `'${t}'`).join(" and ")} to experimental.primary_tools via config mutation`,
-                )
             }
 
             // Set tool permissions from DCP config
