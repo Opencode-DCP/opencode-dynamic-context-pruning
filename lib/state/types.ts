@@ -87,6 +87,7 @@ export interface SessionState {
     nudges: Nudges
     stats: SessionStats
     toolParameters: Map<string, ToolParameterEntry>
+    subAgentResultCache: Map<string, string>
     toolIdList: string[]
     messageIds: MessageIdState
     lastCompaction: number

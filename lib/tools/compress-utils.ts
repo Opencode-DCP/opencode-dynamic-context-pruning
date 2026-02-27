@@ -3,6 +3,11 @@ import { formatBlockRef, formatMessageIdTag, parseBoundaryId } from "../message-
 import { isIgnoredUserMessage } from "../messages/utils"
 import { countAllMessageTokens } from "../strategies/utils"
 import { getFilePathsFromParameters, isProtected } from "../protected-file-patterns"
+import {
+    buildSubagentResultText,
+    getSubAgentId,
+    mergeSubagentResult,
+} from "../subagents/subagent-results"
 
 const BLOCK_PLACEHOLDER_REGEX = /\(b(\d+)\)|\{block_(\d+)\}/gi
 
@@ -750,13 +755,15 @@ function mergeWithSpacing(left: string, right: string): string {
     return `${l}\n\n${r}`
 }
 
-export function appendProtectedTools(
+export async function appendProtectedTools(
+    client: any,
+    state: SessionState,
     summary: string,
     range: RangeResolution,
     searchContext: SearchContext,
     protectedTools: string[],
     protectedFilePatterns: string[] = [],
-): string {
+): Promise<string> {
     const protectedSet = new Set(protectedTools)
     const protectedOutputs: string[] = []
 
@@ -785,6 +792,41 @@ export function appendProtectedTools(
                             typeof part.state.output === "string"
                                 ? part.state.output
                                 : JSON.stringify(part.state.output)
+                    }
+
+                    if (
+                        part.tool === "task" &&
+                        part.state?.status === "completed" &&
+                        typeof part.state?.output === "string"
+                    ) {
+                        const cachedSubAgentResult = state.subAgentResultCache.get(part.callID)
+
+                        if (cachedSubAgentResult !== undefined) {
+                            if (cachedSubAgentResult) {
+                                output = mergeSubagentResult(
+                                    part.state.output,
+                                    cachedSubAgentResult,
+                                )
+                            }
+                        } else {
+                            let subAgentResultText = ""
+                            const subAgentSessionId = getSubAgentId(part)
+                            if (subAgentSessionId) {
+                                try {
+                                    const subAgentMessages = await fetchSessionMessages(
+                                        client,
+                                        subAgentSessionId,
+                                    )
+                                    subAgentResultText = buildSubagentResultText(subAgentMessages)
+                                } catch {}
+                            }
+
+                            state.subAgentResultCache.set(part.callID, subAgentResultText)
+
+                            if (subAgentResultText) {
+                                output = mergeSubagentResult(part.state.output, subAgentResultText)
+                            }
+                        }
                     }
 
                     if (output) {
