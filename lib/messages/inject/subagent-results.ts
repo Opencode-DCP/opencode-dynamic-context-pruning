@@ -20,7 +20,12 @@ export const insertExtendedSubAgentResults = async (
     state: SessionState,
     logger: Logger,
     messages: WithParts[],
+    allowSubAgents: boolean,
 ): Promise<void> => {
+    if (!allowSubAgents) {
+        return
+    }
+
     for (const message of messages) {
         const parts = Array.isArray(message.parts) ? message.parts : []
 

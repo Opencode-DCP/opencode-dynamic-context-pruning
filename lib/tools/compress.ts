@@ -110,6 +110,7 @@ export function createCompressTool(ctx: ToolContext): ReturnType<typeof tool> {
             const finalSummary = await appendProtectedTools(
                 ctx.client,
                 ctx.state,
+                ctx.config.experimental.allowSubAgents,
                 injected.expandedSummary,
                 range,
                 searchContext,

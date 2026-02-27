@@ -121,7 +121,13 @@ export function createChatMessageTransformHandler(
         syncToolCache(state, config, logger, output.messages)
         buildToolIdList(state, output.messages)
         prune(state, logger, config, output.messages)
-        await insertExtendedSubAgentResults(client, state, logger, output.messages)
+        await insertExtendedSubAgentResults(
+            client,
+            state,
+            logger,
+            output.messages,
+            config.experimental.allowSubAgents,
+        )
         insertCompressNudges(state, config, logger, output.messages)
         insertMessageIds(state, config, output.messages)
         applyManualPrompt(state, output.messages, logger)

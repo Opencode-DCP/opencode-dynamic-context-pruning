@@ -758,6 +758,7 @@ function mergeWithSpacing(left: string, right: string): string {
 export async function appendProtectedTools(
     client: any,
     state: SessionState,
+    allowSubAgents: boolean,
     summary: string,
     range: RangeResolution,
     searchContext: SearchContext,
@@ -795,6 +796,7 @@ export async function appendProtectedTools(
                     }
 
                     if (
+                        allowSubAgents &&
                         part.tool === "task" &&
                         part.state?.status === "completed" &&
                         typeof part.state?.output === "string"
