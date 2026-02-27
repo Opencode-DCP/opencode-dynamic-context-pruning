@@ -94,6 +94,21 @@
                 }
             }
         },
+        "experimental": {
+            "type": "object",
+            "description": "Experimental settings that may change in future releases",
+            "additionalProperties": false,
+            "properties": {
+                "allowSubAgents": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Allow DCP processing in subagent sessions"
+                }
+            },
+            "default": {
+                "allowSubAgents": false
+            }
+        },
         "protectedFilePatterns": {
             "type": "array",
             "items": {

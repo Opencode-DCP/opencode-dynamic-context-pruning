@@ -72,7 +72,7 @@ export function createSystemPromptHandler(
             logger.debug("Cached model context limit", { limit: state.modelContextLimit })
         }
 
-        if (state.isSubAgent) {
+        if (state.isSubAgent && !config.experimental.allowSubAgents) {
             return
         }
 
@@ -104,7 +104,7 @@ export function createChatMessageTransformHandler(
     return async (input: {}, output: { messages: WithParts[] }) => {
         await checkSession(client, state, logger, output.messages, config.manualMode.enabled)
 
-        if (state.isSubAgent) {
+        if (state.isSubAgent && !config.experimental.allowSubAgents) {
             return
         }
 
