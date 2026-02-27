@@ -51,8 +51,23 @@ export async function handleStatsCommand(ctx: StatsCommandContext): Promise<void
 
     // Session stats from in-memory state
     const sessionTokens = state.stats.totalPruneTokens
-    const sessionTools = state.prune.tools.size
-    const sessionMessages = state.prune.messages.size
+
+    const prunedToolIds = new Set<string>(state.prune.tools.keys())
+    for (const block of state.prune.messages.blocksById.values()) {
+        if (block.active) {
+            for (const toolId of block.effectiveToolIds) {
+                prunedToolIds.add(toolId)
+            }
+        }
+    }
+    const sessionTools = prunedToolIds.size
+
+    let sessionMessages = 0
+    for (const entry of state.prune.messages.byMessageId.values()) {
+        if (entry.activeBlockIds.length > 0) {
+            sessionMessages++
+        }
+    }
 
     // All-time stats from storage files
     const allTime = await loadAllSessionStats(logger)

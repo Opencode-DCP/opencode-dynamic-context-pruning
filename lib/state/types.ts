@@ -21,15 +21,44 @@ export interface SessionStats {
     totalPruneTokens: number
 }
 
-export interface CompressSummary {
+export interface PrunedMessageEntry {
+    tokenCount: number
+    allBlockIds: number[]
+    activeBlockIds: number[]
+}
+
+export interface CompressionBlock {
     blockId: number
+    active: boolean
+    topic: string
+    startId: string
+    endId: string
     anchorMessageId: string
+    compressMessageId: string
+    includedBlockIds: number[]
+    consumedBlockIds: number[]
+    parentBlockIds: number[]
+    directMessageIds: string[]
+    directToolIds: string[]
+    effectiveMessageIds: string[]
+    effectiveToolIds: string[]
+    createdAt: number
+    deactivatedAt?: number
+    deactivatedByBlockId?: number
     summary: string
+}
+
+export interface PruneMessagesState {
+    byMessageId: Map<string, PrunedMessageEntry>
+    blocksById: Map<number, CompressionBlock>
+    activeBlockIds: Set<number>
+    activeByAnchorMessageId: Map<string, number>
+    nextBlockId: number
 }
 
 export interface Prune {
     tools: Map<string, number>
-    messages: Map<string, number>
+    messages: PruneMessagesState
 }
 
 export interface PendingManualTrigger {
@@ -55,7 +84,6 @@ export interface SessionState {
     manualMode: boolean
     pendingManualTrigger: PendingManualTrigger | null
     prune: Prune
-    compressSummaries: CompressSummary[]
     nudges: Nudges
     stats: SessionStats
     toolParameters: Map<string, ToolParameterEntry>

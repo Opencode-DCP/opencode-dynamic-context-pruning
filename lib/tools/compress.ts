@@ -115,12 +115,18 @@ export function createCompressTool(ctx: ToolContext): ReturnType<typeof tool> {
                 ctx.config.protectedFilePatterns,
             )
 
-            const blockId = allocateBlockId(ctx.state.compressSummaries)
+            const blockId = allocateBlockId(ctx.state)
             const storedSummary = wrapCompressedSummary(blockId, finalSummary)
             const summaryTokens = countTokens(storedSummary)
 
             const applied = applyCompressionState(
                 ctx.state,
+                {
+                    topic: compressArgs.topic,
+                    startId: compressArgs.content.startId,
+                    endId: compressArgs.content.endId,
+                    compressMessageId: toolCtx.messageID,
+                },
                 range,
                 anchorMessageId,
                 blockId,

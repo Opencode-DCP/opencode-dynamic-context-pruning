@@ -5,7 +5,8 @@ export const isMessageCompacted = (state: SessionState, msg: WithParts): boolean
     if (msg.info.time.created < state.lastCompaction) {
         return true
     }
-    if (state.prune.messages.has(msg.info.id)) {
+    const pruneEntry = state.prune.messages.byMessageId.get(msg.info.id)
+    if (pruneEntry && pruneEntry.activeBlockIds.length > 0) {
         return true
     }
     return false

@@ -6,6 +6,8 @@ import {
     findLastCompactionTimestamp,
     countTurns,
     resetOnCompaction,
+    createPruneMessagesState,
+    loadPruneMessagesState,
     loadPruneMap,
     collectTurnNudgeAnchors,
 } from "./utils"
@@ -67,9 +69,8 @@ export function createSessionState(): SessionState {
         pendingManualTrigger: null,
         prune: {
             tools: new Map<string, number>(),
-            messages: new Map<string, number>(),
+            messages: createPruneMessagesState(),
         },
-        compressSummaries: [],
         nudges: {
             contextLimitAnchors: new Set<string>(),
             turnNudgeAnchors: new Set<string>(),
@@ -101,9 +102,8 @@ export function resetSessionState(state: SessionState): void {
     state.pendingManualTrigger = null
     state.prune = {
         tools: new Map<string, number>(),
-        messages: new Map<string, number>(),
+        messages: createPruneMessagesState(),
     }
-    state.compressSummaries = []
     state.nudges = {
         contextLimitAnchors: new Set<string>(),
         turnNudgeAnchors: new Set<string>(),
@@ -159,9 +159,8 @@ export async function ensureSessionInitialized(
         return
     }
 
-    state.prune.tools = loadPruneMap(persisted.prune.tools, persisted.prune.toolIds)
-    state.prune.messages = loadPruneMap(persisted.prune.messages, persisted.prune.messageIds)
-    state.compressSummaries = persisted.compressSummaries || []
+    state.prune.tools = loadPruneMap(persisted.prune.tools)
+    state.prune.messages = loadPruneMessagesState(persisted.prune.messages)
     state.nudges.contextLimitAnchors = new Set<string>(persisted.nudges.contextLimitAnchors || [])
     state.nudges.turnNudgeAnchors = new Set<string>([
         ...state.nudges.turnNudgeAnchors,
