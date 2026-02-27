@@ -811,22 +811,26 @@ export async function appendProtectedTools(
                                 )
                             }
                         } else {
-                            let subAgentResultText = ""
                             const subAgentSessionId = getSubAgentId(part)
                             if (subAgentSessionId) {
+                                let subAgentResultText = ""
                                 try {
                                     const subAgentMessages = await fetchSessionMessages(
                                         client,
                                         subAgentSessionId,
                                     )
                                     subAgentResultText = buildSubagentResultText(subAgentMessages)
-                                } catch {}
-                            }
+                                } catch {
+                                    subAgentResultText = ""
+                                }
 
-                            state.subAgentResultCache.set(part.callID, subAgentResultText)
-
-                            if (subAgentResultText) {
-                                output = mergeSubagentResult(part.state.output, subAgentResultText)
+                                if (subAgentResultText) {
+                                    state.subAgentResultCache.set(part.callID, subAgentResultText)
+                                    output = mergeSubagentResult(
+                                        part.state.output,
+                                        subAgentResultText,
+                                    )
+                                }
                             }
                         }
                     }

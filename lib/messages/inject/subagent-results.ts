@@ -50,7 +50,6 @@ export const insertExtendedSubAgentResults = async (
 
             const subAgentSessionId = getSubAgentId(part)
             if (!subAgentSessionId) {
-                state.subAgentResultCache.set(part.callID, "")
                 continue
             }
 
@@ -67,11 +66,11 @@ export const insertExtendedSubAgentResults = async (
             }
 
             const subAgentResultText = buildSubagentResultText(subAgentMessages)
-            state.subAgentResultCache.set(part.callID, subAgentResultText)
             if (!subAgentResultText) {
                 continue
             }
 
+            state.subAgentResultCache.set(part.callID, subAgentResultText)
             part.state.output = mergeSubagentResult(part.state.output, subAgentResultText)
         }
     }

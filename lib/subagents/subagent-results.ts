@@ -67,5 +67,8 @@ function getLastTextPart(message: WithParts): string {
 
 function assistantMessageHasCompressTool(message: WithParts): boolean {
     const parts = Array.isArray(message.parts) ? message.parts : []
-    return parts.some((part) => part.type === "tool" && part.tool === "compress")
+    return parts.some(
+        (part) =>
+            part.type === "tool" && part.tool === "compress" && part.state?.status === "completed",
+    )
 }
