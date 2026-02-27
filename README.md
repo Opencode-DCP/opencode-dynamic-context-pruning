@@ -110,6 +110,11 @@ DCP uses its own config file:
         "enabled": false,
         "turns": 4,
     },
+    // Experimental settings
+    "experimental": {
+        // Allow DCP processing in subagent sessions
+        "allowSubAgents": false,
+    },
     // Protect file operations from pruning via glob patterns
     // Patterns match tool parameters.filePath (e.g. read/write/edit)
     "protectedFilePatterns": [],
@@ -198,7 +203,9 @@ Restart OpenCode after making config changes.
 
 ## Limitations
 
-**Subagents** — DCP is disabled for subagents. Subagents are not designed to be token efficient; what matters is that the final message returned to the main agent is a concise summary of findings. DCP's pruning could interfere with this summarization behavior.
+**Subagents** — DCP is disabled for subagents by default. Subagents are not designed to be token efficient; what matters is that the final message returned to the main agent is a concise summary of findings. DCP's pruning could interfere with this summarization behavior.
+
+You can opt in experimentally with `experimental.allowSubAgents: true`.
 
 ## License
 

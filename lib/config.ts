@@ -47,6 +47,10 @@ export interface TurnProtection {
     turns: number
 }
 
+export interface ExperimentalConfig {
+    allowSubAgents: boolean
+}
+
 export interface PluginConfig {
     enabled: boolean
     debug: boolean
@@ -55,6 +59,7 @@ export interface PluginConfig {
     commands: Commands
     manualMode: ManualModeConfig
     turnProtection: TurnProtection
+    experimental: ExperimentalConfig
     protectedFilePatterns: string[]
     compress: CompressTool
     strategies: {
@@ -88,6 +93,8 @@ export const VALID_CONFIG_KEYS = new Set([
     "turnProtection",
     "turnProtection.enabled",
     "turnProtection.turns",
+    "experimental",
+    "experimental.allowSubAgents",
     "protectedFilePatterns",
     "commands",
     "commands.enabled",
@@ -222,6 +229,32 @@ export function validateConfigTypes(config: Record<string, any>): ValidationErro
                 expected: "positive number (>= 1)",
                 actual: `${config.turnProtection.turns}`,
             })
+        }
+    }
+
+    const experimental = config.experimental
+    if (experimental !== undefined) {
+        if (
+            typeof experimental !== "object" ||
+            experimental === null ||
+            Array.isArray(experimental)
+        ) {
+            errors.push({
+                key: "experimental",
+                expected: "object",
+                actual: typeof experimental,
+            })
+        } else {
+            if (
+                experimental.allowSubAgents !== undefined &&
+                typeof experimental.allowSubAgents !== "boolean"
+            ) {
+                errors.push({
+                    key: "experimental.allowSubAgents",
+                    expected: "boolean",
+                    actual: typeof experimental.allowSubAgents,
+                })
+            }
         }
     }
 
@@ -562,6 +595,9 @@ const defaultConfig: PluginConfig = {
         enabled: false,
         turns: 4,
     },
+    experimental: {
+        allowSubAgents: false,
+    },
     protectedFilePatterns: [],
     compress: {
         permission: "allow",
@@ -766,6 +802,17 @@ function mergeManualMode(
     }
 }
 
+function mergeExperimental(
+    base: PluginConfig["experimental"],
+    override?: Partial<PluginConfig["experimental"]>,
+): PluginConfig["experimental"] {
+    if (override === undefined) return base
+
+    return {
+        allowSubAgents: override.allowSubAgents ?? base.allowSubAgents,
+    }
+}
+
 function deepCloneConfig(config: PluginConfig): PluginConfig {
     return {
         ...config,
@@ -778,6 +825,7 @@ function deepCloneConfig(config: PluginConfig): PluginConfig {
             automaticStrategies: config.manualMode.automaticStrategies,
         },
         turnProtection: { ...config.turnProtection },
+        experimental: { ...config.experimental },
         protectedFilePatterns: [...config.protectedFilePatterns],
         compress: {
             ...config.compress,
@@ -810,6 +858,7 @@ function mergeLayer(config: PluginConfig, data: Record<string, any>): PluginConf
             enabled: data.turnProtection?.enabled ?? config.turnProtection.enabled,
             turns: data.turnProtection?.turns ?? config.turnProtection.turns,
         },
+        experimental: mergeExperimental(config.experimental, data.experimental as any),
         protectedFilePatterns: [
             ...new Set([...config.protectedFilePatterns, ...(data.protectedFilePatterns ?? [])]),
         ],

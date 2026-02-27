@@ -3,7 +3,13 @@ import type { Logger } from "./logger"
 import type { PluginConfig } from "./config"
 import { assignMessageRefs } from "./message-ids"
 import { syncToolCache } from "./state/tool-cache"
-import { prune, syncCompressionBlocks, insertCompressNudges, insertMessageIds } from "./messages"
+import {
+    prune,
+    syncCompressionBlocks,
+    insertCompressNudges,
+    insertMessageIds,
+    insertExtendedSubAgentResults,
+} from "./messages"
 import { buildToolIdList, isIgnoredUserMessage, stripHallucinations } from "./messages/utils"
 import { checkSession } from "./state"
 import { renderSystemPrompt } from "./prompts"
@@ -72,7 +78,7 @@ export function createSystemPromptHandler(
             logger.debug("Cached model context limit", { limit: state.modelContextLimit })
         }
 
-        if (state.isSubAgent) {
+        if (state.isSubAgent && !config.experimental.allowSubAgents) {
             return
         }
 
@@ -104,7 +110,7 @@ export function createChatMessageTransformHandler(
     return async (input: {}, output: { messages: WithParts[] }) => {
         await checkSession(client, state, logger, output.messages, config.manualMode.enabled)
 
-        if (state.isSubAgent) {
+        if (state.isSubAgent && !config.experimental.allowSubAgents) {
             return
         }
 
@@ -115,6 +121,13 @@ export function createChatMessageTransformHandler(
         syncToolCache(state, config, logger, output.messages)
         buildToolIdList(state, output.messages)
         prune(state, logger, config, output.messages)
+        await insertExtendedSubAgentResults(
+            client,
+            state,
+            logger,
+            output.messages,
+            config.experimental.allowSubAgents,
+        )
         insertCompressNudges(state, config, logger, output.messages)
         insertMessageIds(state, config, output.messages)
         applyManualPrompt(state, output.messages, logger)

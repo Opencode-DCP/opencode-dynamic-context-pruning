@@ -112,7 +112,7 @@ export class Logger {
      * Strips unnecessary metadata from messages for cleaner debug logs.
      *
      * Removed:
-     * - All IDs (id, sessionID, messageID, parentID, callID on parts)
+     * - All IDs (id, sessionID, messageID, parentID)
      * - summary, path, cost, model, agent, mode, finish, providerID, modelID
      * - step-start and step-finish parts entirely
      * - snapshot fields
@@ -121,7 +121,7 @@ export class Logger {
      * Kept:
      * - role, time (created only), tokens (input, output, reasoning, cache)
      * - text, reasoning, tool parts with content
-     * - tool calls with: tool, callID, input, output
+     * - tool calls with: tool, callID, input, output, metadata
      */
     private minimizeForDebug(messages: any[]): any[] {
         return messages.map((msg) => {
@@ -182,6 +182,12 @@ export class Logger {
                             }
                             if (part.metadata) {
                                 toolPart.metadata = part.metadata
+                            }
+                            if (part.state?.metadata) {
+                                toolPart.metadata = {
+                                    ...(toolPart.metadata || {}),
+                                    ...part.state.metadata,
+                                }
                             }
                             if (part.state?.title) {
                                 toolPart.title = part.state.title
