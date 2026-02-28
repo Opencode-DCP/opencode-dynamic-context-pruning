@@ -168,6 +168,37 @@ export function addAnchor(
     return anchorMessageIds.size !== previousSize
 }
 
+function getActiveCompressedBlockRefs(state: SessionState): string[] {
+    return Array.from(state.prune.messages.activeBlockIds)
+        .filter((id) => Number.isInteger(id) && id > 0)
+        .sort((a, b) => a - b)
+        .map((id) => `b${id}`)
+}
+
+function buildCompressedBlockGuidance(refs: string[]): string {
+    const blockCount = refs.length
+    const blockList = blockCount > 0 ? refs.join(", ") : "none"
+
+    return [
+        "Compressed block context:",
+        `- Active compressed blocks in this session: ${blockCount} (${blockList})`,
+        "- If your selected compression range includes any listed block, include each required placeholder exactly once in the summary using `(bN)`.",
+    ].join("\n")
+}
+
+function appendGuidanceToInstructionXml(hintText: string, guidance: string): string {
+    const closeTag = "</instruction>"
+    const closeTagIndex = hintText.lastIndexOf(closeTag)
+
+    if (closeTagIndex === -1) {
+        return hintText
+    }
+
+    const beforeClose = hintText.slice(0, closeTagIndex).trimEnd()
+    const afterClose = hintText.slice(closeTagIndex)
+    return `${beforeClose}\n\n${guidance}\n${afterClose}`
+}
+
 function applyAnchoredNudge(
     anchorMessageIds: Set<string>,
     messages: WithParts[],
@@ -209,12 +240,21 @@ export function applyAnchoredNudges(
     messages: WithParts[],
     modelId: string | undefined,
 ): void {
-    applyAnchoredNudge(state.nudges.contextLimitAnchors, messages, modelId, CONTEXT_LIMIT_NUDGE)
+    const activeBlockRefs = getActiveCompressedBlockRefs(state)
+    const compressedBlockGuidance = buildCompressedBlockGuidance(activeBlockRefs)
+
+    const contextLimitNudge = appendGuidanceToInstructionXml(
+        CONTEXT_LIMIT_NUDGE,
+        compressedBlockGuidance,
+    )
+
+    applyAnchoredNudge(state.nudges.contextLimitAnchors, messages, modelId, contextLimitNudge)
 
     const turnNudgeAnchors = new Set<string>()
     const targetRole = config.compress.nudgeForce === "strong" ? "user" : "assistant"
     const promptToUse =
         config.compress.nudgeForce === "strong" ? USER_TURN_NUDGE : ASSISTANT_TURN_NUDGE
+    const turnNudge = appendGuidanceToInstructionXml(promptToUse, compressedBlockGuidance)
 
     for (const message of messages) {
         if (!state.nudges.turnNudgeAnchors.has(message.info.id)) continue
@@ -224,6 +264,8 @@ export function applyAnchoredNudges(
         }
     }
 
-    applyAnchoredNudge(turnNudgeAnchors, messages, modelId, promptToUse)
-    applyAnchoredNudge(state.nudges.iterationNudgeAnchors, messages, modelId, ITERATION_NUDGE)
+    applyAnchoredNudge(turnNudgeAnchors, messages, modelId, turnNudge)
+
+    const iterationNudge = appendGuidanceToInstructionXml(ITERATION_NUDGE, compressedBlockGuidance)
+    applyAnchoredNudge(state.nudges.iterationNudgeAnchors, messages, modelId, iterationNudge)
 }
