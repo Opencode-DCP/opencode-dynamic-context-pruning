@@ -92,7 +92,10 @@ export function createSystemPromptHandler(
             return
         }
 
-        const newPrompt = renderSystemPrompt(state.manualMode)
+        const newPrompt = renderSystemPrompt(
+            state.manualMode,
+            state.isSubAgent && config.experimental.allowSubAgents,
+        )
         if (output.system.length > 0) {
             output.system[output.system.length - 1] += "\n\n" + newPrompt
         } else {
