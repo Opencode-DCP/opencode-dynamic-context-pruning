@@ -86,7 +86,7 @@ export function createSessionState(): SessionState {
         messageIds: {
             byRawId: new Map<string, string>(),
             byRef: new Map<string, string>(),
-            nextRef: 0,
+            nextRef: 1,
         },
         lastCompaction: 0,
         currentTurn: 0,
@@ -120,7 +120,7 @@ export function resetSessionState(state: SessionState): void {
     state.messageIds = {
         byRawId: new Map<string, string>(),
         byRef: new Map<string, string>(),
-        nextRef: 0,
+        nextRef: 1,
     }
     state.lastCompaction = 0
     state.currentTurn = 0

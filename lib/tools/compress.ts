@@ -37,7 +37,7 @@ export function createCompressTool(ctx: ToolContext): ReturnType<typeof tool> {
                     startId: tool.schema
                         .string()
                         .describe(
-                            "Message or block ID marking the beginning of range (e.g. m0000, b2)",
+                            "Message or block ID marking the beginning of range (e.g. m0001, b2)",
                         ),
                     endId: tool.schema
                         .string()
