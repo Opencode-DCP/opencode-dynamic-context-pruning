@@ -1,4 +1,5 @@
 import type { SessionState, WithParts } from "./state"
+import { isIgnoredUserMessage } from "./messages/utils"
 
 const MESSAGE_REF_REGEX = /^m(\d{4})$/
 const BLOCK_REF_REGEX = /^b([1-9]\d*)$/
@@ -91,6 +92,10 @@ export function assignMessageRefs(state: SessionState, messages: WithParts[]): n
     let assigned = 0
 
     for (const message of messages) {
+        if (message.info.role === "user" && isIgnoredUserMessage(message)) {
+            continue
+        }
+
         const rawMessageId = message.info.id
         if (typeof rawMessageId !== "string" || rawMessageId.length === 0) {
             continue
