@@ -151,14 +151,15 @@ export class Logger {
 
                         if (part.type === "text") {
                             if (part.ignored) return null
-                            return { type: "text", text: part.text }
+                            const textPart: any = { type: "text", text: part.text }
+                            if (part.metadata) textPart.metadata = part.metadata
+                            return textPart
                         }
 
                         if (part.type === "reasoning") {
-                            return {
-                                type: "reasoning",
-                                text: part.text,
-                            }
+                            const reasoningPart: any = { type: "reasoning", text: part.text }
+                            if (part.metadata) reasoningPart.metadata = part.metadata
+                            return reasoningPart
                         }
 
                         if (part.type === "tool") {
