@@ -22,7 +22,7 @@ Using `@latest` ensures you always get the newest version automatically when Ope
 
 Restart OpenCode. The plugin will automatically start optimizing your sessions.
 
-## Beta Notice (v2.2.6-beta0)
+## Beta Notice (v2.2.7-beta0)
 
 - Strategy shift to a single user-facing context tool: `compress`.
 - Context management is now less surgical and more focused on preserving high-signal work grouped by task.
