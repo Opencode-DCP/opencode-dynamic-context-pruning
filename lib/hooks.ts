@@ -9,6 +9,7 @@ import {
     injectCompressNudges,
     injectMessageIds,
     injectExtendedSubAgentResults,
+    stripReasoningForClaude,
 } from "./messages"
 import { buildToolIdList, isIgnoredUserMessage, stripHallucinations } from "./messages/utils"
 import { checkSession } from "./state"
@@ -134,6 +135,7 @@ export function createChatMessageTransformHandler(
         injectCompressNudges(state, config, logger, output.messages)
         injectMessageIds(state, config, output.messages)
         applyManualPrompt(state, output.messages, logger)
+        stripReasoningForClaude(output.messages)
 
         if (state.sessionId) {
             await logger.saveContext(state.sessionId, output.messages)
