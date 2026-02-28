@@ -35,9 +35,9 @@ For model-facing behavior (prompts and tool calls), this capability is always ad
 
 ### Tool
 
-**Compress** — Exposes a single `compress` tool with one method: select a conversation range using injected `startId` and `endId` (`mNNNN` or `bN`), then replace it with a technical summary.
+**Compress** — Exposes a `compress` tool that will select a conversation range and replace it with a technical summary.
 
-The model can use that same method at different scales: tiny ranges for noise cleanup, focused ranges for preserving key findings, and full chapters for completed work.
+The model can use `compress` at different scales: tiny ranges for noise cleanup, focused ranges for preserving key findings, and full chapters for completed work. The model will choose the best moment to compress based on session context size and opportunity.
 
 ### Strategies
 
@@ -55,16 +55,12 @@ LLM providers like Anthropic and OpenAI cache prompts based on exact prefix matc
 
 **Trade-off:** You lose some cache read benefits but gain larger token savings from reduced context size and performance improvements through reduced context poisoning. In most cases, the token savings outweigh the cache miss cost—especially in long sessions where context bloat becomes significant.
 
-> **Note:** In testing, cache hit rates were approximately 80% with DCP enabled vs 85% without for most providers.
-
-**Best use case:** Providers that count usage in requests, such as Github Copilot and Google Antigravity, have no negative price impact.
+> **Note:** In testing, cache hit rates were approximately 85% with DCP enabled vs 90% without for most providers.
 
 **Best use cases:**
 
-- **Request-based billing** — Providers that count usage in requests, such as Github Copilot and Google Antigravity, have no negative price impact.
+- **Request-based billing** — Providers that count usage in requests, such as Github Copilot have no negative price impact.
 - **Uniform token pricing** — Providers that bill cached tokens at the same rate as regular input tokens, such as Cerebras, see pure savings with no cache-miss penalty.
-
-**Claude Subscriptions:** Anthropic subscription users (who receive "free" caching) may experience faster limit depletion than hit-rate ratios suggest due to the higher relative cost of cache misses. See [Claude Cache Limits](https://she-llac.com/claude-limits) for details.
 
 ## Configuration
 
