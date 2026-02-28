@@ -90,9 +90,19 @@ export function formatMessageIdTag(ref: string): string {
 
 export function assignMessageRefs(state: SessionState, messages: WithParts[]): number {
     let assigned = 0
+    let skippedInitialSubAgentUserMessage = false
 
     for (const message of messages) {
         if (message.info.role === "user" && isIgnoredUserMessage(message)) {
+            continue
+        }
+
+        if (
+            state.isSubAgent &&
+            !skippedInitialSubAgentUserMessage &&
+            message.info.role === "user"
+        ) {
+            skippedInitialSubAgentUserMessage = true
             continue
         }
 
