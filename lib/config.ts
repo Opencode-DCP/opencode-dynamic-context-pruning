@@ -14,8 +14,10 @@ export interface Deduplication {
 export interface CompressTool {
     permission: Permission
     showCompression: boolean
-    contextLimit: number | `${number}%`
-    modelLimits?: Record<string, number | `${number}%`>
+    maxContextLimit: number | `${number}%`
+    minContextLimit: number | `${number}%`
+    modelMaxLimits?: Record<string, number | `${number}%`>
+    modelMinLimits?: Record<string, number | `${number}%`>
     nudgeFrequency: number
     iterationNudgeThreshold: number
     nudgeForce: "strong" | "soft"
@@ -105,8 +107,10 @@ export const VALID_CONFIG_KEYS = new Set([
     "compress",
     "compress.permission",
     "compress.showCompression",
-    "compress.contextLimit",
-    "compress.modelLimits",
+    "compress.maxContextLimit",
+    "compress.minContextLimit",
+    "compress.modelMaxLimits",
+    "compress.modelMinLimits",
     "compress.nudgeFrequency",
     "compress.iterationNudgeThreshold",
     "compress.nudgeForce",
@@ -129,8 +133,8 @@ function getConfigKeyPaths(obj: Record<string, any>, prefix = ""): string[] {
         const fullKey = prefix ? `${prefix}.${key}` : key
         keys.push(fullKey)
 
-        // modelLimits is a dynamic map keyed by providerID/modelID; do not recurse into arbitrary IDs.
-        if (fullKey === "compress.modelLimits") {
+        // model*Limits are dynamic maps keyed by providerID/modelID; do not recurse into arbitrary IDs.
+        if (fullKey === "compress.modelMaxLimits" || fullKey === "compress.modelMinLimits") {
             continue
         }
 
@@ -384,46 +388,64 @@ export function validateConfigTypes(config: Record<string, any>): ValidationErro
                 })
             }
 
-            if (compress.contextLimit !== undefined) {
-                const isValidNumber = typeof compress.contextLimit === "number"
-                const isPercentString =
-                    typeof compress.contextLimit === "string" && compress.contextLimit.endsWith("%")
+            const validateLimitValue = (
+                key: string,
+                value: unknown,
+                actualValue: unknown = value,
+            ): void => {
+                const isValidNumber = typeof value === "number"
+                const isPercentString = typeof value === "string" && value.endsWith("%")
 
                 if (!isValidNumber && !isPercentString) {
                     errors.push({
-                        key: "compress.contextLimit",
+                        key,
                         expected: 'number | "${number}%"',
-                        actual: JSON.stringify(compress.contextLimit),
+                        actual: JSON.stringify(actualValue),
                     })
                 }
             }
 
-            if (compress.modelLimits !== undefined) {
-                if (
-                    typeof compress.modelLimits !== "object" ||
-                    compress.modelLimits === null ||
-                    Array.isArray(compress.modelLimits)
-                ) {
+            const validateModelLimits = (
+                key: "compress.modelMaxLimits" | "compress.modelMinLimits",
+                limits: unknown,
+            ): void => {
+                if (limits === undefined) {
+                    return
+                }
+
+                if (typeof limits !== "object" || limits === null || Array.isArray(limits)) {
                     errors.push({
-                        key: "compress.modelLimits",
+                        key,
                         expected: "Record<string, number | ${number}%>",
-                        actual: typeof compress.modelLimits,
+                        actual: typeof limits,
                     })
-                } else {
-                    for (const [providerModelKey, limit] of Object.entries(compress.modelLimits)) {
-                        const isValidNumber = typeof limit === "number"
-                        const isPercentString =
-                            typeof limit === "string" && /^\d+(?:\.\d+)?%$/.test(limit)
-                        if (!isValidNumber && !isPercentString) {
-                            errors.push({
-                                key: `compress.modelLimits.${providerModelKey}`,
-                                expected: 'number | "${number}%"',
-                                actual: JSON.stringify(limit),
-                            })
-                        }
+                    return
+                }
+
+                for (const [providerModelKey, limit] of Object.entries(limits)) {
+                    const isValidNumber = typeof limit === "number"
+                    const isPercentString =
+                        typeof limit === "string" && /^\d+(?:\.\d+)?%$/.test(limit)
+                    if (!isValidNumber && !isPercentString) {
+                        errors.push({
+                            key: `${key}.${providerModelKey}`,
+                            expected: 'number | "${number}%"',
+                            actual: JSON.stringify(limit),
+                        })
                     }
                 }
             }
+
+            if (compress.maxContextLimit !== undefined) {
+                validateLimitValue("compress.maxContextLimit", compress.maxContextLimit)
+            }
+
+            if (compress.minContextLimit !== undefined) {
+                validateLimitValue("compress.minContextLimit", compress.minContextLimit)
+            }
+
+            validateModelLimits("compress.modelMaxLimits", compress.modelMaxLimits)
+            validateModelLimits("compress.modelMinLimits", compress.modelMinLimits)
 
             const validValues = ["ask", "allow", "deny"]
             if (compress.permission !== undefined && !validValues.includes(compress.permission)) {
@@ -602,7 +624,8 @@ const defaultConfig: PluginConfig = {
     compress: {
         permission: "allow",
         showCompression: false,
-        contextLimit: 100000,
+        maxContextLimit: 100000,
+        minContextLimit: 30000,
         nudgeFrequency: 5,
         iterationNudgeThreshold: 15,
         nudgeForce: "soft",
@@ -767,8 +790,10 @@ function mergeCompress(
     return {
         permission: override.permission ?? base.permission,
         showCompression: override.showCompression ?? base.showCompression,
-        contextLimit: override.contextLimit ?? base.contextLimit,
-        modelLimits: override.modelLimits ?? base.modelLimits,
+        maxContextLimit: override.maxContextLimit ?? base.maxContextLimit,
+        minContextLimit: override.minContextLimit ?? base.minContextLimit,
+        modelMaxLimits: override.modelMaxLimits ?? base.modelMaxLimits,
+        modelMinLimits: override.modelMinLimits ?? base.modelMinLimits,
         nudgeFrequency: override.nudgeFrequency ?? base.nudgeFrequency,
         iterationNudgeThreshold: override.iterationNudgeThreshold ?? base.iterationNudgeThreshold,
         nudgeForce: override.nudgeForce ?? base.nudgeForce,
@@ -829,7 +854,8 @@ function deepCloneConfig(config: PluginConfig): PluginConfig {
         protectedFilePatterns: [...config.protectedFilePatterns],
         compress: {
             ...config.compress,
-            modelLimits: { ...config.compress.modelLimits },
+            modelMaxLimits: { ...config.compress.modelMaxLimits },
+            modelMinLimits: { ...config.compress.modelMinLimits },
             protectedTools: [...config.compress.protectedTools],
         },
         strategies: {

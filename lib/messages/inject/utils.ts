@@ -81,11 +81,12 @@ export function getModelInfo(messages: WithParts[]): LastUserModelContext {
     }
 }
 
-function resolveContextLimit(
+function resolveContextTokenLimit(
     config: PluginConfig,
     state: SessionState,
     providerId: string | undefined,
     modelId: string | undefined,
+    threshold: "max" | "min",
 ): number | undefined {
     const parseLimitValue = (limit: number | `${number}%` | undefined): number | undefined => {
         if (limit === undefined) {
@@ -110,7 +111,8 @@ function resolveContextLimit(
         return Math.round((clampedPercent / 100) * state.modelContextLimit)
     }
 
-    const modelLimits = config.compress.modelLimits
+    const modelLimits =
+        threshold === "max" ? config.compress.modelMaxLimits : config.compress.modelMinLimits
     if (modelLimits && providerId !== undefined && modelId !== undefined) {
         const providerModelId = `${providerId}/${modelId}`
         const modelLimit = modelLimits[providerModelId]
@@ -119,23 +121,29 @@ function resolveContextLimit(
         }
     }
 
-    return parseLimitValue(config.compress.contextLimit)
+    const globalLimit =
+        threshold === "max" ? config.compress.maxContextLimit : config.compress.minContextLimit
+    return parseLimitValue(globalLimit)
 }
 
-export function isContextOverLimit(
+export function isContextOverLimits(
     config: PluginConfig,
     state: SessionState,
     providerId: string | undefined,
     modelId: string | undefined,
     messages: WithParts[],
-): boolean {
-    const contextLimit = resolveContextLimit(config, state, providerId, modelId)
-    if (contextLimit === undefined) {
-        return false
-    }
-
+) {
+    const maxContextLimit = resolveContextTokenLimit(config, state, providerId, modelId, "max")
+    const minContextLimit = resolveContextTokenLimit(config, state, providerId, modelId, "min")
     const currentTokens = getCurrentTokenUsage(messages)
-    return currentTokens > contextLimit
+
+    const overMaxLimit = maxContextLimit === undefined ? false : currentTokens > maxContextLimit
+    const overMinLimit = minContextLimit === undefined ? true : currentTokens >= minContextLimit
+
+    return {
+        overMaxLimit,
+        overMinLimit,
+    }
 }
 
 export function addAnchor(

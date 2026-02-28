@@ -20,7 +20,7 @@ import {
     getIterationNudgeThreshold,
     getNudgeFrequency,
     getModelInfo,
-    isContextOverLimit,
+    isContextOverLimits,
     messageHasCompress,
 } from "./utils"
 
@@ -52,9 +52,26 @@ export const insertCompressNudges = (
     const { providerId, modelId } = getModelInfo(messages)
     let anchorsChanged = false
 
-    const contextOverLimit = isContextOverLimit(config, state, providerId, modelId, messages)
+    const { overMaxLimit, overMinLimit } = isContextOverLimits(
+        config,
+        state,
+        providerId,
+        modelId,
+        messages,
+    )
 
-    if (contextOverLimit) {
+    if (!overMinLimit) {
+        const hadTurnAnchors = state.nudges.turnNudgeAnchors.size > 0
+        const hadIterationAnchors = state.nudges.iterationNudgeAnchors.size > 0
+
+        if (hadTurnAnchors || hadIterationAnchors) {
+            state.nudges.turnNudgeAnchors.clear()
+            state.nudges.iterationNudgeAnchors.clear()
+            anchorsChanged = true
+        }
+    }
+
+    if (overMaxLimit) {
         if (lastMessage) {
             const interval = getNudgeFrequency(config)
             const added = addAnchor(
@@ -68,7 +85,7 @@ export const insertCompressNudges = (
                 anchorsChanged = true
             }
         }
-    } else {
+    } else if (overMinLimit) {
         const isLastMessageUser = lastMessage?.message.info.role === "user"
 
         if (isLastMessageUser && lastAssistantMessage) {

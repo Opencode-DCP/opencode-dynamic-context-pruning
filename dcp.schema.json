@@ -133,8 +133,8 @@
                     "default": false,
                     "description": "Show compression summaries in notifications"
                 },
-                "contextLimit": {
-                    "description": "When session tokens exceed this limit, a compress nudge is injected (\"X%\" uses percentage of the model's context window)",
+                "maxContextLimit": {
+                    "description": "Soft upper threshold. Above this, DCP keeps sending strong compression nudges (based on nudgeFrequency), so the model is pushed to compress. Accepts number or \"X%\" of the model context window.",
                     "default": 100000,
                     "oneOf": [
                         {
@@ -146,8 +146,36 @@
                         }
                     ]
                 },
-                "modelLimits": {
-                    "description": "Model-specific context limits by exact provider/model key. Examples: \"openai/gpt-5\", \"anthropic/claude-3-7-sonnet\", \"ollama/llama3.1\"",
+                "minContextLimit": {
+                    "description": "Soft lower threshold for reminder nudges. Below this, turn/iteration reminders are off (compression is less likely). At or above this, reminders are on. Accepts number or \"X%\" of the model context window.",
+                    "default": 30000,
+                    "oneOf": [
+                        {
+                            "type": "number"
+                        },
+                        {
+                            "type": "string",
+                            "pattern": "^\\d+(?:\\.\\d+)?%$"
+                        }
+                    ]
+                },
+                "modelMaxLimits": {
+                    "description": "Per-model override for maxContextLimit by exact provider/model key. If set, this takes priority over the global maxContextLimit.",
+                    "type": "object",
+                    "additionalProperties": {
+                        "oneOf": [
+                            {
+                                "type": "number"
+                            },
+                            {
+                                "type": "string",
+                                "pattern": "^\\d+(?:\\.\\d+)?%$"
+                            }
+                        ]
+                    }
+                },
+                "modelMinLimits": {
+                    "description": "Per-model override for minContextLimit by exact provider/model key. If set, this takes priority over the global minContextLimit.",
                     "type": "object",
                     "additionalProperties": {
                         "oneOf": [
@@ -165,7 +193,7 @@
                     "type": "number",
                     "default": 5,
                     "minimum": 1,
-                    "description": "How often the context-limit nudge fires when above contextLimit (1 = every fetch, 5 = every 5th fetch)"
+                    "description": "How often the context-limit nudge fires when above maxContextLimit (1 = every fetch, 5 = every 5th fetch)"
                 },
                 "iterationNudgeThreshold": {
                     "type": "number",
