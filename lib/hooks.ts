@@ -6,9 +6,9 @@ import { syncToolCache } from "./state/tool-cache"
 import {
     prune,
     syncCompressionBlocks,
-    insertCompressNudges,
-    insertMessageIds,
-    insertExtendedSubAgentResults,
+    injectCompressNudges,
+    injectMessageIds,
+    injectExtendedSubAgentResults,
 } from "./messages"
 import { buildToolIdList, isIgnoredUserMessage, stripHallucinations } from "./messages/utils"
 import { checkSession } from "./state"
@@ -124,15 +124,15 @@ export function createChatMessageTransformHandler(
         syncToolCache(state, config, logger, output.messages)
         buildToolIdList(state, output.messages)
         prune(state, logger, config, output.messages)
-        await insertExtendedSubAgentResults(
+        await injectExtendedSubAgentResults(
             client,
             state,
             logger,
             output.messages,
             config.experimental.allowSubAgents,
         )
-        insertCompressNudges(state, config, logger, output.messages)
-        insertMessageIds(state, config, output.messages)
+        injectCompressNudges(state, config, logger, output.messages)
+        injectMessageIds(state, config, output.messages)
         applyManualPrompt(state, output.messages, logger)
 
         if (state.sessionId) {

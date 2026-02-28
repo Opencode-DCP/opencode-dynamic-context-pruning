@@ -1,5 +1,5 @@
 export { prune } from "./prune"
 export { syncCompressionBlocks } from "./sync"
-export { insertCompressNudges } from "./inject/inject"
-export { insertMessageIds } from "./inject/inject"
-export { insertExtendedSubAgentResults } from "./inject/subagent-results"
+export { injectCompressNudges } from "./inject/inject"
+export { injectMessageIds } from "./inject/inject"
+export { injectExtendedSubAgentResults } from "./inject/subagent-results"

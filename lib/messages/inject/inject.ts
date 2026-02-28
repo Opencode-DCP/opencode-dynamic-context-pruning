@@ -24,7 +24,7 @@ import {
     messageHasCompress,
 } from "./utils"
 
-export const insertCompressNudges = (
+export const injectCompressNudges = (
     state: SessionState,
     config: PluginConfig,
     logger: Logger,
@@ -134,7 +134,7 @@ export const insertCompressNudges = (
     }
 }
 
-export const insertMessageIds = (
+export const injectMessageIds = (
     state: SessionState,
     config: PluginConfig,
     messages: WithParts[],

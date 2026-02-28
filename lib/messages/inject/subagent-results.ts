@@ -15,7 +15,7 @@ async function fetchSubAgentMessages(client: any, sessionId: string): Promise<Wi
     return Array.isArray(payload) ? payload : []
 }
 
-export const insertExtendedSubAgentResults = async (
+export const injectExtendedSubAgentResults = async (
     client: any,
     state: SessionState,
     logger: Logger,
