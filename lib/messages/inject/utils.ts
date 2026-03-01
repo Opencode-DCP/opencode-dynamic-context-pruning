@@ -176,21 +176,18 @@ export function addAnchor(
     return anchorMessageIds.size !== previousSize
 }
 
-function getActiveCompressedBlockRefs(state: SessionState): string[] {
-    return Array.from(state.prune.messages.activeBlockIds)
+export function buildCompressedBlockGuidance(state: SessionState): string {
+    const refs = Array.from(state.prune.messages.activeBlockIds)
         .filter((id) => Number.isInteger(id) && id > 0)
         .sort((a, b) => a - b)
         .map((id) => `b${id}`)
-}
-
-function buildCompressedBlockGuidance(refs: string[]): string {
     const blockCount = refs.length
     const blockList = blockCount > 0 ? refs.join(", ") : "none"
 
     return [
         "Compressed block context:",
         `- Active compressed blocks in this session: ${blockCount} (${blockList})`,
-        "- If your selected compression range includes any listed block, include each required placeholder exactly once in the summary using `(bN)`.",
+        "- If your selected compression range includes any listed block, include each required placeholder exactly once in the summary using \`(bN)\`.",
     ].join("\n")
 }
 
@@ -248,8 +245,7 @@ export function applyAnchoredNudges(
     messages: WithParts[],
     modelId: string | undefined,
 ): void {
-    const activeBlockRefs = getActiveCompressedBlockRefs(state)
-    const compressedBlockGuidance = buildCompressedBlockGuidance(activeBlockRefs)
+    const compressedBlockGuidance = buildCompressedBlockGuidance(state)
 
     const contextLimitNudge = appendGuidanceToInstructionXml(
         CONTEXT_LIMIT_NUDGE,

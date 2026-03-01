@@ -12,6 +12,7 @@ import type { SessionState, WithParts } from "../state"
 import type { PluginConfig } from "../config"
 import { sendIgnoredMessage } from "../ui/notification"
 import { getCurrentParams } from "../strategies/utils"
+import { buildCompressedBlockGuidance } from "../messages/inject/utils"
 
 const MANUAL_MODE_ON = "Manual mode is now ON. Use /dcp compress to trigger context tools manually."
 
@@ -25,10 +26,11 @@ const COMPRESS_TRIGGER_PROMPT = [
     "Return after compress with a brief explanation of what range was compressed.",
 ].join("\n\n")
 
-function getTriggerPrompt(tool: "compress", userFocus?: string): string {
+function getTriggerPrompt(tool: "compress", state: SessionState, userFocus?: string): string {
     const base = COMPRESS_TRIGGER_PROMPT
+    const compressedBlockGuidance = buildCompressedBlockGuidance(state)
 
-    const sections = [base]
+    const sections = [base, compressedBlockGuidance]
     if (userFocus && userFocus.trim().length > 0) {
         sections.push(`Additional user focus:\n${userFocus.trim()}`)
     }
@@ -76,5 +78,5 @@ export async function handleManualTriggerCommand(
     tool: "compress",
     userFocus?: string,
 ): Promise<string | null> {
-    return getTriggerPrompt(tool, userFocus)
+    return getTriggerPrompt(tool, ctx.state, userFocus)
 }
