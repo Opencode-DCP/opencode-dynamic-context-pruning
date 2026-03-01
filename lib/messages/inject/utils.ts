@@ -9,7 +9,7 @@ import {
 } from "../utils"
 import { getLastUserMessage } from "../../shared-utils"
 import { getCurrentTokenUsage } from "../../strategies/utils"
-import { CONTEXT_LIMIT_NUDGE } from "../../prompts/nudge"
+import { CONTEXT_LIMIT_NUDGE } from "../../prompts/context-limit-nudge"
 import { USER_TURN_NUDGE, ASSISTANT_TURN_NUDGE } from "../../prompts/turn-nudge"
 import { ITERATION_NUDGE } from "../../prompts/iteration-nudge"
 
