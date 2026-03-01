@@ -19,6 +19,7 @@ import { handleContextCommand } from "./commands/context"
 import { handleHelpCommand } from "./commands/help"
 import { handleSweepCommand } from "./commands/sweep"
 import { handleManualToggleCommand, handleManualTriggerCommand } from "./commands/manual"
+import { handleUncompressCommand } from "./commands/uncompress"
 import { ensureSessionInitialized } from "./state/state"
 import { cacheSystemPromptTokens } from "./ui/utils"
 
@@ -228,6 +229,17 @@ export function createCommandExecuteHandler(
                     text: rawArgs ? `/dcp ${rawArgs}` : `/dcp ${subcommand}`,
                 })
                 return
+            }
+
+            if (
+                (subcommand === "decompress" || subcommand === "uncompress") &&
+                config.compress.permission !== "deny"
+            ) {
+                await handleUncompressCommand({
+                    ...commandCtx,
+                    args: subArgs,
+                })
+                throw new Error("__DCP_DECOMPRESS_HANDLED__")
             }
 
             await handleHelpCommand(commandCtx)

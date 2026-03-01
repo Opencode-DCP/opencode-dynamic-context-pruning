@@ -27,6 +27,7 @@ const BASE_COMMANDS: [string, string][] = [
 
 const TOOL_COMMANDS: Record<string, [string, string]> = {
     compress: ["/dcp compress [focus]", "Trigger manual compress tool execution"],
+    decompress: ["/dcp decompress <n>", "Restore selected compression"],
 }
 
 function getVisibleCommands(config: PluginConfig): [string, string][] {
@@ -34,6 +35,7 @@ function getVisibleCommands(config: PluginConfig): [string, string][] {
 
     if (config.compress.permission !== "deny") {
         commands.push(TOOL_COMMANDS.compress)
+        commands.push(TOOL_COMMANDS.decompress)
     }
 
     return commands

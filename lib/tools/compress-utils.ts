@@ -567,6 +567,8 @@ export function applyCompressionState(
     const block: CompressionBlock = {
         blockId,
         active: true,
+        deactivatedByUser: false,
+        compressedTokens: 0,
         topic: input.topic,
         startId: input.startId,
         endId: input.endId,
@@ -687,6 +689,8 @@ export function applyCompressionState(
             compressedTokens += entry.tokenCount
         }
     }
+
+    block.compressedTokens = compressedTokens
 
     state.stats.pruneTokenCounter += compressedTokens
     state.stats.totalPruneTokens += state.stats.pruneTokenCounter

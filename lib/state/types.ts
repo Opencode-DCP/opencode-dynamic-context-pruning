@@ -30,6 +30,8 @@ export interface PrunedMessageEntry {
 export interface CompressionBlock {
     blockId: number
     active: boolean
+    deactivatedByUser: boolean
+    compressedTokens: number
     topic: string
     startId: string
     endId: string

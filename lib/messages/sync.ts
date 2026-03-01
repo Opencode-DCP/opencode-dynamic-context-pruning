@@ -50,6 +50,15 @@ export const syncCompressionBlocks = (
             continue
         }
 
+        if (block.deactivatedByUser) {
+            block.active = false
+            if (block.deactivatedAt === undefined) {
+                block.deactivatedAt = now
+            }
+            block.deactivatedByBlockId = undefined
+            continue
+        }
+
         for (const consumedBlockId of block.consumedBlockIds) {
             if (!messagesState.activeBlockIds.has(consumedBlockId)) {
                 continue

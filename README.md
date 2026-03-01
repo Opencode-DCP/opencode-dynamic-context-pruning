@@ -190,6 +190,7 @@ DCP provides a `/dcp` slash command:
 - `/dcp manual [on|off]` — Toggle manual mode or set explicit state. When on, the AI will not autonomously use context management tools.
 
 - `/dcp compress [focus]` — Trigger a single compress tool execution. Optional focus text directs what range to compress.
+- `/dcp decompress <n>` — Restore a specific active compression by ID (for example `/dcp decompress 2`). Running without an argument shows available compression IDs, token sizes, and topics.
 
 ### Protected Tools
 

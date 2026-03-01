@@ -144,6 +144,12 @@ export function loadPruneMessagesState(
             state.blocksById.set(blockId, {
                 blockId,
                 active: block.active === true,
+                deactivatedByUser: block.deactivatedByUser === true,
+                compressedTokens:
+                    typeof block.compressedTokens === "number" &&
+                    Number.isFinite(block.compressedTokens)
+                        ? Math.max(0, block.compressedTokens)
+                        : 0,
                 topic: typeof block.topic === "string" ? block.topic : "",
                 startId: typeof block.startId === "string" ? block.startId : "",
                 endId: typeof block.endId === "string" ? block.endId : "",
