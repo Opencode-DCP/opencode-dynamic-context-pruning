@@ -2,7 +2,7 @@ import type { Logger } from "../logger"
 import type { SessionState } from "../state"
 import {
     formatPrunedItemsList,
-    formatSessionMap,
+    formatProgressBar,
     formatStatsHeader,
     formatTokenCount,
 } from "./utils"
@@ -164,7 +164,7 @@ export async function sendCompressNotification(
                 activePrunedMessages.set(messageId, entry.tokenCount)
             }
         }
-        const progressBar = formatSessionMap(sessionMessageIds, activePrunedMessages, 50)
+        const progressBar = formatProgressBar(sessionMessageIds, activePrunedMessages, messageIds)
         const reduction =
             totalSessionTokens > 0 ? Math.round((compressedTokens / totalSessionTokens) * 100) : 0
 

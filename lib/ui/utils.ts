@@ -154,22 +154,34 @@ export function truncate(str: string, maxLen: number = 60): string {
     return str.slice(0, maxLen - 3) + "..."
 }
 
-export function formatSessionMap(
+export function formatProgressBar(
     messageIds: string[],
     prunedMessages: Map<string, number>,
+    recentMessageIds: string[],
     width: number = 50,
 ): string {
-    const total = messageIds.length
-    if (total === 0) return `│${"░".repeat(width)}│`
+    const ACTIVE = "█"
+    const PRUNED = "░"
+    const RECENT = "⣿"
+    const recentSet = new Set(recentMessageIds)
 
-    const bar = new Array(width).fill("█")
+    const total = messageIds.length
+    if (total === 0) return `│${PRUNED.repeat(width)}│`
+
+    const bar = new Array(width).fill(ACTIVE)
 
     for (let m = 0; m < total; m++) {
-        if (prunedMessages.has(messageIds[m])) {
-            const start = Math.floor((m / total) * width)
-            const end = Math.floor(((m + 1) / total) * width)
+        const msgId = messageIds[m]
+        const start = Math.floor((m / total) * width)
+        const end = Math.floor(((m + 1) / total) * width)
+
+        if (recentSet.has(msgId)) {
             for (let i = start; i < end; i++) {
-                bar[i] = "░"
+                bar[i] = RECENT
+            }
+        } else if (prunedMessages.has(msgId)) {
+            for (let i = start; i < end; i++) {
+                bar[i] = PRUNED
             }
         }
     }
