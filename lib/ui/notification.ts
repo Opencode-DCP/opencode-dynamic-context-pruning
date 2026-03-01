@@ -135,6 +135,7 @@ export async function sendCompressNotification(
     sessionId: string,
     toolIds: string[],
     messageIds: string[],
+    compressionId: number,
     topic: string,
     summary: string,
     summaryTokens: number,
@@ -153,6 +154,7 @@ export async function sendCompressNotification(
 
     if (config.pruneNotification === "minimal") {
         message = formatStatsHeader(state.stats.totalPruneTokens, state.stats.pruneTokenCounter)
+        message += ` — Compression #${compressionId}`
     } else {
         message = formatStatsHeader(state.stats.totalPruneTokens, state.stats.pruneTokenCounter)
 
@@ -169,7 +171,7 @@ export async function sendCompressNotification(
             totalSessionTokens > 0 ? Math.round((compressedTokens / totalSessionTokens) * 100) : 0
 
         message += `\n\n${progressBar}`
-        message += `\n▣ Compressing (${pruneTokenCounterStr} removed, ${reduction}% reduction)`
+        message += `\n▣ Compression #${compressionId} (${pruneTokenCounterStr} removed, ${reduction}% reduction)`
         message += `\n→ Topic: ${topic}`
         message += `\n→ Items: ${messageIds.length} messages`
         if (toolIds.length > 0) {

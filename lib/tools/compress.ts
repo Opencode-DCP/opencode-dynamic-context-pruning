@@ -153,6 +153,7 @@ export function createCompressTool(ctx: ToolContext): ReturnType<typeof tool> {
                 toolCtx.sessionID,
                 range.toolIds,
                 applied.messageIds,
+                blockId,
                 compressArgs.topic,
                 finalSummary,
                 summaryTokens,
