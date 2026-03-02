@@ -801,6 +801,11 @@ export async function appendProtectedTools(
     const protectedOutputs: string[] = []
 
     for (const messageId of range.messageIds) {
+        const existingCompressionEntry = state.prune.messages.byMessageId.get(messageId)
+        if (existingCompressionEntry && existingCompressionEntry.activeBlockIds.length > 0) {
+            continue
+        }
+
         const message = searchContext.rawMessagesById.get(messageId)
         if (!message) continue
 
