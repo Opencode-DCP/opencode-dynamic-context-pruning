@@ -7,7 +7,7 @@ import { saveSessionState } from "../state/persistence"
 import { sendIgnoredMessage } from "../ui/notification"
 import { formatTokenCount } from "../ui/utils"
 
-export interface UncompressCommandContext {
+export interface DecompressCommandContext {
     client: any
     state: SessionState
     logger: Logger
@@ -81,7 +81,7 @@ function snapshotActiveMessages(messagesState: PruneMessagesState): Map<string, 
     return activeMessages
 }
 
-function formatUncompressMessage(
+function formatDecompressMessage(
     targetBlockId: number,
     restoredMessageCount: number,
     restoredTokens: number,
@@ -109,12 +109,7 @@ function formatUncompressMessage(
 function formatAvailableBlocksMessage(availableBlocks: CompressionBlock[]): string {
     const lines: string[] = []
 
-    lines.push("╭─────────────────────────────────────────────────────────────────────────╮")
-    lines.push("│                             DCP Decompress                              │")
-    lines.push("╰─────────────────────────────────────────────────────────────────────────╯")
-    lines.push("")
-    lines.push("Usage:")
-    lines.push("  /dcp decompress <n>")
+    lines.push("Usage: /dcp decompress <n>")
     lines.push("")
 
     if (availableBlocks.length === 0) {
@@ -137,7 +132,7 @@ function formatAvailableBlocksMessage(availableBlocks: CompressionBlock[]): stri
     return lines.join("\n")
 }
 
-export async function handleUncompressCommand(ctx: UncompressCommandContext): Promise<void> {
+export async function handleDecompressCommand(ctx: DecompressCommandContext): Promise<void> {
     const { client, state, logger, sessionId, messages, args } = ctx
 
     const params = getCurrentParams(state, messages, logger)
@@ -240,7 +235,7 @@ export async function handleUncompressCommand(ctx: UncompressCommandContext): Pr
 
     await saveSessionState(state, logger)
 
-    const message = formatUncompressMessage(
+    const message = formatDecompressMessage(
         targetBlockId,
         restoredMessageCount,
         restoredTokens,
