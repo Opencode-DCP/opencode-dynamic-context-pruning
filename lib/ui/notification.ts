@@ -133,16 +133,11 @@ export async function sendCompressNotification(
     config: PluginConfig,
     state: SessionState,
     sessionId: string,
-    newlyCompressedToolIds: string[],
-    newlyCompressedMessageIds: string[],
     compressionId: number,
-    topic: string,
     summary: string,
     summaryTokens: number,
     totalSessionTokens: number,
-    compressedTokens: number,
     sessionMessageIds: string[],
-    totalMessages: number,
     params: any,
 ): Promise<boolean> {
     if (config.pruneNotification === "off") {
@@ -151,6 +146,19 @@ export async function sendCompressNotification(
 
     let message: string
     const summaryTokensStr = formatTokenCount(summaryTokens)
+    const compressionBlock = state.prune.messages.blocksById.get(compressionId)
+
+    if (!compressionBlock) {
+        logger.error("Compression block missing for notification", {
+            compressionId,
+            sessionId,
+        })
+    }
+
+    const newlyCompressedToolIds = compressionBlock?.directToolIds ?? []
+    const newlyCompressedMessageIds = compressionBlock?.directMessageIds ?? []
+    const topic = compressionBlock?.topic ?? "(unknown topic)"
+    const compressedTokens = compressionBlock?.compressedTokens ?? 0
 
     if (config.pruneNotification === "minimal") {
         message = formatStatsHeader(state.stats.totalPruneTokens, state.stats.pruneTokenCounter)

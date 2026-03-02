@@ -151,16 +151,11 @@ export function createCompressTool(ctx: ToolContext): ReturnType<typeof tool> {
                 ctx.config,
                 ctx.state,
                 toolCtx.sessionID,
-                applied.newlyCompressedToolIds,
-                applied.newlyCompressedMessageIds,
                 blockId,
-                compressArgs.topic,
                 finalSummary,
                 summaryTokens,
                 totalSessionTokens,
-                applied.compressedTokens,
                 sessionMessageIds,
-                rawMessages.length,
                 params,
             )
 
