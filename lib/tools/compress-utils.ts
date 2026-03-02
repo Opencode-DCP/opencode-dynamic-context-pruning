@@ -59,6 +59,8 @@ export interface InjectedSummaryResult {
 export interface AppliedCompressionResult {
     compressedTokens: number
     messageIds: string[]
+    newlyCompressedMessageIds: string[]
+    newlyCompressedToolIds: string[]
 }
 
 export interface CompressionStateInput {
@@ -563,6 +565,18 @@ export function applyCompressionState(
         }
     }
 
+    const initiallyActiveToolIds = new Set<string>()
+    for (const activeBlockId of messagesState.activeBlockIds) {
+        const activeBlock = messagesState.blocksById.get(activeBlockId)
+        if (!activeBlock || !activeBlock.active) {
+            continue
+        }
+
+        for (const toolId of activeBlock.effectiveToolIds) {
+            initiallyActiveToolIds.add(toolId)
+        }
+    }
+
     const createdAt = Date.now()
     const block: CompressionBlock = {
         blockId,
@@ -577,8 +591,8 @@ export function applyCompressionState(
         includedBlockIds: included,
         consumedBlockIds: consumed,
         parentBlockIds: [],
-        directMessageIds: [...range.messageIds],
-        directToolIds: [...range.toolIds],
+        directMessageIds: [],
+        directToolIds: [],
         effectiveMessageIds: [...effectiveMessageIds],
         effectiveToolIds: [...effectiveToolIds],
         createdAt,
@@ -676,6 +690,7 @@ export function applyCompressionState(
     }
 
     let compressedTokens = 0
+    const newlyCompressedMessageIds: string[] = []
     for (const messageId of effectiveMessageIds) {
         const entry = messagesState.byMessageId.get(messageId)
         if (!entry) {
@@ -687,8 +702,19 @@ export function applyCompressionState(
 
         if (isNowActive && !wasActive) {
             compressedTokens += entry.tokenCount
+            newlyCompressedMessageIds.push(messageId)
         }
     }
+
+    const newlyCompressedToolIds: string[] = []
+    for (const toolId of effectiveToolIds) {
+        if (!initiallyActiveToolIds.has(toolId)) {
+            newlyCompressedToolIds.push(toolId)
+        }
+    }
+
+    block.directMessageIds = [...newlyCompressedMessageIds]
+    block.directToolIds = [...newlyCompressedToolIds]
 
     block.compressedTokens = compressedTokens
 
@@ -699,6 +725,8 @@ export function applyCompressionState(
     return {
         compressedTokens,
         messageIds: range.messageIds,
+        newlyCompressedMessageIds,
+        newlyCompressedToolIds,
     }
 }
 

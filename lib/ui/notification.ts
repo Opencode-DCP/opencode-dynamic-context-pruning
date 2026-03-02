@@ -133,8 +133,8 @@ export async function sendCompressNotification(
     config: PluginConfig,
     state: SessionState,
     sessionId: string,
-    toolIds: string[],
-    messageIds: string[],
+    newlyCompressedToolIds: string[],
+    newlyCompressedMessageIds: string[],
     compressionId: number,
     topic: string,
     summary: string,
@@ -166,16 +166,20 @@ export async function sendCompressNotification(
                 activePrunedMessages.set(messageId, entry.tokenCount)
             }
         }
-        const progressBar = formatProgressBar(sessionMessageIds, activePrunedMessages, messageIds)
+        const progressBar = formatProgressBar(
+            sessionMessageIds,
+            activePrunedMessages,
+            newlyCompressedMessageIds,
+        )
         const reduction =
             totalSessionTokens > 0 ? Math.round((compressedTokens / totalSessionTokens) * 100) : 0
 
         message += `\n\n${progressBar}`
         message += `\n▣ Compression #${compressionId} (${pruneTokenCounterStr} removed, ${reduction}% reduction)`
         message += `\n→ Topic: ${topic}`
-        message += `\n→ Items: ${messageIds.length} messages`
-        if (toolIds.length > 0) {
-            message += ` and ${toolIds.length} tools condensed`
+        message += `\n→ Items: ${newlyCompressedMessageIds.length} messages`
+        if (newlyCompressedToolIds.length > 0) {
+            message += ` and ${newlyCompressedToolIds.length} tools condensed`
         } else {
             message += ` condensed`
         }
