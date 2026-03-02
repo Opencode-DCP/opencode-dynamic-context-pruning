@@ -110,6 +110,9 @@ DCP uses its own config file:
     "experimental": {
         // Allow DCP processing in subagent sessions
         "allowSubAgents": false,
+        // Enable user-editable prompt overrides under dcp-prompts directories
+        // When false (default), prompt override files/directories are ignored
+        "customPrompts": false,
     },
     // Protect file operations from pruning via glob patterns
     // Patterns match tool parameters.filePath (e.g. read/write/edit)
@@ -193,14 +196,45 @@ DCP provides a `/dcp` slash command:
 - `/dcp decompress <n>` — Restore a specific active compression by ID (for example `/dcp decompress 2`). Running without an argument shows available compression IDs, token sizes, and topics.
 - `/dcp recompress <n>` — Re-apply a user-decompressed compression by ID (for example `/dcp recompress 2`). Running without an argument shows recompressible IDs, token sizes, and topics.
 
+### Prompt Overrides
+
+DCP exposes six editable prompts:
+
+- `system`
+- `compress`
+- `context-limit-nudge`
+- `user-turn-nudge`
+- `assistant-turn-nudge`
+- `iteration-nudge`
+
+This feature is disabled by default. Set `experimental.customPrompts` to `true` in your DCP config to activate it.
+
+When enabled, managed defaults are written to `~/.config/opencode/dcp-prompts/defaults/` as plain-text prompt files (no XML wrappers and no inline comments). A single `README.md` in that directory explains each prompt and how to create overrides.
+
+To customize behavior, add a file with the same name under an overrides directory and edit it as plain text. DCP wraps override text with the required XML at runtime.
+
+Override precedence:
+
+1. `.opencode/dcp-prompts/overrides/` (project)
+2. `$OPENCODE_CONFIG_DIR/dcp-prompts/overrides/` (config dir)
+3. `~/.config/opencode/dcp-prompts/overrides/` (global)
+
+To reset an override, delete the matching file from your overrides directory.
+
+If you later set `experimental.customPrompts` to `false`, DCP stops reading overrides and does not regenerate the defaults directory.
+
+> [!NOTE]
+> Default prompts remain bundler-safe: runtime uses bundled/generated TypeScript prompt strings and does not read packaged markdown files.
+> `compress` prompt changes apply after plugin restart because tool descriptions are registered at startup.
+
 ### Protected Tools
 
 By default, these tools are always protected from pruning:
-`task`, `todowrite`, `todoread`, `compress`, `batch`, `plan_enter`, `plan_exit`
+`task`, `skill`, `todowrite`, `todoread`, `compress`, `batch`, `plan_enter`, `plan_exit`
 
 The `protectedTools` arrays in `commands` and `strategies` add to this default list.
 
-For the `compress` tool, `compress.protectedTools` ensures specific tool outputs are appended to the compressed summary. It defaults to an empty array `[]` but always inherently protects `task`, `todowrite`, and `todoread`.
+For the `compress` tool, `compress.protectedTools` ensures specific tool outputs are appended to the compressed summary. It defaults to an empty array `[]` but always inherently protects `task`, `skill`, `todowrite`, and `todoread`.
 
 ### Config Precedence
 
