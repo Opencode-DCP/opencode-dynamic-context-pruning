@@ -164,7 +164,7 @@ export function createCompressTool(ctx: ToolContext): ReturnType<typeof tool> {
                 ctx.state,
                 toolCtx.sessionID,
                 blockId,
-                finalSummary,
+                compressArgs.content.summary,
                 summaryTokens,
                 totalSessionTokens,
                 sessionMessageIds,
