@@ -215,7 +215,9 @@ export class Logger {
                 await mkdir(contextDir, { recursive: true })
             }
 
-            const minimized = this.minimizeForDebug(messages)
+            const minimized = this.minimizeForDebug(messages).filter(
+                (msg) => msg.parts && msg.parts.length > 0,
+            )
             const timestamp = new Date().toISOString().replace(/[:.]/g, "-")
             const contextFile = join(contextDir, `${timestamp}.json`)
             await writeFile(contextFile, JSON.stringify(minimized, null, 2))
