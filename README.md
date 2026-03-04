@@ -3,7 +3,7 @@
 [![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/dansmolsky)
 [![npm version](https://img.shields.io/npm/v/@tarquinen/opencode-dcp.svg)](https://www.npmjs.com/package/@tarquinen/opencode-dcp)
 
-Automatically reduces token usage in OpenCode by removing obsolete content from conversation history.
+Automatically reduces token usage in OpenCode by managing conversation context.
 
 ![DCP in action](assets/images/dcp-demo5.png)
 
@@ -22,45 +22,23 @@ Using `@beta` ensures you always get the newest version automatically when OpenC
 
 Restart OpenCode. The plugin will automatically start optimizing your sessions.
 
-## Beta Notice (v2.2.8-beta0)
+## How It Works
 
-- Strategy shift to a single user-facing context tool: `compress`.
-- Context management is now less surgical and more focused on preserving high-signal work grouped by task.
+DCP reduces context size through a compress tool and automatic cleanup. Your session history is never modified — DCP replaces pruned content with placeholders before sending requests to your LLM.
 
-## How Pruning Works
+### Compress
 
-DCP uses one user-facing tool and strategies to reduce context size:
+A tool exposed to your model that selects a conversation range and replaces it with a technical summary. When a new compression overlaps an earlier one, the earlier summary is nested inside the new one — so information is preserved through layers of compression rather than diluted away.
 
-For model-facing behavior (prompts and tool calls), this capability is always addressed as `compress`.
+The model compresses at whatever scale fits: small ranges for noise cleanup, focused ranges for key findings, or broad ranges for completed work. Context thresholds (`minContextLimit`, `maxContextLimit`) and nudge settings control how aggressively the model is prompted to compress.
 
-### Tool
+### Deduplication
 
-**Compress** — Exposes a `compress` tool that will select a conversation range and replace it with a technical summary.
+Identifies repeated tool calls (same tool, same arguments) and keeps only the most recent output. Recalculated when the compress tool runs, so prompt cache is only impacted alongside compression.
 
-The model can use `compress` at different scales: tiny ranges for noise cleanup, focused ranges for preserving key findings, and full chapters for completed work. The model will choose the best moment to compress based on session context size and opportunity.
+### Purge Errors
 
-### Strategies
-
-**Deduplication** — Identifies repeated tool calls (e.g., reading the same file multiple times) and keeps only the most recent output. Runs automatically on every request with zero LLM cost.
-
-**Supersede Writes** — Removes write tool calls for files that have subsequently been read. When a file is written and later read, the original write content becomes redundant since the current file state is captured in the read result. Runs automatically on every request with zero LLM cost.
-
-**Purge Errors** — Prunes tool inputs for tools that returned errors after a configurable number of turns (default: 4). Error messages are preserved for context, but the potentially large input content is removed. Runs automatically on every request with zero LLM cost.
-
-Your session history is never modified—DCP replaces pruned content with placeholders before sending requests to your LLM.
-
-## Impact on Prompt Caching
-
-LLM providers like Anthropic and OpenAI cache prompts based on exact prefix matching. When DCP prunes a tool output, it changes the message content, which invalidates cached prefixes from that point forward.
-
-**Trade-off:** You lose some cache read benefits but gain larger token savings from reduced context size and performance improvements through reduced context poisoning. In most cases, the token savings outweigh the cache miss cost—especially in long sessions where context bloat becomes significant.
-
-> **Note:** In testing, cache hit rates were approximately 85% with DCP enabled vs 90% without for most providers.
-
-**Best use cases:**
-
-- **Request-based billing** — Providers that count usage in requests, such as Github Copilot have no negative price impact.
-- **Uniform token pricing** — Providers that bill cached tokens at the same rate as regular input tokens, such as Cerebras, see pure savings with no cache-miss penalty.
+Prunes inputs from errored tool calls after a configurable number of turns (default: 4). Error messages are preserved; only the potentially large input content is removed. Recalculated on compress tool use.
 
 ## Configuration
 
@@ -97,8 +75,8 @@ DCP uses its own config file:
     // tools only run when explicitly triggered via /dcp commands
     "manualMode": {
         "enabled": false,
-        // When true, automatic strategies (deduplication, supersedeWrites, purgeErrors)
-        // still run even in manual mode
+        // When true, automatic cleanup (deduplication, purgeErrors)
+        // still runs even in manual mode
         "automaticStrategies": true,
     },
     // Protect from pruning for <turns> message turns past tool invocation
@@ -235,11 +213,22 @@ Each level overrides the previous, so project settings take priority over config
 
 Restart OpenCode after making config changes.
 
+## Impact on Prompt Caching
+
+LLM providers cache prompts based on exact prefix matching. When DCP prunes content, it changes messages, which invalidates cached prefixes from that point forward.
+
+**Trade-off:** You lose some cache reads but gain token savings from reduced context size and fewer hallucinations from stale context. In most cases, especially in long sessions, the savings outweigh the cache miss cost.
+
+> **Note:** In testing, cache hit rates were approximately 85% with DCP vs 90% without.
+
+**No impact for:**
+
+- **Request-based billing** — Providers like Github Copilot that charge per request, not tokens.
+- **Uniform token pricing** — Providers like Cerebras that bill cached and uncached tokens at the same rate.
+
 ## Limitations
 
-**Subagents** — DCP is disabled for subagents by default. Subagents are not designed to be token efficient; what matters is that the final message returned to the main agent is a concise summary of findings. DCP's pruning could interfere with this summarization behavior.
-
-You can opt in experimentally with `experimental.allowSubAgents: true`.
+**Subagents** — Disabled by default. Subagent sessions prioritize returning concise summaries to the main agent, and pruning could interfere with that. Opt in with `experimental.allowSubAgents: true`.
 
 ## License
 
