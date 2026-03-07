@@ -131,6 +131,8 @@ DCP uses its own config file:
         // Controls how likely compression is after user messages
         // ("strong" = more likely, "soft" = less likely)
         "nudgeForce": "soft",
+        // Flat tool schema: improves tool call reliability but uglier in the TUI
+        "flatSchema": false,
         // Tool names whose completed outputs are appended to the compression
         "protectedTools": [],
     },
