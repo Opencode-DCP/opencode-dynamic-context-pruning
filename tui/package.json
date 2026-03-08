@@ -1,0 +1,12 @@
+{
+    "$schema": "https://json.schemastore.org/package.json",
+    "name": "dcp-tui-probe-local",
+    "private": true,
+    "type": "module",
+    "dependencies": {
+        "@opencode-ai/plugin": "1.2.20",
+        "@opentui/core": "0.0.0-20260304-eee67156",
+        "@opentui/solid": "0.0.0-20260304-eee67156",
+        "solid-js": "1.9.9"
+    }
+}
