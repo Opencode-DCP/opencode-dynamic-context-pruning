@@ -4,9 +4,9 @@
     "private": true,
     "type": "module",
     "dependencies": {
-        "@opencode-ai/plugin": "1.2.20",
-        "@opentui/core": "0.0.0-20260304-eee67156",
-        "@opentui/solid": "0.0.0-20260304-eee67156",
+        "@opencode-ai/plugin": "1.2.21",
+        "@opentui/core": "0.0.0-20260307-536c401b",
+        "@opentui/solid": "0.0.0-20260307-536c401b",
         "solid-js": "1.9.9"
     }
 }
