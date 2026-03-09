@@ -255,27 +255,6 @@ export function collectTurnNudgeAnchors(messages: WithParts[]): Set<string> {
     return anchors
 }
 
-export function loadPruneOriginMap(obj?: Record<string, PruneOrigin>): Map<string, PruneOrigin> {
-    if (!obj || typeof obj !== "object") {
-        return new Map()
-    }
-
-    const entries: [string, PruneOrigin][] = []
-    for (const [toolId, origin] of Object.entries(obj)) {
-        if (
-            origin &&
-            typeof origin === "object" &&
-            typeof origin.source === "string" &&
-            typeof origin.originMessageId === "string" &&
-            origin.originMessageId.length > 0
-        ) {
-            entries.push([toolId, origin])
-        }
-    }
-
-    return new Map(entries)
-}
-
 export function resetOnCompaction(state: SessionState): void {
     state.toolParameters.clear()
     state.prune.tools = new Map<string, number>()
