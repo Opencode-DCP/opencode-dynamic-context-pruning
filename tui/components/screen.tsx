@@ -1,4 +1,5 @@
 /** @jsxImportSource @opentui/solid */
+import type { JSX } from "solid-js"
 import type { DcpPalette } from "../shared/theme"
 
 export const Screen = (props: {
@@ -6,7 +7,7 @@ export const Screen = (props: {
     title: string
     subtitle?: string
     footer?: string
-    children?: unknown
+    children?: JSX.Element
 }) => {
     return (
         <box width="100%" height="100%" backgroundColor={props.palette.panel} padding={1}>
@@ -17,7 +18,7 @@ export const Screen = (props: {
                     gap={1}
                     padding={1}
                     backgroundColor={props.palette.base}
-                    border={["left"]}
+                    border={{ type: "single" }}
                     borderColor={props.palette.accent}
                 >
                     <text fg={props.palette.text}>

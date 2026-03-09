@@ -1,6 +1,6 @@
-// @ts-nocheck
 /** @jsxImportSource @opentui/solid */
 import { createEffect, createMemo, createSignal, onCleanup, Show } from "solid-js"
+import type { TuiApi } from "@opencode-ai/plugin/tui"
 import { formatTokenCount } from "../../lib/ui/utils"
 import { loadContextSnapshotCached, peekContextSnapshot } from "../data/context"
 import { openPanel } from "../shared/navigation"
@@ -70,7 +70,7 @@ const SidebarContextBar = (props: {
 }
 
 const SidebarContext = (props: {
-    api: any
+    api: TuiApi
     client: DcpTuiClient
     config: DcpTuiConfig
     names: DcpRouteNames
@@ -150,7 +150,7 @@ const SidebarContext = (props: {
             flexDirection="column"
             gap={0}
             backgroundColor={props.palette.base}
-            border={["left"]}
+            border={{ type: "single" }}
             borderColor={props.palette.accent}
             paddingTop={1}
             paddingBottom={1}
@@ -267,7 +267,7 @@ const SidebarContext = (props: {
 }
 
 export const createSidebarTopSlot = (
-    api: any,
+    api: TuiApi,
     client: DcpTuiClient,
     config: DcpTuiConfig,
     names: DcpRouteNames,
@@ -275,14 +275,16 @@ export const createSidebarTopSlot = (
     id: names.slot,
     slots: {
         sidebar_top(ctx, value: { session_id: string }) {
-            const palette = getPalette(ctx.theme.current as Record<string, unknown>)
+            const palette = createMemo(() =>
+                getPalette(ctx.theme.current as Record<string, unknown>),
+            )
             return (
                 <SidebarContext
                     api={api}
                     client={client}
                     config={config}
                     names={names}
-                    palette={palette}
+                    palette={palette()}
                     sessionID={value.session_id}
                 />
             )

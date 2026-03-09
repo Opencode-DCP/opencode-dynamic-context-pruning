@@ -1,4 +1,3 @@
-// @ts-nocheck
 /** @jsxImportSource @opentui/solid */
 import type { TuiPluginInput } from "@opencode-ai/plugin/tui"
 import { registerCommands } from "./commands"

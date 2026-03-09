@@ -1,4 +1,3 @@
-// @ts-nocheck
 import type { TuiPluginInput } from "@opencode-ai/plugin/tui"
 
 export type DcpTuiClient = TuiPluginInput["client"]

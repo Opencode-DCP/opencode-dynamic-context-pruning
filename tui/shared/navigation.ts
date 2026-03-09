@@ -1,4 +1,3 @@
-// @ts-nocheck
 import type { TuiApi } from "@opencode-ai/plugin/tui"
 import type { DcpRouteNames, DcpRouteParams, DcpRouteSource } from "./types"
 

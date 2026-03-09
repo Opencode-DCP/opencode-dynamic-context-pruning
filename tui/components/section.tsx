@@ -1,11 +1,12 @@
 /** @jsxImportSource @opentui/solid */
+import type { JSX } from "solid-js"
 import type { DcpPalette } from "../shared/theme"
 
 export const Section = (props: {
     palette: DcpPalette
     title: string
     subtitle?: string
-    children?: unknown
+    children?: JSX.Element
 }) => {
     return (
         <box
@@ -14,7 +15,7 @@ export const Section = (props: {
             gap={1}
             padding={1}
             backgroundColor={props.palette.base}
-            border={["left"]}
+            border={{ type: "single" }}
             borderColor={props.palette.border}
         >
             <text fg={props.palette.text}>
