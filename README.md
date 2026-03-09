@@ -42,11 +42,13 @@ Prunes inputs from errored tool calls after a configurable number of turns (defa
 
 ## Configuration
 
-DCP uses its own config file:
+DCP uses its own config file, searched in order:
 
-- Global: `~/.config/opencode/dcp.jsonc` (or `dcp.json`), created automatically on first run
-- Custom config directory: `$OPENCODE_CONFIG_DIR/dcp.jsonc` (or `dcp.json`), if `OPENCODE_CONFIG_DIR` is set
-- Project: `.opencode/dcp.jsonc` (or `dcp.json`) in your project's `.opencode` directory
+1. Global: `~/.config/opencode/dcp.jsonc` (or `dcp.json`), created automatically on first run
+2. Custom config directory: `$OPENCODE_CONFIG_DIR/dcp.jsonc` (or `dcp.json`), if `OPENCODE_CONFIG_DIR` is set
+3. Project: `.opencode/dcp.jsonc` (or `dcp.json`) in your project's `.opencode` directory
+
+Each level overrides the previous, so project settings take priority over global. Restart OpenCode after making config changes.
 
 > [!IMPORTANT]
 > Defaults are applied automatically. Expand this if you want to review or override settings.
@@ -207,14 +209,6 @@ By default, these tools are always protected from pruning:
 The `protectedTools` arrays in `commands` and `strategies` add to this default list.
 
 For the `compress` tool, `compress.protectedTools` ensures specific tool outputs are appended to the compressed summary. It defaults to an empty array `[]` but always inherently protects `task`, `skill`, `todowrite`, and `todoread`.
-
-### Config Precedence
-
-Settings are merged in order:
-Defaults → Global (`~/.config/opencode/dcp.jsonc`) → Config Dir (`$OPENCODE_CONFIG_DIR/dcp.jsonc`) → Project (`.opencode/dcp.jsonc`).
-Each level overrides the previous, so project settings take priority over config-dir and global, which take priority over defaults.
-
-Restart OpenCode after making config changes.
 
 ## Impact on Prompt Caching
 
