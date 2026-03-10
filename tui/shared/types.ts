@@ -42,6 +42,7 @@ export interface DcpPersistedSummary {
     available: boolean
     activeBlockCount: number
     activeBlockTopics: string[]
+    activeBlockTopicTotal: number
     lastUpdated?: string
 }
 

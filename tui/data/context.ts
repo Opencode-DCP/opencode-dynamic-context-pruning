@@ -58,6 +58,7 @@ export const createPlaceholderContextSnapshot = (
         available: false,
         activeBlockCount: 0,
         activeBlockTopics: [],
+        activeBlockTopicTotal: 0,
     },
     notes,
     loadedAt: Date.now(),
@@ -245,12 +246,13 @@ export const loadContextSnapshot = async (
     const { state, persisted } = await buildState(sessionID, messages)
     const breakdown = analyzeTokens(state, messages)
 
-    const topics = Array.from(state.prune.messages.activeBlockIds)
+    const allTopics = Array.from(state.prune.messages.activeBlockIds)
         .map((blockID) => state.prune.messages.blocksById.get(blockID))
         .filter((block): block is NonNullable<typeof block> => !!block)
         .map((block) => block.topic)
         .filter((topic) => !!topic)
-        .slice(0, 3)
+    const topics = allTopics.slice(0, 5)
+    const topicTotal = allTopics.length
 
     const notes: string[] = []
     if (persisted) {
@@ -269,6 +271,7 @@ export const loadContextSnapshot = async (
             available: !!persisted,
             activeBlockCount: state.prune.messages.activeBlockIds.size,
             activeBlockTopics: topics,
+            activeBlockTopicTotal: topicTotal,
             lastUpdated: persisted?.lastUpdated,
         },
         notes,
