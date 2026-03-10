@@ -68,7 +68,7 @@ const buildState = async (
     }
 }
 
-export const loadContextSnapshot = async (
+const loadContextSnapshot = async (
     client: DcpTuiClient,
     sessionID?: string,
 ): Promise<DcpContextSnapshot> => {

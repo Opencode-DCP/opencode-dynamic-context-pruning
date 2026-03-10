@@ -14,6 +14,8 @@ export interface DcpPalette {
     warning: DcpColor
 }
 
+export type DcpTone = "text" | "muted" | "accent" | "success" | "warning"
+
 const defaults = {
     panel: "#111111",
     base: "#1d1d1d",
@@ -45,4 +47,12 @@ export const getPalette = (theme: Record<string, unknown>): DcpPalette => {
         success: get("success", defaults.success),
         warning: get("warning", defaults.warning),
     }
+}
+
+export const toneColor = (palette: DcpPalette, tone: DcpTone = "text") => {
+    if (tone === "accent") return palette.accent
+    if (tone === "success") return palette.success
+    if (tone === "warning") return palette.warning
+    if (tone === "muted") return palette.muted
+    return palette.text
 }

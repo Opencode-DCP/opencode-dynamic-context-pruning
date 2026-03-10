@@ -2,7 +2,7 @@
 import { createEffect, createMemo, createSignal, on, onCleanup, untrack } from "solid-js"
 import type { TuiApi, TuiPluginInput } from "@opencode-ai/plugin/tui"
 import { Logger } from "../../lib/logger"
-import { formatTokenCount } from "../../lib/ui/utils"
+import { truncate } from "../../lib/ui/utils"
 import {
     createPlaceholderContextSnapshot,
     invalidateContextSnapshot,
@@ -10,27 +10,14 @@ import {
     peekContextSnapshot,
 } from "../data/context"
 import { openPanel } from "../shared/navigation"
-import { getPalette, type DcpColor, type DcpPalette } from "../shared/theme"
+import { getPalette, toneColor, type DcpColor, type DcpPalette } from "../shared/theme"
 import type { DcpMessageStatus, DcpRouteNames, DcpTuiClient, DcpTuiConfig } from "../shared/types"
 
 const BAR_WIDTH = 12
 // Content width derived from graph row: label(9) + space(1) + percent(4) + " |"(2) + bar(12) + "| "(2) + tokens(~5)
 const CONTENT_WIDTH = 9 + 1 + 4 + 2 + BAR_WIDTH + 2 + 5
 
-const truncate = (text: string, max: number) =>
-    text.length > max ? text.slice(0, max - 3) + "..." : text
 const REFRESH_DEBOUNCE_MS = 100
-
-const toneColor = (
-    palette: DcpPalette,
-    tone: "text" | "muted" | "accent" | "success" | "warning" = "text",
-) => {
-    if (tone === "accent") return palette.accent
-    if (tone === "success") return palette.success
-    if (tone === "warning") return palette.warning
-    if (tone === "muted") return palette.muted
-    return palette.text
-}
 
 const compactTokenCount = (value: number): string => {
     if (value >= 100_000) return `${Math.round(value / 1000)}K`
