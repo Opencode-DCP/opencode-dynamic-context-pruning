@@ -14,6 +14,11 @@ import { getPalette, type DcpPalette } from "../shared/theme"
 import type { DcpRouteNames, DcpTuiClient, DcpTuiConfig } from "../shared/types"
 
 const BAR_WIDTH = 12
+// Content width derived from graph row: label(9) + space(1) + percent(4) + " |"(2) + bar(12) + "| "(2) + tokens(~5)
+const CONTENT_WIDTH = 9 + 1 + 4 + 2 + BAR_WIDTH + 2 + 5
+
+const truncate = (text: string, max: number) =>
+    text.length > max ? text.slice(0, max - 3) + "..." : text
 const REFRESH_DEBOUNCE_MS = 100
 
 const toneColor = (
@@ -40,17 +45,16 @@ const SummaryRow = (props: {
     label: string
     value: string
     tone?: "text" | "muted" | "accent" | "success" | "warning"
+    marginTop?: number
 }) => {
     return (
         <box
             width="100%"
-            backgroundColor={props.palette.surface}
-            paddingLeft={1}
-            paddingRight={1}
             flexDirection="row"
             justifyContent="space-between"
+            marginTop={props.marginTop}
         >
-            <text fg={props.palette.muted}>{props.label}</text>
+            <text fg={props.palette.text}>{props.label}</text>
             <text fg={toneColor(props.palette, props.tone)}>
                 <b>{props.value}</b>
             </text>
@@ -69,12 +73,15 @@ const SidebarContextBar = (props: {
     const percent = createMemo(() =>
         props.total > 0 ? `${Math.round((props.value / props.total) * 100)}%` : "0%",
     )
-    const label = createMemo(() => props.label.padEnd(8, " "))
+    const label = createMemo(() => props.label.padEnd(9, " "))
     const bar = createMemo(() => buildBar(props.value, props.total, props.char))
     return (
-        <text
-            fg={toneColor(props.palette, props.tone)}
-        >{`${label()} ${percent().padStart(4, " ")} |${bar()}| ${compactTokenCount(props.value)}`}</text>
+        <box flexDirection="row">
+            <text fg={props.palette.text}>{label()}</text>
+            <text fg={toneColor(props.palette, props.tone)}>
+                {` ${percent().padStart(4, " ")} |${bar()}| ${compactTokenCount(props.value).padStart(5, " ")}`}
+            </text>
+        </box>
     )
 }
 
@@ -149,6 +156,7 @@ const SidebarContext = (props: {
         }
 
         const cached = peekContextSnapshot(sessionID)
+        let silentRefresh = false
         if (cached) {
             void props.logger.debug("Sidebar using cached snapshot before reload", {
                 sessionID,
@@ -159,18 +167,24 @@ const SidebarContext = (props: {
             setLoading(false)
         } else {
             const current = untrack(snapshot)
-            if (!preserveSnapshot || current?.sessionID !== sessionID) {
+            if (preserveSnapshot && current?.sessionID === sessionID) {
+                silentRefresh = true
+                void props.logger.debug("Sidebar silent refresh, keeping current snapshot", {
+                    sessionID,
+                })
+            } else {
                 setSnapshot(createPlaceholderContextSnapshot(sessionID, ["Loading DCP context..."]))
+                setLoading(true)
+                void props.logger.debug("Sidebar entering loading state", {
+                    sessionID,
+                    hadCurrentSnapshot: !!current,
+                })
             }
-            setLoading(true)
-            void props.logger.debug("Sidebar entering loading state", {
-                sessionID,
-                hadCurrentSnapshot: !!current,
-                preservedSnapshot: preserveSnapshot && current?.sessionID === sessionID,
-            })
         }
         setError(undefined)
-        requestRender("refresh-start", { sessionID, reason })
+        if (!silentRefresh) {
+            requestRender("refresh-start", { sessionID, reason })
+        }
 
         const currentRequest = ++requestVersion
         void props.logger.debug("Sidebar refresh request issued", {
@@ -357,44 +371,14 @@ const SidebarContext = (props: {
         ),
     )
 
-    const prunedItems = createMemo(() => {
-        const value = snapshot()
-        const parts: string[] = []
-        if (value.breakdown.prunedToolCount > 0) {
-            parts.push(
-                `${value.breakdown.prunedToolCount} tool${value.breakdown.prunedToolCount === 1 ? "" : "s"}`,
-            )
-        }
-        if (value.breakdown.prunedMessageCount > 0) {
-            parts.push(
-                `${value.breakdown.prunedMessageCount} msg${value.breakdown.prunedMessageCount === 1 ? "" : "s"}`,
-            )
-        }
-        return parts.length > 0 ? `${parts.join(", ")} pruned` : "No pruned items"
-    })
-
     const blockSummary = createMemo(() => {
         return `${snapshot().persisted.activeBlockCount}`
     })
 
-    const topicLine = createMemo(() => {
-        const value = snapshot()
-        if (!value.persisted.activeBlockTopics.length) return ""
-        return `Topics: ${value.persisted.activeBlockTopics.join(" | ")}`
-    })
-
-    const noteLine = createMemo(() => {
-        const topic = topicLine()
-        if (topic) return topic
-        return snapshot().notes[0] ?? ""
-    })
-
-    const stateLine = createMemo(() => {
-        if (error() && snapshot().breakdown.total === 0) return "DCP context failed to load."
-        if (error()) return `Refresh failed: ${error()}`
-        if (loading()) return "Loading DCP context..."
-        return "DCP context loaded."
-    })
+    const topics = createMemo(() => snapshot().persisted.activeBlockTopics)
+    const topicTotal = createMemo(() => snapshot().persisted.activeBlockTopicTotal)
+    const topicOverflow = createMemo(() => topicTotal() - topics().length)
+    const fallbackNote = createMemo(() => snapshot().notes[0] ?? "")
 
     const status = createMemo(() => {
         if (error() && snapshot().breakdown.total > 0)
@@ -411,7 +395,7 @@ const SidebarContext = (props: {
             width="100%"
             flexDirection="column"
             gap={0}
-            backgroundColor={props.palette.base}
+            backgroundColor={props.palette.surface}
             border={{ type: "single" }}
             borderColor={props.palette.accent}
             paddingTop={1}
@@ -427,87 +411,86 @@ const SidebarContext = (props: {
                             <b>{props.config.label}</b>
                         </text>
                     </box>
-                    <text fg={props.palette.muted}>click for more</text>
+                    <text fg={props.palette.text}>click for more</text>
                 </box>
                 <text fg={toneColor(props.palette, status().tone)}>{status().label}</text>
             </box>
 
             <box flexDirection="row" justifyContent="space-between">
-                <text fg={props.palette.muted}>session {props.sessionID().slice(0, 18)}</text>
-            </box>
-
-            <box paddingTop={1}>
-                <text fg={error() ? props.palette.warning : props.palette.muted}>
-                    {stateLine()}
+                <text fg={props.palette.muted}>
+                    {props.sessionID().length > 27
+                        ? props.sessionID().slice(0, 27) + "..."
+                        : props.sessionID()}
                 </text>
             </box>
 
+            <SummaryRow
+                palette={props.palette}
+                label="Saved"
+                value={`~${compactTokenCount(snapshot().breakdown.prunedTokens)}`}
+                tone="accent"
+                marginTop={1}
+            />
+            <SummaryRow
+                palette={props.palette}
+                label="Compressions"
+                value={blockSummary()}
+                tone="accent"
+            />
+
             <box width="100%" flexDirection="column" gap={0} paddingTop={1}>
-                <box
-                    width="100%"
-                    flexDirection="row"
-                    justifyContent="space-between"
-                    backgroundColor={props.palette.surface}
-                    paddingLeft={1}
-                    paddingRight={1}
-                >
-                    <text fg={props.palette.muted}>Current</text>
-                    <text fg={props.palette.accent}>
-                        <b>~{compactTokenCount(snapshot().breakdown.total)}</b>
-                    </text>
-                </box>
-                <SummaryRow
+                <SidebarContextBar
                     palette={props.palette}
-                    label="Saved"
-                    value={`~${compactTokenCount(snapshot().breakdown.prunedTokens)}`}
-                    tone="success"
-                />
-                <SummaryRow
-                    palette={props.palette}
-                    label="Compressions"
-                    value={blockSummary()}
+                    label="System"
+                    value={snapshot().breakdown.system}
+                    total={snapshot().breakdown.total}
+                    char="█"
                     tone="accent"
                 />
+                <SidebarContextBar
+                    palette={props.palette}
+                    label="User"
+                    value={snapshot().breakdown.user}
+                    total={snapshot().breakdown.total}
+                    char="█"
+                    tone="accent"
+                />
+                <SidebarContextBar
+                    palette={props.palette}
+                    label="Assistant"
+                    value={snapshot().breakdown.assistant}
+                    total={snapshot().breakdown.total}
+                    char="█"
+                    tone="accent"
+                />
+                <SidebarContextBar
+                    palette={props.palette}
+                    label="Tools"
+                    value={snapshot().breakdown.tools}
+                    total={snapshot().breakdown.total}
+                    char="█"
+                    tone="accent"
+                />
+            </box>
 
-                <box width="100%" flexDirection="column" gap={0} paddingTop={1}>
-                    <SidebarContextBar
-                        palette={props.palette}
-                        label="System"
-                        value={snapshot().breakdown.system}
-                        total={snapshot().breakdown.total}
-                        char="█"
-                        tone="accent"
-                    />
-                    <SidebarContextBar
-                        palette={props.palette}
-                        label="User"
-                        value={snapshot().breakdown.user}
-                        total={snapshot().breakdown.total}
-                        char="▓"
-                        tone="text"
-                    />
-                    <SidebarContextBar
-                        palette={props.palette}
-                        label="Assist"
-                        value={snapshot().breakdown.assistant}
-                        total={snapshot().breakdown.total}
-                        char="▒"
-                        tone="muted"
-                    />
-                    <SidebarContextBar
-                        palette={props.palette}
-                        label="Tools"
-                        value={snapshot().breakdown.tools}
-                        total={snapshot().breakdown.total}
-                        char="░"
-                        tone="warning"
-                    />
-                </box>
-
-                <box width="100%" flexDirection="column" gap={0} paddingTop={1}>
-                    <text fg={props.palette.muted}>{prunedItems()}</text>
-                    <text fg={props.palette.muted}>{noteLine()}</text>
-                </box>
+            <box width="100%" flexDirection="column" gap={0} paddingTop={1}>
+                {topics().length > 0 ? (
+                    <>
+                        <text fg={props.palette.text}>
+                            <b>Compressed Topics</b>
+                        </text>
+                        {topics().map((t) => (
+                            <text fg={props.palette.muted}>{truncate(t, CONTENT_WIDTH)}</text>
+                        ))}
+                        {topicOverflow() > 0 ? (
+                            <text fg={props.palette.muted} dim>
+                                ... {topicOverflow()} more topics
+                            </text>
+                        ) : null}
+                    </>
+                ) : fallbackNote() ? (
+                    <text fg={props.palette.muted}>{fallbackNote()}</text>
+                ) : null}
             </box>
         </box>
     )
