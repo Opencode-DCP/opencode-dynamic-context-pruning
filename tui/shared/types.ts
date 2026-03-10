@@ -24,19 +24,10 @@ export interface DcpRouteParams {
     source?: string
 }
 
-export interface DcpContextBreakdown {
-    system: number
-    user: number
-    assistant: number
-    tools: number
-    toolCount: number
-    toolsInContextCount: number
-    prunedTokens: number
-    prunedToolCount: number
-    prunedMessageCount: number
-    total: number
-    messageCount: number
-}
+export {
+    type TokenBreakdown as DcpContextBreakdown,
+    type MessageStatus as DcpMessageStatus,
+} from "../../lib/analysis/tokens"
 
 export interface DcpPersistedSummary {
     available: boolean
@@ -50,6 +41,7 @@ export interface DcpContextSnapshot {
     sessionID?: string
     breakdown: DcpContextBreakdown
     persisted: DcpPersistedSummary
+    messageStatuses: DcpMessageStatus[]
     notes: string[]
     loadedAt: number
 }
