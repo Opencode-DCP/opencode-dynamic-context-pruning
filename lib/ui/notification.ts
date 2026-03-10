@@ -1,5 +1,5 @@
 import type { Logger } from "../logger"
-import type { SessionState } from "../state"
+import type { SessionState, WithParts } from "../state"
 import {
     formatPrunedItemsList,
     formatProgressBar,
@@ -8,6 +8,7 @@ import {
 } from "./utils"
 import { ToolParameterEntry } from "../state"
 import { PluginConfig } from "../config"
+import { isMessageCompacted } from "../shared-utils"
 
 export type PruneReason = "completion" | "noise" | "extraction"
 export const PRUNE_REASON_LABELS: Record<PruneReason, string> = {
@@ -137,7 +138,7 @@ export async function sendCompressNotification(
     summary: string,
     summaryTokens: number,
     totalSessionTokens: number,
-    sessionMessageIds: string[],
+    sessionMessages: WithParts[],
     params: any,
 ): Promise<boolean> {
     if (config.pruneNotification === "off") {
@@ -168,10 +169,12 @@ export async function sendCompressNotification(
 
         const pruneTokenCounterStr = `~${formatTokenCount(compressedTokens)}`
 
+        const sessionMessageIds = sessionMessages.map((msg) => msg.info.id)
         const activePrunedMessages = new Map<string, number>()
-        for (const [messageId, entry] of state.prune.messages.byMessageId) {
-            if (entry.activeBlockIds.length > 0) {
-                activePrunedMessages.set(messageId, entry.tokenCount)
+        for (const msg of sessionMessages) {
+            if (isMessageCompacted(state, msg)) {
+                const pruneEntry = state.prune.messages.byMessageId.get(msg.info.id)
+                activePrunedMessages.set(msg.info.id, pruneEntry?.tokenCount ?? 0)
             }
         }
         const progressBar = formatProgressBar(
