@@ -20,6 +20,10 @@ const CONTENT_WIDTH = 9 + 1 + 4 + 2 + BAR_WIDTH + 2 + 5
 const REFRESH_DEBOUNCE_MS = 100
 
 const compactTokenCount = (value: number): string => {
+    if (value >= 1_000_000) {
+        const m = (value / 1_000_000).toFixed(2)
+        return `${m}M`
+    }
     if (value >= 100_000) return `${Math.round(value / 1000)}K`
     if (value >= 1_000) {
         const k = (value / 1000).toFixed(1)
@@ -458,7 +462,7 @@ const SidebarContext = (props: {
             />
             <SummaryRow
                 palette={props.palette}
-                label="Context"
+                label="Current Context"
                 value={`~${compactTokenCount(snapshot().breakdown.total)}`}
                 tone="accent"
                 swatch={props.palette.accent}
@@ -528,6 +532,26 @@ const SidebarContext = (props: {
                     <text fg={props.palette.muted}>{fallbackNote()}</text>
                 ) : null}
             </box>
+
+            {snapshot().allTimeStats.sessionCount > 0 && (
+                <box width="100%" flexDirection="column" paddingTop={1}>
+                    <text fg={props.palette.text}>
+                        <b>All Time</b>
+                    </text>
+                    <SummaryRow
+                        palette={props.palette}
+                        label="Tokens Saved"
+                        value={`~${compactTokenCount(snapshot().allTimeStats.totalTokensSaved)}`}
+                        tone="accent"
+                    />
+                    <SummaryRow
+                        palette={props.palette}
+                        label="Sessions"
+                        value={`${snapshot().allTimeStats.sessionCount}`}
+                        tone="accent"
+                    />
+                </box>
+            )}
         </box>
     )
 }

@@ -10,6 +10,7 @@ import {
     loadPruneMap,
     loadPruneMessagesState,
 } from "../../lib/state/utils"
+import { loadAllSessionStats } from "../../lib/state/persistence"
 import { analyzeTokens, emptyBreakdown } from "../../lib/analysis/tokens"
 import type { DcpContextSnapshot, DcpTuiClient } from "../shared/types"
 
@@ -44,6 +45,7 @@ export const createPlaceholderContextSnapshot = (
         activeBlockTopicTotal: 0,
     },
     messageStatuses: [],
+    allTimeStats: { totalTokensSaved: 0, sessionCount: 0 },
     notes,
     loadedAt: Date.now(),
 })
@@ -90,7 +92,10 @@ const loadContextSnapshot = async (
     })
 
     const { state, persisted } = await buildState(sessionID, messages)
-    const { breakdown, messageStatuses } = analyzeTokens(state, messages)
+    const [{ breakdown, messageStatuses }, aggregated] = await Promise.all([
+        Promise.resolve(analyzeTokens(state, messages)),
+        loadAllSessionStats(logger),
+    ])
 
     const allTopics = Array.from(state.prune.messages.activeBlockIds)
         .map((blockID) => state.prune.messages.blocksById.get(blockID))
@@ -121,6 +126,10 @@ const loadContextSnapshot = async (
             lastUpdated: persisted?.lastUpdated,
         },
         messageStatuses,
+        allTimeStats: {
+            totalTokensSaved: aggregated.totalTokens,
+            sessionCount: aggregated.sessionCount,
+        },
         notes,
         loadedAt: Date.now(),
     }

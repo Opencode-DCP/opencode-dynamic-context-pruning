@@ -37,11 +37,17 @@ export interface DcpPersistedSummary {
     lastUpdated?: string
 }
 
+export interface DcpAllTimeStats {
+    totalTokensSaved: number
+    sessionCount: number
+}
+
 export interface DcpContextSnapshot {
     sessionID?: string
     breakdown: DcpContextBreakdown
     persisted: DcpPersistedSummary
     messageStatuses: DcpMessageStatus[]
+    allTimeStats: DcpAllTimeStats
     notes: string[]
     loadedAt: number
 }
