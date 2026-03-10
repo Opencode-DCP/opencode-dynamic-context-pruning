@@ -4,6 +4,7 @@ export type DcpTuiClient = TuiPluginInput["client"]
 export type DcpRouteSource = "sidebar" | "command"
 
 export interface DcpTuiConfig {
+    debug: boolean
     label: string
     route: string
 }
