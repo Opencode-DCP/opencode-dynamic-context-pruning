@@ -32,16 +32,27 @@ export interface FlatCompressToolArgs {
 }
 
 export function normalizeCompressArgs(args: Record<string, unknown>): CompressToolArgs {
-    if ("content" in args && typeof args.content === "object" && args.content !== null) {
-        return args as unknown as CompressToolArgs
+    let content: Record<string, unknown> | null = null
+
+    if (typeof args.content === "object" && args.content !== null && !Array.isArray(args.content)) {
+        content = args.content as Record<string, unknown>
+    } else if (typeof args.content === "string") {
+        try {
+            const parsed = JSON.parse(args.content)
+            if (typeof parsed === "object" && parsed !== null && !Array.isArray(parsed)) {
+                content = parsed as Record<string, unknown>
+            }
+        } catch {
+            // not valid JSON, leave content as null
+        }
     }
 
     return {
-        topic: args.topic as string,
+        topic: (args.topic ?? "") as string,
         content: {
-            startId: args.startId as string,
-            endId: args.endId as string,
-            summary: args.summary as string,
+            startId: (content?.startId ?? args.startId ?? "") as string,
+            endId: (content?.endId ?? args.endId ?? "") as string,
+            summary: (content?.summary ?? args.summary ?? "") as string,
         },
     }
 }
