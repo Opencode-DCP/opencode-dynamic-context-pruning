@@ -3,7 +3,7 @@ import { openPanel } from "./shared/navigation"
 import type { DcpRouteNames, DcpTuiConfig } from "./shared/types"
 
 export const registerCommands = (api: TuiApi, config: DcpTuiConfig, names: DcpRouteNames) => {
-    const keys = api.keybind?.create({ close: "escape,ctrl+h" })
+    const keys = api.keybind?.create({ close: "escape" })
     api.command.register(() => [
         {
             title: `${config.label} panel`,

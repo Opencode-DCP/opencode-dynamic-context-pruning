@@ -18,14 +18,12 @@ const PanelScreen = (props: {
     const palette = createMemo(() => getPalette(props.api.theme.current as Record<string, unknown>))
     const sessionID = () => getSessionIDFromParams(props.params)
     const source = () => getRouteSource(props.params)
-    const keys = props.api.keybind?.create({ close: "escape,ctrl+h" })
+    const keys = props.api.keybind?.create({ close: "escape" })
 
     useKeyboard((evt) => {
         if (props.api.route.current.name !== props.names.routes.panel) return
         if (props.api.ui?.dialog?.open) return
-        const matched = keys
-            ? keys.match("close", evt)
-            : evt.name === "escape" || (evt.ctrl && evt.name === "h")
+        const matched = keys ? keys.match("close", evt) : evt.name === "escape"
         if (!matched) return
         evt.preventDefault()
         evt.stopPropagation()
