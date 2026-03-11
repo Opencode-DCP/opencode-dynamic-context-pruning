@@ -38,7 +38,9 @@
     "author": "tarquinen",
     "license": "AGPL-3.0-or-later",
     "peerDependencies": {
-        "@opencode-ai/plugin": ">=0.13.7"
+        "@opencode-ai/plugin": ">=1.2.0",
+        "@opentui/core": ">=0.1.87",
+        "@opentui/solid": ">=0.0.0-20260307"
     },
     "dependencies": {
         "@anthropic-ai/tokenizer": "^0.0.4",
@@ -48,7 +50,9 @@
         "zod": "^4.3.6"
     },
     "devDependencies": {
-        "@opencode-ai/plugin": "^1.1.49",
+        "@opencode-ai/plugin": "^1.2.24",
+        "@opentui/core": "0.0.0-20260307-536c401b",
+        "@opentui/solid": "0.0.0-20260307-536c401b",
         "@types/node": "^25.1.0",
         "prettier": "^3.8.1",
         "tsx": "^4.21.0",

@@ -2,6 +2,8 @@
 import type { JSX } from "solid-js"
 import type { DcpPalette } from "../shared/theme"
 
+const SINGLE_BORDER = { type: "single" } as any
+
 export const Section = (props: {
     palette: DcpPalette
     title: string
@@ -15,7 +17,7 @@ export const Section = (props: {
             gap={1}
             padding={1}
             backgroundColor={props.palette.base}
-            border={{ type: "single" }}
+            border={SINGLE_BORDER}
             borderColor={props.palette.border}
         >
             <text fg={props.palette.text}>

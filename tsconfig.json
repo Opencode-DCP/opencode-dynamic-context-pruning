@@ -4,6 +4,7 @@
         "target": "ES2022",
         "module": "ESNext",
         "lib": ["ES2023"],
+        "jsx": "react-jsx",
         "moduleResolution": "bundler",
         "resolveJsonModule": true,
         "allowJs": true,
@@ -19,6 +20,6 @@
         "sourceMap": true,
         "types": ["node"]
     },
-    "include": ["index.ts", "lib/**/*"],
+    "include": ["index.ts", "lib/**/*", "tui/**/*"],
     "exclude": ["node_modules", "dist", "logs"]
 }

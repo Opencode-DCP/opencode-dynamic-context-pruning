@@ -1,15 +1,15 @@
 import type { TuiApi } from "@opencode-ai/plugin/tui"
 import { openPanel } from "./shared/navigation"
-import type { DcpRouteNames, DcpTuiConfig } from "./shared/types"
+import { LABEL, type DcpRouteNames } from "./shared/names"
 
-export const registerCommands = (api: TuiApi, config: DcpTuiConfig, names: DcpRouteNames) => {
+export const registerCommands = (api: TuiApi, names: DcpRouteNames) => {
     const keys = api.keybind?.create({ close: "escape" })
     api.command.register(() => [
         {
-            title: `${config.label} panel`,
+            title: `${LABEL} panel`,
             value: names.commands.panel,
             description: "Open the DCP placeholder panel",
-            category: config.label,
+            category: LABEL,
             ...(keys ? { keybind: keys.get("close") } : {}),
             slash: {
                 name: "dcp-panel",

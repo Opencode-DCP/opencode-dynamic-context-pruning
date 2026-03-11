@@ -1,5 +1,6 @@
 import type { TuiApi } from "@opencode-ai/plugin/tui"
-import type { DcpRouteNames, DcpRouteParams, DcpRouteSource } from "./types"
+import type { DcpRouteNames } from "./names"
+import type { DcpRouteParams, DcpRouteSource } from "./types"
 
 export const getSessionIDFromParams = (params?: Record<string, unknown>) => {
     if (typeof params?.session_id === "string") return params.session_id

@@ -7,11 +7,10 @@ import { Screen } from "../components/screen"
 import { Section } from "../components/section"
 import { getRouteSource, getSessionIDFromParams, goBack } from "../shared/navigation"
 import { getPalette } from "../shared/theme"
-import type { DcpRouteNames, DcpTuiConfig } from "../shared/types"
+import { LABEL, type DcpRouteNames } from "../shared/names"
 
 const PanelScreen = (props: {
     api: TuiApi
-    config: DcpTuiConfig
     names: DcpRouteNames
     params?: Record<string, unknown>
 }) => {
@@ -33,7 +32,7 @@ const PanelScreen = (props: {
     return (
         <Screen
             palette={palette()}
-            title={props.config.label}
+            title={LABEL}
             subtitle="Placeholder shell for future DCP tools and views."
             footer="Press Esc to return"
         >
@@ -68,18 +67,10 @@ const PanelScreen = (props: {
 
 export const createPanelRoute = (input: {
     api: TuiApi
-    config: DcpTuiConfig
     names: DcpRouteNames
 }): TuiRouteDefinition => {
     return {
         name: input.names.routes.panel,
-        render: ({ params }) => (
-            <PanelScreen
-                api={input.api}
-                config={input.config}
-                names={input.names}
-                params={params}
-            />
-        ),
+        render: ({ params }) => <PanelScreen api={input.api} names={input.names} params={params} />,
     }
 }

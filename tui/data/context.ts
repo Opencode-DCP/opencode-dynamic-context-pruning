@@ -14,23 +14,9 @@ import { loadAllSessionStats } from "../../lib/state/persistence"
 import { analyzeTokens, emptyBreakdown } from "../../lib/analysis/tokens"
 import type { DcpContextSnapshot, DcpTuiClient } from "../shared/types"
 
-let logger = new Logger(false, "TUI")
 const snapshotCache = new Map<string, DcpContextSnapshot>()
 const inflightSnapshots = new Map<string, Promise<DcpContextSnapshot>>()
 const CACHE_TTL_MS = 5000
-
-const summarizeSnapshot = (snapshot: DcpContextSnapshot) => ({
-    sessionID: snapshot.sessionID,
-    totalTokens: snapshot.breakdown.total,
-    messageCount: snapshot.breakdown.messageCount,
-    prunedTokens: snapshot.breakdown.prunedTokens,
-    activeBlockCount: snapshot.persisted.activeBlockCount,
-    loadedAt: snapshot.loadedAt,
-})
-
-export const setContextLogger = (nextLogger: Logger) => {
-    logger = nextLogger
-}
 
 export const createPlaceholderContextSnapshot = (
     sessionID?: string,
@@ -53,6 +39,7 @@ export const createPlaceholderContextSnapshot = (
 const buildState = async (
     sessionID: string,
     messages: WithParts[],
+    logger: Logger,
 ): Promise<{ state: SessionState; persisted: Awaited<ReturnType<typeof loadSessionState>> }> => {
     const state = createSessionState()
     const persisted = await loadSessionState(sessionID, logger)
@@ -72,26 +59,21 @@ const buildState = async (
 
 const loadContextSnapshot = async (
     client: DcpTuiClient,
+    logger: Logger,
     sessionID?: string,
 ): Promise<DcpContextSnapshot> => {
     if (!sessionID) {
-        void logger.debug("Context snapshot requested without session")
         return createPlaceholderContextSnapshot(undefined, [
             "Open this panel from a session to inspect DCP context.",
         ])
     }
 
-    void logger.debug("Loading context snapshot", { sessionID })
     const messagesResult = await client.session.messages({ sessionID })
     const messages = Array.isArray(messagesResult.data)
         ? (messagesResult.data as WithParts[])
         : ([] as WithParts[])
-    void logger.debug("Fetched session messages for context snapshot", {
-        sessionID,
-        messageCount: messages.length,
-    })
 
-    const { state, persisted } = await buildState(sessionID, messages)
+    const { state, persisted } = await buildState(sessionID, messages, logger)
     const [{ breakdown, messageStatuses }, aggregated] = await Promise.all([
         Promise.resolve(analyzeTokens(state, messages)),
         loadAllSessionStats(logger),
@@ -115,7 +97,7 @@ const loadContextSnapshot = async (
         notes.push("This session does not have any messages yet.")
     }
 
-    const snapshot = {
+    return {
         sessionID,
         breakdown,
         persisted: {
@@ -133,13 +115,6 @@ const loadContextSnapshot = async (
         notes,
         loadedAt: Date.now(),
     }
-
-    void logger.debug("Loaded context snapshot", {
-        ...summarizeSnapshot(snapshot),
-        persisted: !!persisted,
-    })
-
-    return snapshot
 }
 
 export const peekContextSnapshot = (sessionID?: string): DcpContextSnapshot | undefined => {
@@ -149,23 +124,20 @@ export const peekContextSnapshot = (sessionID?: string): DcpContextSnapshot | un
 
 export const invalidateContextSnapshot = (sessionID?: string) => {
     if (!sessionID) {
-        void logger.debug("Invalidating all context snapshots")
         snapshotCache.clear()
         inflightSnapshots.clear()
         return
     }
-
-    void logger.debug("Invalidating context snapshot", { sessionID })
     snapshotCache.delete(sessionID)
     inflightSnapshots.delete(sessionID)
 }
 
 export const loadContextSnapshotCached = async (
     client: DcpTuiClient,
+    logger: Logger,
     sessionID?: string,
 ): Promise<DcpContextSnapshot> => {
     if (!sessionID) {
-        void logger.debug("Cached context snapshot requested without session")
         return createPlaceholderContextSnapshot(undefined, [
             "Open this panel from a session to inspect DCP context.",
         ])
@@ -173,44 +145,28 @@ export const loadContextSnapshotCached = async (
 
     const cached = snapshotCache.get(sessionID)
     if (cached && Date.now() - cached.loadedAt < CACHE_TTL_MS) {
-        void logger.debug("Context snapshot cache hit", {
-            sessionID,
-            cacheAgeMs: Date.now() - cached.loadedAt,
-        })
         return cached
-    }
-
-    if (cached) {
-        void logger.debug("Context snapshot cache stale", {
-            sessionID,
-            cacheAgeMs: Date.now() - cached.loadedAt,
-        })
-    } else {
-        void logger.debug("Context snapshot cache miss", { sessionID })
     }
 
     const inflight = inflightSnapshots.get(sessionID)
     if (inflight) {
-        void logger.debug("Reusing inflight context snapshot request", { sessionID })
         return inflight
     }
 
-    const request = loadContextSnapshot(client, sessionID)
+    const request = loadContextSnapshot(client, logger, sessionID)
         .then((snapshot) => {
             snapshotCache.set(sessionID, snapshot)
-            void logger.debug("Stored context snapshot in cache", summarizeSnapshot(snapshot))
             return snapshot
         })
-        .catch((cause) => {
-            void logger.error("Context snapshot request failed", {
+        .catch((error) => {
+            logger.error("Failed to load TUI context snapshot", {
                 sessionID,
-                error: cause instanceof Error ? cause.message : String(cause),
+                error: error instanceof Error ? error.message : String(error),
             })
-            throw cause
+            throw error
         })
         .finally(() => {
             inflightSnapshots.delete(sessionID)
-            void logger.debug("Cleared inflight context snapshot request", { sessionID })
         })
 
     inflightSnapshots.set(sessionID, request)
