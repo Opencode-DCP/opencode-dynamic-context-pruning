@@ -27,7 +27,7 @@ export const createPlaceholderContextSnapshot = (
     persisted: {
         available: false,
         activeBlockCount: 0,
-        activeBlockTopics: [],
+        activeBlocks: [],
         activeBlockTopicTotal: 0,
     },
     messageStatuses: [],
@@ -35,6 +35,13 @@ export const createPlaceholderContextSnapshot = (
     notes,
     loadedAt: Date.now(),
 })
+
+function cleanBlockSummary(raw: string): string {
+    return raw
+        .replace(/^\s*\[Compressed conversation section\]\s*/i, "")
+        .replace(/\s*<dcp-message-id>b\d+<\/dcp-message-id>\s*$/i, "")
+        .trim()
+}
 
 const buildState = async (
     sessionID: string,
@@ -77,13 +84,12 @@ const loadContextSnapshot = async (
         loadAllSessionStats(logger),
     ])
 
-    const allTopics = Array.from(state.prune.messages.activeBlockIds)
+    const allBlocks = Array.from(state.prune.messages.activeBlockIds)
         .map((blockID) => state.prune.messages.blocksById.get(blockID))
-        .filter((block): block is NonNullable<typeof block> => !!block)
-        .map((block) => block.topic)
-        .filter((topic) => !!topic)
-    const topics = allTopics.slice(0, 5)
-    const topicTotal = allTopics.length
+        .filter((block): block is NonNullable<typeof block> => !!block && !!block.topic)
+        .map((block) => ({ topic: block.topic, summary: cleanBlockSummary(block.summary) }))
+    const blocks = allBlocks.slice(0, 5)
+    const topicTotal = allBlocks.length
 
     const notes: string[] = []
     if (persisted) {
@@ -101,7 +107,7 @@ const loadContextSnapshot = async (
         persisted: {
             available: !!persisted,
             activeBlockCount: state.prune.messages.activeBlockIds.size,
-            activeBlockTopics: topics,
+            activeBlocks: blocks,
             activeBlockTopicTotal: topicTotal,
             lastUpdated: persisted?.lastUpdated,
         },

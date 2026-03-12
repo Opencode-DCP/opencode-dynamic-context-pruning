@@ -41,7 +41,7 @@ declare module "@opencode-ai/plugin/tui" {
                 variant?: string
                 duration?: number
             }) => void
-            dialog: {
+            dialog?: {
                 open?: boolean
             }
         }

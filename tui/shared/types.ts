@@ -8,10 +8,15 @@ export type DcpTuiClient = TuiPluginInput["client"]
 
 export type { DcpContextBreakdown, DcpMessageStatus }
 
+export interface DcpActiveBlockInfo {
+    topic: string
+    summary: string
+}
+
 export interface DcpPersistedSummary {
     available: boolean
     activeBlockCount: number
-    activeBlockTopics: string[]
+    activeBlocks: DcpActiveBlockInfo[]
     activeBlockTopicTotal: number
     lastUpdated?: string
 }

@@ -1,6 +1,6 @@
 /** @jsxImportSource @opentui/solid */
 import { createEffect, createMemo, createSignal, on, onCleanup, untrack } from "solid-js"
-import type { TuiPluginInput } from "@opencode-ai/plugin/tui"
+import type { TuiApi, TuiPluginInput } from "@opencode-ai/plugin/tui"
 import { Logger } from "../../lib/logger"
 import {
     createPlaceholderContextSnapshot,
@@ -10,12 +10,16 @@ import {
 } from "../data/context"
 import { getPalette, toneColor, type DcpColor, type DcpPalette } from "../shared/theme"
 import { LABEL, type DcpRouteNames } from "../shared/names"
-import type { DcpMessageStatus, DcpTuiClient } from "../shared/types"
+import type { DcpActiveBlockInfo, DcpMessageStatus, DcpTuiClient } from "../shared/types"
 
 const SINGLE_BORDER = { type: "single" } as any
 const DIM_TEXT = { dim: true } as any
 
 const REFRESH_DEBOUNCE_MS = 100
+const MAX_TOPIC_LEN = 30
+
+const truncateTopic = (topic: string): string =>
+    topic.length > MAX_TOPIC_LEN ? topic.slice(0, MAX_TOPIC_LEN - 3) + "..." : topic
 
 const compactTokenCount = (value: number): string => {
     if (value >= 1_000_000) {
@@ -110,9 +114,11 @@ const SidebarContextBar = (props: {
 }
 
 const SidebarContext = (props: {
+    api: TuiApi
     client: DcpTuiClient
     event: TuiPluginInput["event"]
     renderer: TuiPluginInput["renderer"]
+    names: DcpRouteNames
     palette: DcpPalette
     sessionID: () => string
     logger: Logger
@@ -277,9 +283,17 @@ const SidebarContext = (props: {
         ),
     )
 
-    const topics = createMemo(() => snapshot().persisted.activeBlockTopics)
+    const blocks = createMemo(() => snapshot().persisted.activeBlocks)
     const topicTotal = createMemo(() => snapshot().persisted.activeBlockTopicTotal)
-    const topicOverflow = createMemo(() => topicTotal() - topics().length)
+    const topicOverflow = createMemo(() => topicTotal() - blocks().length)
+
+    const navigateToSummary = (block: DcpActiveBlockInfo) => {
+        props.api.route.navigate(props.names.routes.summary, {
+            topic: block.topic,
+            summary: block.summary,
+            sessionID: props.sessionID(),
+        })
+    }
     const fallbackNote = createMemo(() => snapshot().notes[0] ?? "")
 
     const messageBarRuns = createMemo(() => buildMessageRuns(snapshot().messageStatuses))
@@ -378,18 +392,42 @@ const SidebarContext = (props: {
             </box>
 
             <box width="100%" flexDirection="column" gap={0} paddingTop={1}>
-                {topics().length > 0 ? (
+                {blocks().length > 0 ? (
                     <>
                         <text fg={props.palette.text}>
                             <b>Compressed Topics</b>
                         </text>
-                        {topics().map((t) => (
-                            <text fg={props.palette.muted}>{t}</text>
+                        {blocks().map((block) => (
+                            <box flexDirection="row" width="100%" height={1}>
+                                <box flexGrow={1} flexShrink={1} overflow="hidden" height={1}>
+                                    <text fg={props.palette.muted}>
+                                        {truncateTopic(block.topic)}
+                                    </text>
+                                </box>
+                                <box flexShrink={0} height={1} paddingLeft={1}>
+                                    <box
+                                        backgroundColor={props.palette.base}
+                                        height={1}
+                                        onMouseUp={() => navigateToSummary(block)}
+                                    >
+                                        <text fg={props.palette.accent}> ▶ </text>
+                                    </box>
+                                </box>
+                            </box>
                         ))}
                         {topicOverflow() > 0 ? (
-                            <text {...DIM_TEXT} fg={props.palette.muted}>
-                                ... {topicOverflow()} more topics
-                            </text>
+                            <box flexDirection="row" width="100%" height={1}>
+                                <box flexGrow={1} flexShrink={1} height={1}>
+                                    <text {...DIM_TEXT} fg={props.palette.muted}>
+                                        ... {topicOverflow()} more topics
+                                    </text>
+                                </box>
+                                <box flexShrink={0} height={1} paddingLeft={1}>
+                                    <box backgroundColor={props.palette.base} height={1}>
+                                        <text fg={props.palette.accent}> ▼ </text>
+                                    </box>
+                                </box>
+                            </box>
                         ) : null}
                     </>
                 ) : fallbackNote() ? (
@@ -421,6 +459,7 @@ const SidebarContext = (props: {
 }
 
 export const createSidebarTopSlot = (
+    api: TuiApi,
     client: DcpTuiClient,
     event: TuiPluginInput["event"],
     renderer: TuiPluginInput["renderer"],
@@ -438,9 +477,11 @@ export const createSidebarTopSlot = (
             )
             return (
                 <SidebarContext
+                    api={api}
                     client={client}
                     event={event}
                     renderer={renderer}
+                    names={names}
                     palette={palette()}
                     sessionID={() => value.session_id}
                     logger={logger}
