@@ -337,18 +337,18 @@ const SidebarContext = (props: {
 
             <SummaryRow
                 palette={props.palette}
-                label="Saved Tokens"
-                value={`~${compactTokenCount(snapshot().breakdown.prunedTokens)}`}
+                label="Current Messages"
+                value={`~${compactTokenCount(snapshot().breakdown.total)}`}
                 tone="accent"
-                swatch={props.palette.muted}
+                swatch={props.palette.accent}
                 marginTop={1}
             />
             <SummaryRow
                 palette={props.palette}
-                label="Current Context"
-                value={`~${compactTokenCount(snapshot().breakdown.total)}`}
+                label="Compressed Messages"
+                value={`~${compactTokenCount(snapshot().breakdown.prunedTokens)}`}
                 tone="accent"
-                swatch={props.palette.accent}
+                swatch={props.palette.muted}
             />
 
             {snapshot().messageStatuses.length > 0 && (
