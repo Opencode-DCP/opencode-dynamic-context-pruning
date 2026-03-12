@@ -2,7 +2,6 @@
 import { createEffect, createMemo, createSignal, on, onCleanup, untrack } from "solid-js"
 import type { TuiPluginInput } from "@opencode-ai/plugin/tui"
 import { Logger } from "../../lib/logger"
-import { truncate } from "../../lib/ui/utils"
 import {
     createPlaceholderContextSnapshot,
     invalidateContextSnapshot,
@@ -13,11 +12,8 @@ import { getPalette, toneColor, type DcpColor, type DcpPalette } from "../shared
 import { LABEL, type DcpRouteNames } from "../shared/names"
 import type { DcpMessageStatus, DcpTuiClient } from "../shared/types"
 
-const BAR_WIDTH = 12
 const SINGLE_BORDER = { type: "single" } as any
 const DIM_TEXT = { dim: true } as any
-// Content width derived from graph row: label(9) + space(1) + percent(4) + " |"(2) + bar(12) + "| "(2) + tokens(~5)
-const CONTENT_WIDTH = 9 + 1 + 4 + 2 + BAR_WIDTH + 2 + 5
 
 const REFRESH_DEBOUNCE_MS = 100
 
@@ -37,37 +33,17 @@ const compactTokenCount = (value: number): string => {
     return "0"
 }
 
-const buildBar = (value: number, total: number) => {
-    if (total <= 0) return " ".repeat(BAR_WIDTH)
-    const filled = Math.max(0, Math.round((value / total) * BAR_WIDTH))
-    return "█".repeat(filled).padEnd(BAR_WIDTH, " ")
-}
-
-const buildMessageBar = (
+const buildMessageRuns = (
     statuses: DcpMessageStatus[],
-    width: number = CONTENT_WIDTH,
-): { text: string; status: DcpMessageStatus }[] => {
-    const ACTIVE = "█"
-    const PRUNED = "░"
-    if (statuses.length === 0) return [{ text: PRUNED.repeat(width), status: "pruned" }]
+): { count: number; status: DcpMessageStatus }[] => {
+    if (statuses.length === 0) return [{ count: 1, status: "pruned" }]
 
-    // Map each bar position to a message status
-    const bar: DcpMessageStatus[] = new Array(width).fill("active")
-    for (let m = 0; m < statuses.length; m++) {
-        const start = Math.floor((m / statuses.length) * width)
-        const end = Math.floor(((m + 1) / statuses.length) * width)
-        for (let i = start; i < end; i++) {
-            bar[i] = statuses[m]
-        }
-    }
-
-    // Group consecutive same-status positions into runs
-    const runs: { text: string; status: DcpMessageStatus }[] = []
+    // Group consecutive same-status messages into runs
+    const runs: { count: number; status: DcpMessageStatus }[] = []
     let runStart = 0
-    for (let i = 1; i <= width; i++) {
-        if (i === width || bar[i] !== bar[runStart]) {
-            const char = bar[runStart] === "pruned" ? PRUNED : ACTIVE
-            runs.push({ text: char.repeat(i - runStart), status: bar[runStart] })
+    for (let i = 1; i <= statuses.length; i++) {
+        if (i === statuses.length || statuses[i] !== statuses[runStart]) {
+            runs.push({ count: i - runStart, status: statuses[runStart] })
             runStart = i
         }
     }
@@ -111,17 +87,24 @@ const SidebarContextBar = (props: {
         props.total > 0 ? `${Math.round((props.value / props.total) * 100)}%` : "0%",
     )
     const label = createMemo(() => props.label.padEnd(9, " "))
-    const bar = createMemo(() => buildBar(props.value, props.total))
     return (
-        <box flexDirection="row">
+        <box width="100%" flexDirection="row">
             <text fg={props.palette.text}>
                 {label()}
                 {` ${percent().padStart(4, " ")} |`}
             </text>
-            <text fg={toneColor(props.palette, props.tone)}>{bar()}</text>
-            <text
-                fg={props.palette.text}
-            >{`| ${compactTokenCount(props.value).padStart(5, " ")}`}</text>
+            <box flexGrow={1} flexDirection="row" height={1}>
+                {props.value > 0 && (
+                    <box
+                        flexGrow={props.value}
+                        backgroundColor={toneColor(props.palette, props.tone)}
+                    />
+                )}
+                {props.total > props.value && <box flexGrow={props.total - props.value} />}
+            </box>
+            <text fg={props.palette.text}>
+                {`| ${compactTokenCount(props.value).padStart(5, " ")}`}
+            </text>
         </box>
     )
 }
@@ -299,7 +282,7 @@ const SidebarContext = (props: {
     const topicOverflow = createMemo(() => topicTotal() - topics().length)
     const fallbackNote = createMemo(() => snapshot().notes[0] ?? "")
 
-    const messageBarRuns = createMemo(() => buildMessageBar(snapshot().messageStatuses))
+    const messageBarRuns = createMemo(() => buildMessageRuns(snapshot().messageStatuses))
 
     const status = createMemo(() => {
         if (error() && snapshot().breakdown.total > 0)
@@ -351,15 +334,14 @@ const SidebarContext = (props: {
             />
 
             {snapshot().messageStatuses.length > 0 && (
-                <box flexDirection="row" marginTop={1}>
+                <box width="100%" flexDirection="row" height={1} marginTop={1}>
                     {messageBarRuns().map((run) => (
-                        <text
-                            fg={
+                        <box
+                            flexGrow={run.count}
+                            backgroundColor={
                                 run.status === "active" ? props.palette.accent : props.palette.muted
                             }
-                        >
-                            {run.text}
-                        </text>
+                        />
                     ))}
                 </box>
             )}
@@ -402,7 +384,7 @@ const SidebarContext = (props: {
                             <b>Compressed Topics</b>
                         </text>
                         {topics().map((t) => (
-                            <text fg={props.palette.muted}>{truncate(t, CONTENT_WIDTH)}</text>
+                            <text fg={props.palette.muted}>{t}</text>
                         ))}
                         {topicOverflow() > 0 ? (
                             <text {...DIM_TEXT} fg={props.palette.muted}>
