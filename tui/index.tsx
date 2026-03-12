@@ -2,8 +2,6 @@
 import type { TuiPluginInput } from "@opencode-ai/plugin/tui"
 import { getConfigForDirectory } from "../lib/config"
 import { Logger } from "../lib/logger"
-import { registerCommands } from "./commands"
-import { createPanelRoute } from "./routes/panel"
 import { createSidebarTopSlot } from "./slots/sidebar-top"
 import { NAMES } from "./shared/names"
 
@@ -20,25 +18,9 @@ const tui = async (input: TuiPluginInput) => {
 
     const logger = new Logger(config.tui.debug, "tui")
 
-    input.api.route.register([
-        createPanelRoute({
-            api: input.api,
-            names: NAMES,
-        }),
-    ])
-
-    registerCommands(input.api, NAMES)
-
     if (config.tui.sidebar) {
         input.slots.register(
-            createSidebarTopSlot(
-                input.api,
-                input.client,
-                input.event,
-                input.renderer,
-                NAMES,
-                logger,
-            ),
+            createSidebarTopSlot(input.client, input.event, input.renderer, NAMES, logger),
         )
     }
 }
