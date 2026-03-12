@@ -283,9 +283,13 @@ const SidebarContext = (props: {
         ),
     )
 
-    const blocks = createMemo(() => snapshot().persisted.activeBlocks)
-    const topicTotal = createMemo(() => snapshot().persisted.activeBlockTopicTotal)
-    const topicOverflow = createMemo(() => topicTotal() - blocks().length)
+    const TOPIC_LIMIT = 3
+    const allBlocks = createMemo(() => snapshot().persisted.activeBlocks)
+    const [topicsExpanded, setTopicsExpanded] = createSignal(false)
+    const blocks = createMemo(() =>
+        topicsExpanded() ? allBlocks() : allBlocks().slice(0, TOPIC_LIMIT),
+    )
+    const topicOverflow = createMemo(() => allBlocks().length - TOPIC_LIMIT)
 
     const navigateToSummary = (block: DcpActiveBlockInfo) => {
         props.api.route.navigate(props.names.routes.summary, {
@@ -419,12 +423,20 @@ const SidebarContext = (props: {
                             <box flexDirection="row" width="100%" height={1}>
                                 <box flexGrow={1} flexShrink={1} height={1}>
                                     <text {...DIM_TEXT} fg={props.palette.muted}>
-                                        ... {topicOverflow()} more topics
+                                        {topicsExpanded()
+                                            ? `showing all ${allBlocks().length} topics`
+                                            : `... ${topicOverflow()} more topics`}
                                     </text>
                                 </box>
                                 <box flexShrink={0} height={1} paddingLeft={1}>
-                                    <box backgroundColor={props.palette.base} height={1}>
-                                        <text fg={props.palette.accent}> ▼ </text>
+                                    <box
+                                        backgroundColor={props.palette.base}
+                                        height={1}
+                                        onMouseUp={() => setTopicsExpanded(!topicsExpanded())}
+                                    >
+                                        <text fg={props.palette.accent}>
+                                            {topicsExpanded() ? " ▲ " : " ▼ "}
+                                        </text>
                                     </box>
                                 </box>
                             </box>
