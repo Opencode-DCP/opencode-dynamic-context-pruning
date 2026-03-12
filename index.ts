@@ -9,7 +9,6 @@ import { Logger } from "./lib/logger"
 import { createSessionState } from "./lib/state"
 import { createCompressTool } from "./lib/tools"
 import { PromptStore } from "./lib/prompts/store"
-import tuiPlugin from "./tui/index"
 import {
     createChatMessageTransformHandler,
     createCommandExecuteHandler,
@@ -17,6 +16,11 @@ import {
     createTextCompleteHandler,
 } from "./lib/hooks"
 import { configureClientAuth, isSecureMode } from "./lib/auth"
+
+let tuiPlugin: Record<string, unknown> = {}
+try {
+    tuiPlugin = (await import("./tui/index")).default
+} catch {}
 
 const server: Plugin = (async (ctx) => {
     const config = getConfig(ctx)
