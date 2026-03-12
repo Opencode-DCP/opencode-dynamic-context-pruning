@@ -63,9 +63,7 @@ const loadContextSnapshot = async (
     sessionID?: string,
 ): Promise<DcpContextSnapshot> => {
     if (!sessionID) {
-        return createPlaceholderContextSnapshot(undefined, [
-            "Open this panel from a session to inspect DCP context.",
-        ])
+        return createPlaceholderContextSnapshot(undefined, ["No active session."])
     }
 
     const messagesResult = await client.session.messages({ sessionID })
@@ -138,9 +136,7 @@ export const loadContextSnapshotCached = async (
     sessionID?: string,
 ): Promise<DcpContextSnapshot> => {
     if (!sessionID) {
-        return createPlaceholderContextSnapshot(undefined, [
-            "Open this panel from a session to inspect DCP context.",
-        ])
+        return createPlaceholderContextSnapshot(undefined, ["No active session."])
     }
 
     const cached = snapshotCache.get(sessionID)

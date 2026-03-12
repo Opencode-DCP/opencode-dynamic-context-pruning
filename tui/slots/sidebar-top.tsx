@@ -1,6 +1,6 @@
 /** @jsxImportSource @opentui/solid */
 import { createEffect, createMemo, createSignal, on, onCleanup, untrack } from "solid-js"
-import type { TuiApi, TuiPluginInput } from "@opencode-ai/plugin/tui"
+import type { TuiPluginInput } from "@opencode-ai/plugin/tui"
 import { Logger } from "../../lib/logger"
 import { truncate } from "../../lib/ui/utils"
 import {
@@ -9,7 +9,6 @@ import {
     loadContextSnapshotCached,
     peekContextSnapshot,
 } from "../data/context"
-import { openPanel } from "../shared/navigation"
 import { getPalette, toneColor, type DcpColor, type DcpPalette } from "../shared/theme"
 import { LABEL, type DcpRouteNames } from "../shared/names"
 import type { DcpMessageStatus, DcpTuiClient } from "../shared/types"
@@ -128,11 +127,9 @@ const SidebarContextBar = (props: {
 }
 
 const SidebarContext = (props: {
-    api: TuiApi
     client: DcpTuiClient
     event: TuiPluginInput["event"]
     renderer: TuiPluginInput["renderer"]
-    names: DcpRouteNames
     palette: DcpPalette
     sessionID: () => string
     logger: Logger
@@ -325,7 +322,6 @@ const SidebarContext = (props: {
             paddingBottom={1}
             paddingLeft={1}
             paddingRight={1}
-            onMouseUp={() => openPanel(props.api, props.names, "sidebar", props.sessionID())}
         >
             <box flexDirection="row" justifyContent="space-between" alignItems="center">
                 <box flexDirection="row" gap={1} alignItems="center">
@@ -334,7 +330,6 @@ const SidebarContext = (props: {
                             <b>{LABEL}</b>
                         </text>
                     </box>
-                    <text fg={props.palette.text}>click for more</text>
                 </box>
                 <text fg={toneColor(props.palette, status().tone)}>{status().label}</text>
             </box>
@@ -444,7 +439,6 @@ const SidebarContext = (props: {
 }
 
 export const createSidebarTopSlot = (
-    api: TuiApi,
     client: DcpTuiClient,
     event: TuiPluginInput["event"],
     renderer: TuiPluginInput["renderer"],
@@ -462,11 +456,9 @@ export const createSidebarTopSlot = (
             )
             return (
                 <SidebarContext
-                    api={api}
                     client={client}
                     event={event}
                     renderer={renderer}
-                    names={names}
                     palette={palette()}
                     sessionID={() => value.session_id}
                     logger={logger}

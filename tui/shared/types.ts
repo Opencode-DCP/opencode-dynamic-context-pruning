@@ -5,12 +5,6 @@ import type {
 } from "../../lib/analysis/tokens"
 
 export type DcpTuiClient = TuiPluginInput["client"]
-export type DcpRouteSource = "sidebar" | "command"
-
-export interface DcpRouteParams {
-    session_id?: string
-    source?: string
-}
 
 export type { DcpContextBreakdown, DcpMessageStatus }
 
