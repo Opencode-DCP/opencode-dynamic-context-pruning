@@ -287,20 +287,3 @@ export function formatPrunedItemsList(
 
     return lines
 }
-
-export function formatPruningResultForTool(
-    prunedIds: string[],
-    toolMetadata: Map<string, ToolParameterEntry>,
-    workingDirectory?: string,
-): string {
-    const lines: string[] = []
-    lines.push(`Context pruning complete. Pruned ${prunedIds.length} tool outputs.`)
-    lines.push("")
-
-    if (prunedIds.length > 0) {
-        lines.push(`Semantically pruned (${prunedIds.length}):`)
-        lines.push(...formatPrunedItemsList(prunedIds, toolMetadata, workingDirectory))
-    }
-
-    return lines.join("\n").trim()
-}

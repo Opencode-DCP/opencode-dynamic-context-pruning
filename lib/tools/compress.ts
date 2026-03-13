@@ -24,7 +24,7 @@ import {
 import { isIgnoredUserMessage } from "../messages/utils"
 import { assignMessageRefs } from "../message-ids"
 import { getCurrentParams, getCurrentTokenUsage, countTokens } from "../strategies/utils"
-import { deduplicate, supersedeWrites, purgeErrors } from "../strategies"
+import { deduplicate, purgeErrors } from "../strategies"
 import { saveSessionState } from "../state/persistence"
 import { sendCompressNotification } from "../ui/notification"
 import { NESTED_FORMAT_OVERLAY, FLAT_FORMAT_OVERLAY } from "../prompts/internal-overlays"
@@ -116,7 +116,6 @@ export function createCompressTool(ctx: ToolContext): ReturnType<typeof tool> {
             assignMessageRefs(ctx.state, rawMessages)
 
             deduplicate(ctx.state, ctx.logger, ctx.config, rawMessages)
-            // supersedeWrites(ctx.state, ctx.logger, ctx.config, rawMessages)
             purgeErrors(ctx.state, ctx.logger, ctx.config, rawMessages)
 
             const searchContext = buildSearchContext(ctx.state, rawMessages)

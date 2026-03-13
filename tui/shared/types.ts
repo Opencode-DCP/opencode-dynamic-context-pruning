@@ -6,7 +6,7 @@ import type {
 
 export type DcpTuiClient = TuiPluginInput["client"]
 
-export type { DcpContextBreakdown, DcpMessageStatus }
+export type { DcpMessageStatus }
 
 export interface DcpActiveBlockInfo {
     topic: string

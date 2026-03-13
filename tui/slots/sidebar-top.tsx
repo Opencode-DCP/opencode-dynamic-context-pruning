@@ -40,7 +40,7 @@ const compactTokenCount = (value: number): string => {
 const buildMessageRuns = (
     statuses: DcpMessageStatus[],
 ): { count: number; status: DcpMessageStatus }[] => {
-    if (statuses.length === 0) return [{ count: 1, status: "pruned" }]
+    if (statuses.length === 0) return []
 
     // Group consecutive same-status messages into runs
     const runs: { count: number; status: DcpMessageStatus }[] = []
