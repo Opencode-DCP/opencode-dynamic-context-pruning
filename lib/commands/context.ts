@@ -1,6 +1,7 @@
 /**
  * DCP Context Command
  * Shows a visual breakdown of token usage in the current session.
+ * Token calculation logic lives in ../analysis/tokens.ts
  *
  * TOKEN CALCULATION STRATEGY
  * ==========================
@@ -44,10 +45,8 @@ import type { Logger } from "../logger"
 import type { SessionState, WithParts } from "../state"
 import { sendIgnoredMessage } from "../ui/notification"
 import { formatTokenCount } from "../ui/utils"
-import { isMessageCompacted } from "../shared-utils"
-import { isIgnoredUserMessage } from "../messages/utils"
-import { countTokens, getCurrentParams } from "../strategies/utils"
-import type { AssistantMessage, TextPart, ToolPart } from "@opencode-ai/sdk/v2"
+import { getCurrentParams } from "../strategies/utils"
+import { analyzeTokens, type TokenBreakdown } from "../analysis/tokens"
 
 export interface ContextCommandContext {
     client: any
@@ -55,180 +54,6 @@ export interface ContextCommandContext {
     logger: Logger
     sessionId: string
     messages: WithParts[]
-}
-
-interface TokenBreakdown {
-    system: number
-    user: number
-    assistant: number
-    tools: number
-    toolCount: number
-    toolsInContextCount: number
-    prunedTokens: number
-    prunedToolCount: number
-    prunedMessageCount: number
-    total: number
-}
-
-function analyzeTokens(state: SessionState, messages: WithParts[]): TokenBreakdown {
-    const breakdown: TokenBreakdown = {
-        system: 0,
-        user: 0,
-        assistant: 0,
-        tools: 0,
-        toolCount: 0,
-        toolsInContextCount: 0,
-        prunedTokens: state.stats.totalPruneTokens,
-        prunedToolCount: 0,
-        prunedMessageCount: 0,
-        total: 0,
-    }
-
-    let firstAssistant: AssistantMessage | undefined
-    for (const msg of messages) {
-        if (msg.info.role === "assistant") {
-            const assistantInfo = msg.info as AssistantMessage
-            if (
-                assistantInfo.tokens?.input > 0 ||
-                assistantInfo.tokens?.cache?.read > 0 ||
-                assistantInfo.tokens?.cache?.write > 0
-            ) {
-                firstAssistant = assistantInfo
-                break
-            }
-        }
-    }
-
-    let lastAssistant: AssistantMessage | undefined
-    for (let i = messages.length - 1; i >= 0; i--) {
-        const msg = messages[i]
-        if (msg.info.role === "assistant") {
-            const assistantInfo = msg.info as AssistantMessage
-            if (assistantInfo.tokens?.output > 0) {
-                lastAssistant = assistantInfo
-                break
-            }
-        }
-    }
-
-    const apiInput = lastAssistant?.tokens?.input || 0
-    const apiOutput = lastAssistant?.tokens?.output || 0
-    const apiReasoning = lastAssistant?.tokens?.reasoning || 0
-    const apiCacheRead = lastAssistant?.tokens?.cache?.read || 0
-    const apiCacheWrite = lastAssistant?.tokens?.cache?.write || 0
-    breakdown.total = apiInput + apiOutput + apiReasoning + apiCacheRead + apiCacheWrite
-
-    const userTextParts: string[] = []
-    const toolInputParts: string[] = []
-    const toolOutputParts: string[] = []
-    let firstUserText = ""
-    let foundFirstUser = false
-    const allToolIds = new Set<string>()
-    const activeToolIds = new Set<string>()
-    const prunedByMessageToolIds = new Set<string>()
-    const allMessageIds = new Set<string>()
-
-    for (const msg of messages) {
-        allMessageIds.add(msg.info.id)
-        const parts = Array.isArray(msg.parts) ? msg.parts : []
-        const isCompacted = isMessageCompacted(state, msg)
-        const pruneEntry = state.prune.messages.byMessageId.get(msg.info.id)
-        const isMessagePruned = !!pruneEntry && pruneEntry.activeBlockIds.length > 0
-        const isIgnoredUser = msg.info.role === "user" && isIgnoredUserMessage(msg)
-
-        for (const part of parts) {
-            if (part.type === "tool") {
-                const toolPart = part as ToolPart
-                if (toolPart.callID) {
-                    allToolIds.add(toolPart.callID)
-                    if (!isCompacted) {
-                        activeToolIds.add(toolPart.callID)
-                    }
-                    if (isMessagePruned) {
-                        prunedByMessageToolIds.add(toolPart.callID)
-                    }
-                }
-
-                const isPruned = toolPart.callID && state.prune.tools.has(toolPart.callID)
-                if (!isCompacted && !isPruned) {
-                    if (toolPart.state?.input) {
-                        const inputStr =
-                            typeof toolPart.state.input === "string"
-                                ? toolPart.state.input
-                                : JSON.stringify(toolPart.state.input)
-                        toolInputParts.push(inputStr)
-                    }
-
-                    if (toolPart.state?.status === "completed" && toolPart.state?.output) {
-                        const outputStr =
-                            typeof toolPart.state.output === "string"
-                                ? toolPart.state.output
-                                : JSON.stringify(toolPart.state.output)
-                        toolOutputParts.push(outputStr)
-                    }
-                }
-            } else if (
-                part.type === "text" &&
-                msg.info.role === "user" &&
-                !isCompacted &&
-                !isIgnoredUser
-            ) {
-                const textPart = part as TextPart
-                const text = textPart.text || ""
-                userTextParts.push(text)
-                if (!foundFirstUser) {
-                    firstUserText += text
-                }
-            }
-        }
-
-        if (msg.info.role === "user" && !isIgnoredUser && !foundFirstUser) {
-            foundFirstUser = true
-        }
-    }
-
-    const prunedByToolIds = new Set<string>()
-    for (const id of allToolIds) {
-        if (state.prune.tools.has(id)) {
-            prunedByToolIds.add(id)
-        }
-    }
-
-    const prunedToolIds = new Set<string>([...prunedByToolIds, ...prunedByMessageToolIds])
-    const toolsInContextCount = [...activeToolIds].filter((id) => !prunedByToolIds.has(id)).length
-
-    let prunedMessageCount = 0
-    for (const [id, entry] of state.prune.messages.byMessageId) {
-        if (allMessageIds.has(id) && entry.activeBlockIds.length > 0) {
-            prunedMessageCount++
-        }
-    }
-
-    breakdown.toolCount = allToolIds.size
-    breakdown.toolsInContextCount = toolsInContextCount
-    breakdown.prunedToolCount = prunedToolIds.size
-    breakdown.prunedMessageCount = prunedMessageCount
-
-    const firstUserTokens = countTokens(firstUserText)
-    breakdown.user = countTokens(userTextParts.join("\n"))
-    const toolInputTokens = countTokens(toolInputParts.join("\n"))
-    const toolOutputTokens = countTokens(toolOutputParts.join("\n"))
-
-    if (firstAssistant) {
-        const firstInput =
-            (firstAssistant.tokens?.input || 0) +
-            (firstAssistant.tokens?.cache?.read || 0) +
-            (firstAssistant.tokens?.cache?.write || 0)
-        breakdown.system = Math.max(0, firstInput - firstUserTokens)
-    }
-
-    breakdown.tools = toolInputTokens + toolOutputTokens
-    breakdown.assistant = Math.max(
-        0,
-        breakdown.total - breakdown.system - breakdown.user - breakdown.tools,
-    )
-
-    return breakdown
 }
 
 function createBar(value: number, maxValue: number, width: number, char: string = "█"): string {
@@ -299,7 +124,7 @@ function formatContextMessage(breakdown: TokenBreakdown): string {
 export async function handleContextCommand(ctx: ContextCommandContext): Promise<void> {
     const { client, state, logger, sessionId, messages } = ctx
 
-    const breakdown = analyzeTokens(state, messages)
+    const { breakdown } = analyzeTokens(state, messages)
 
     const message = formatContextMessage(breakdown)
 

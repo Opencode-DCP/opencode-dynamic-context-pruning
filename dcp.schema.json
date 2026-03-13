@@ -94,6 +94,27 @@
                 }
             }
         },
+        "tui": {
+            "type": "object",
+            "description": "Configuration for the DCP TUI integration",
+            "additionalProperties": false,
+            "properties": {
+                "sidebar": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Show the DCP sidebar widget in the TUI"
+                },
+                "debug": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Enable debug/error logging for the DCP TUI"
+                }
+            },
+            "default": {
+                "sidebar": true,
+                "debug": false
+            }
+        },
         "experimental": {
             "type": "object",
             "description": "Experimental settings that may change in future releases",

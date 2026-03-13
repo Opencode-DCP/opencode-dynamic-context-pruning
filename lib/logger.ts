@@ -5,12 +5,16 @@ import { homedir } from "os"
 
 export class Logger {
     private logDir: string
+    private scope?: string
     public enabled: boolean
 
-    constructor(enabled: boolean) {
+    constructor(enabled: boolean, scope?: string) {
         this.enabled = enabled
+        this.scope = scope?.replace(/[^A-Za-z0-9._-]/g, "_")
         const configHome = process.env.XDG_CONFIG_HOME || join(homedir(), ".config")
-        this.logDir = join(configHome, "opencode", "logs", "dcp")
+        this.logDir = this.scope
+            ? join(configHome, "opencode", "logs", "dcp", this.scope)
+            : join(configHome, "opencode", "logs", "dcp")
     }
 
     private async ensureLogDir() {
@@ -78,12 +82,17 @@ export class Logger {
 
             const logLine = `${timestamp} ${level.padEnd(5)} ${component}: ${message}${dataStr ? " | " + dataStr : ""}\n`
 
-            const dailyLogDir = join(this.logDir, "daily")
-            if (!existsSync(dailyLogDir)) {
-                await mkdir(dailyLogDir, { recursive: true })
+            const logFile = this.scope
+                ? join(this.logDir, `${new Date().toISOString().split("T")[0]}.log`)
+                : join(this.logDir, "daily", `${new Date().toISOString().split("T")[0]}.log`)
+
+            if (!this.scope) {
+                const dailyLogDir = join(this.logDir, "daily")
+                if (!existsSync(dailyLogDir)) {
+                    await mkdir(dailyLogDir, { recursive: true })
+                }
             }
 
-            const logFile = join(dailyLogDir, `${new Date().toISOString().split("T")[0]}.log`)
             await writeFile(logFile, logLine, { flag: "a" })
         } catch (error) {}
     }
