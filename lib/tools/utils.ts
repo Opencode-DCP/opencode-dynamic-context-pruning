@@ -409,67 +409,40 @@ export function validateSummaryPlaceholders(
     endReference: BoundaryReference,
     summaryByBlockId: Map<number, CompressionBlock>,
 ): number[] {
-    const issues: string[] = []
-
     const boundaryOptionalIds = new Set<number>()
     if (startReference.kind === "compressed-block") {
         if (startReference.blockId === undefined) {
-            issues.push("Failed to map boundary matches back to raw messages")
-        } else {
-            boundaryOptionalIds.add(startReference.blockId)
+            throw new Error("Failed to map boundary matches back to raw messages")
         }
+        boundaryOptionalIds.add(startReference.blockId)
     }
     if (endReference.kind === "compressed-block") {
         if (endReference.blockId === undefined) {
-            issues.push("Failed to map boundary matches back to raw messages")
-        } else {
-            boundaryOptionalIds.add(endReference.blockId)
+            throw new Error("Failed to map boundary matches back to raw messages")
         }
+        boundaryOptionalIds.add(endReference.blockId)
     }
 
     const strictRequiredIds = requiredBlockIds.filter((id) => !boundaryOptionalIds.has(id))
     const requiredSet = new Set(requiredBlockIds)
-    const placeholderIds = placeholders.map((p) => p.blockId)
-    const placeholderSet = new Set<number>()
-    const duplicateIds = new Set<number>()
+    const keptPlaceholderIds = new Set<number>()
+    const validPlaceholders: ParsedBlockPlaceholder[] = []
 
-    for (const id of placeholderIds) {
-        if (placeholderSet.has(id)) {
-            duplicateIds.add(id)
-            continue
+    for (const placeholder of placeholders) {
+        const isKnown = summaryByBlockId.has(placeholder.blockId)
+        const isRequired = requiredSet.has(placeholder.blockId)
+        const isDuplicate = keptPlaceholderIds.has(placeholder.blockId)
+
+        if (isKnown && isRequired && !isDuplicate) {
+            validPlaceholders.push(placeholder)
+            keptPlaceholderIds.add(placeholder.blockId)
         }
-        placeholderSet.add(id)
     }
 
-    const missing = strictRequiredIds.filter((id) => !placeholderSet.has(id))
+    placeholders.length = 0
+    placeholders.push(...validPlaceholders)
 
-    const unknown = placeholderIds.filter((id) => !summaryByBlockId.has(id))
-    if (unknown.length > 0) {
-        const uniqueUnknown = [...new Set(unknown)]
-        issues.push(
-            `Unknown block placeholders: ${uniqueUnknown.map(formatBlockPlaceholder).join(", ")}`,
-        )
-    }
-
-    const invalid = placeholderIds.filter((id) => !requiredSet.has(id))
-    if (invalid.length > 0) {
-        const uniqueInvalid = [...new Set(invalid)]
-        issues.push(
-            `Invalid block placeholders for selected range: ${uniqueInvalid.map(formatBlockPlaceholder).join(", ")}`,
-        )
-    }
-
-    if (duplicateIds.size > 0) {
-        issues.push(
-            `Duplicate block placeholders are not allowed: ${[...duplicateIds].map(formatBlockPlaceholder).join(", ")}`,
-        )
-    }
-
-    if (issues.length > 0) {
-        throwCombinedIssues(issues)
-    }
-
-    return missing
+    return strictRequiredIds.filter((id) => !keptPlaceholderIds.has(id))
 }
 
 export function injectBlockPlaceholders(
