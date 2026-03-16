@@ -143,7 +143,10 @@ export function formatStatsHeader(totalTokensSaved: number, pruneTokenCounter: n
 }
 
 export function formatTokenCount(tokens: number): string {
-    if (tokens >= 1000) {
+    if (tokens >= 100_000) {
+        return `${Math.round(tokens / 1000)}K tokens`
+    }
+    if (tokens >= 10_000) {
         return `${(tokens / 1000).toFixed(1)}K`.replace(".0K", "K") + " tokens"
     }
     return tokens.toString() + " tokens"
@@ -283,21 +286,4 @@ export function formatPrunedItemsList(
     }
 
     return lines
-}
-
-export function formatPruningResultForTool(
-    prunedIds: string[],
-    toolMetadata: Map<string, ToolParameterEntry>,
-    workingDirectory?: string,
-): string {
-    const lines: string[] = []
-    lines.push(`Context pruning complete. Pruned ${prunedIds.length} tool outputs.`)
-    lines.push("")
-
-    if (prunedIds.length > 0) {
-        lines.push(`Semantically pruned (${prunedIds.length}):`)
-        lines.push(...formatPrunedItemsList(prunedIds, toolMetadata, workingDirectory))
-    }
-
-    return lines.join("\n").trim()
 }

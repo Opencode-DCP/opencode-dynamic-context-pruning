@@ -17,7 +17,12 @@ import {
 } from "./lib/hooks"
 import { configureClientAuth, isSecureMode } from "./lib/auth"
 
-const plugin: Plugin = (async (ctx) => {
+let tuiPlugin: Record<string, unknown> = {}
+try {
+    tuiPlugin = (await import("./tui/index")).default
+} catch {}
+
+const server: Plugin = (async (ctx) => {
     const config = getConfig(ctx)
 
     if (!config.enabled) {
@@ -139,4 +144,7 @@ const plugin: Plugin = (async (ctx) => {
     }
 }) satisfies Plugin
 
-export default plugin
+export default {
+    server,
+    ...tuiPlugin,
+}
