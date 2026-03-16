@@ -1,0 +1,93 @@
+name: Bug Report
+description: Report a bug with DCP. Please include debug logs.
+title: "[Bug]: "
+labels: ["bug"]
+body:
+    - type: markdown
+      attributes:
+          value: |
+              Thanks for taking the time to report a bug! To help us investigate, please include debug context logs.
+
+              **How to get debug logs:**
+              1. In your `dcp.jsonc`, add `"debug": true`
+              2. Send a message in your opencode session to trigger a new log
+              3. Navigate to `~/.config/opencode/logs/dcp/context/{last session ID}/{last timestamp}.json`
+              4. Attach or paste the relevant portion of the log below
+
+              Debug can be enabled after experiencing the bug — you'll just have to send another message in your opencode session to trigger a new log json generation.
+
+    - type: textarea
+      id: description
+      attributes:
+          label: Bug Description
+          description: A clear and concise description of the bug.
+          placeholder: Describe what happened...
+      validations:
+          required: true
+
+    - type: textarea
+      id: expected
+      attributes:
+          label: Expected Behavior
+          description: What did you expect to happen?
+          placeholder: Describe what you expected...
+      validations:
+          required: true
+
+    - type: textarea
+      id: debug-logs
+      attributes:
+          label: Debug Context Logs
+          description: |
+              Paste the relevant portion of your debug context log JSON here.
+              Navigate to `~/.config/opencode/logs/dcp/context/{session ID}/{timestamp}.json`
+          render: json
+      validations:
+          required: true
+
+    - type: textarea
+      id: tool-call
+      attributes:
+          label: Tool Call Details
+          description: If applicable, describe what the tool call looked like and what the error was.
+          placeholder: "e.g. compress was called with startId: m0001, endId: m0010, and returned..."
+      validations:
+          required: false
+
+    - type: input
+      id: dcp-version
+      attributes:
+          label: DCP Version
+          description: Which version of `@tarquinen/opencode-dcp` are you using?
+          placeholder: "e.g. 3.0.4"
+      validations:
+          required: true
+
+    - type: input
+      id: opencode-version
+      attributes:
+          label: Opencode Version
+          description: Which version of opencode are you using?
+          placeholder: "e.g. 0.1.50"
+      validations:
+          required: true
+
+    - type: dropdown
+      id: model
+      attributes:
+          label: Model
+          description: Which model are you using?
+          options:
+              - Claude Sonnet 4
+              - Claude Opus 4
+              - Other (specify in description)
+      validations:
+          required: true
+
+    - type: textarea
+      id: additional
+      attributes:
+          label: Additional Context
+          description: Any other context, screenshots, or information that might help.
+      validations:
+          required: false
