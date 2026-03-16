@@ -7,7 +7,6 @@ import {
     parseBlockPlaceholders,
     validateSummaryPlaceholders,
     wrapCompressedSummary,
-    type BoundaryReference,
 } from "../lib/tools/utils"
 
 function createBlock(blockId: number, body: string): CompressionBlock {
@@ -17,8 +16,7 @@ function createBlock(blockId: number, body: string): CompressionBlock {
         deactivatedByUser: false,
         compressedTokens: 0,
         topic: `Block ${blockId}`,
-        startId: "m0001",
-        endId: "m0002",
+        targetId: `b${blockId}m0001`,
         anchorMessageId: `msg-${blockId}`,
         compressMessageId: `compress-${blockId}`,
         includedBlockIds: [],
@@ -33,14 +31,6 @@ function createBlock(blockId: number, body: string): CompressionBlock {
     }
 }
 
-function createMessageBoundary(messageId: string, rawIndex: number): BoundaryReference {
-    return {
-        kind: "message",
-        messageId,
-        rawIndex,
-    }
-}
-
 test("compress placeholder validation keeps valid placeholders and ignores invalid ones", () => {
     const summaryByBlockId = new Map([
         [1, createBlock(1, "First compressed summary")],
@@ -49,13 +39,7 @@ test("compress placeholder validation keeps valid placeholders and ignores inval
     const summary = "Intro (b1) unknown (b9) duplicate (b1) out-of-range (b2) outro"
     const parsed = parseBlockPlaceholders(summary)
 
-    const missingBlockIds = validateSummaryPlaceholders(
-        parsed,
-        [1],
-        createMessageBoundary("msg-a", 0),
-        createMessageBoundary("msg-b", 1),
-        summaryByBlockId,
-    )
+    const missingBlockIds = validateSummaryPlaceholders(parsed, [1], summaryByBlockId)
 
     assert.deepEqual(
         parsed.map((placeholder) => placeholder.blockId),
@@ -63,13 +47,7 @@ test("compress placeholder validation keeps valid placeholders and ignores inval
     )
     assert.equal(missingBlockIds.length, 0)
 
-    const injected = injectBlockPlaceholders(
-        summary,
-        parsed,
-        summaryByBlockId,
-        createMessageBoundary("msg-a", 0),
-        createMessageBoundary("msg-b", 1),
-    )
+    const injected = injectBlockPlaceholders(summary, parsed, summaryByBlockId)
 
     assert.match(injected.expandedSummary, /First compressed summary/)
     assert.doesNotMatch(injected.expandedSummary, /Second compressed summary/)
@@ -83,23 +61,11 @@ test("compress continues by appending required block summaries the model omitted
     const summary = "The model forgot to include the prior block."
     const parsed = parseBlockPlaceholders(summary)
 
-    const missingBlockIds = validateSummaryPlaceholders(
-        parsed,
-        [1],
-        createMessageBoundary("msg-a", 0),
-        createMessageBoundary("msg-b", 1),
-        summaryByBlockId,
-    )
+    const missingBlockIds = validateSummaryPlaceholders(parsed, [1], summaryByBlockId)
 
     assert.deepEqual(missingBlockIds, [1])
 
-    const injected = injectBlockPlaceholders(
-        summary,
-        parsed,
-        summaryByBlockId,
-        createMessageBoundary("msg-a", 0),
-        createMessageBoundary("msg-b", 1),
-    )
+    const injected = injectBlockPlaceholders(summary, parsed, summaryByBlockId)
     const finalSummary = appendMissingBlockSummaries(
         injected.expandedSummary,
         missingBlockIds,

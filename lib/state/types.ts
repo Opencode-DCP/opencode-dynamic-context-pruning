@@ -33,8 +33,7 @@ export interface CompressionBlock {
     deactivatedByUser: boolean
     compressedTokens: number
     topic: string
-    startId: string
-    endId: string
+    targetId: string
     anchorMessageId: string
     compressMessageId: string
     includedBlockIds: number[]
@@ -55,6 +54,7 @@ export interface PruneMessagesState {
     blocksById: Map<number, CompressionBlock>
     activeBlockIds: Set<number>
     activeByAnchorMessageId: Map<string, number>
+    currentBlockId: number
     nextBlockId: number
 }
 
@@ -71,6 +71,7 @@ export interface PendingManualTrigger {
 export interface MessageIdState {
     byRawId: Map<string, string>
     byRef: Map<string, string>
+    blockByRawId: Map<string, number>
     nextRef: number
 }
 

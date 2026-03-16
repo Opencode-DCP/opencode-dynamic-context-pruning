@@ -33,7 +33,7 @@ const INTERNAL_AGENT_SIGNATURES = [
     "Summarize what was done in this conversation",
 ]
 
-const DCP_MESSAGE_ID_TAG_REGEX = /<dcp-message-id>(?:m\d+|b\d+)<\/dcp-message-id>/g
+const DCP_MESSAGE_ID_TAG_REGEX = /<dcp-message-id>(?:b\d+m\d+|m\d+|b\d+)<\/dcp-message-id>/g
 const DCP_SYSTEM_REMINDER_REGEX = /<dcp-system-reminder\b[^>]*>[\s\S]*?<\/dcp-system-reminder>/g
 
 function applyManualPrompt(state: SessionState, messages: WithParts[], logger: Logger): void {

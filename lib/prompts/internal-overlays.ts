@@ -25,9 +25,8 @@ THE FORMAT OF COMPRESS
 {
   topic: string,           // Short label (3-5 words) - e.g., "Auth System Exploration"
   content: {
-    startId: string,       // Boundary ID at range start: mNNNN or bN
-    endId: string,         // Boundary ID at range end: mNNNN or bN
-    summary: string        // Complete technical summary replacing all content in range
+    targetId: string,      // Block-scoped message ID or block ID: bNmNNNN or bN
+    summary: string        // Complete technical summary replacing the selected block
   }
 }
 \`\`\``
@@ -38,8 +37,7 @@ THE FORMAT OF COMPRESS
 \`\`\`
 {
   topic: string,           // Short label (3-5 words) - e.g., "Auth System Exploration"
-  startId: string,         // Boundary ID at range start: mNNNN or bN
-  endId: string,           // Boundary ID at range end: mNNNN or bN
-  summary: string          // Complete technical summary replacing all content in range
+  targetId: string,        // Block-scoped message ID or block ID: bNmNNNN or bN
+  summary: string          // Complete technical summary replacing the selected block
 }
 \`\`\``

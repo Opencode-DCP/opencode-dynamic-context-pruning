@@ -21,9 +21,9 @@ const MANUAL_MODE_OFF = "Manual mode is now OFF."
 const COMPRESS_TRIGGER_PROMPT = [
     "<compress triggered manually>",
     "Manual mode trigger received. You must now use the compress tool.",
-    "Find the most significant completed section of the conversation that can be compressed into a high-fidelity technical summary.",
-    "Choose safe boundaries and preserve all critical implementation details.",
-    "Return after compress with a brief explanation of what range was compressed.",
+    "Find the most significant completed conversation block that can be compressed into a high-fidelity technical summary.",
+    "Choose a safe block-scoped target ID and preserve all critical implementation details.",
+    "Return after compress with a brief explanation of what block was compressed.",
 ].join("\n\n")
 
 function getTriggerPrompt(tool: "compress", state: SessionState, userFocus?: string): string {

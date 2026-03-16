@@ -82,7 +82,7 @@ const PROMPT_DEFINITIONS: PromptDefinition[] = [
         key: "turn-nudge",
         fileName: "turn-nudge.md",
         label: "Turn Nudge",
-        description: "Nudge to compress closed ranges at turn boundaries",
+        description: "Nudge to compress closed blocks at turn boundaries",
         usage: "Injected when context is between min and max limits at a new user turn",
         runtimeField: "turnNudge",
     },

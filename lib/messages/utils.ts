@@ -4,7 +4,7 @@ import type { SessionState, WithParts } from "../state"
 import type { UserMessage } from "@opencode-ai/sdk/v2"
 
 const SUMMARY_ID_HASH_LENGTH = 16
-const DCP_MESSAGE_ID_TAG_REGEX = /<dcp-message-id>(?:m\d+|b\d+)<\/dcp-message-id>/g
+const DCP_MESSAGE_ID_TAG_REGEX = /<dcp-message-id>(?:b\d+m\d+|m\d+|b\d+)<\/dcp-message-id>/g
 const DCP_SYSTEM_REMINDER_REGEX = /<dcp-system-reminder\b[^>]*>[\s\S]*?<\/dcp-system-reminder>/g
 
 const generateStableId = (prefix: string, seed: string): string => {

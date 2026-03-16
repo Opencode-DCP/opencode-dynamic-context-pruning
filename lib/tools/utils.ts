@@ -18,16 +18,14 @@ const BLOCK_PLACEHOLDER_REGEX = /\(b(\d+)\)|\{block_(\d+)\}/gi
 export interface CompressToolArgs {
     topic: string
     content: {
-        startId: string
-        endId: string
+        targetId: string
         summary: string
     }
 }
 
 export interface FlatCompressToolArgs {
     topic: string
-    startId: string
-    endId: string
+    targetId: string
     summary: string
 }
 
@@ -39,8 +37,7 @@ export function normalizeCompressArgs(args: Record<string, unknown>): CompressTo
     return {
         topic: args.topic as string,
         content: {
-            startId: args.startId as string,
-            endId: args.endId as string,
+            targetId: args.targetId as string,
             summary: args.summary as string,
         },
     }
@@ -61,9 +58,10 @@ export interface SearchContext {
     summaryByBlockId: Map<number, CompressionBlock>
 }
 
-export interface RangeResolution {
-    startReference: BoundaryReference
-    endReference: BoundaryReference
+export interface BlockResolution {
+    targetReference: BoundaryReference
+    blockId: number
+    anchorMessageId: string
     messageIds: string[]
     messageTokenById: Map<string, number>
     toolIds: string[]
@@ -91,8 +89,7 @@ export interface AppliedCompressionResult {
 
 export interface CompressionStateInput {
     topic: string
-    startId: string
-    endId: string
+    targetId: string
     compressMessageId: string
 }
 
@@ -107,12 +104,8 @@ export function validateCompressArgs(args: CompressToolArgs): void {
         throw new Error("topic is required and must be a non-empty string")
     }
 
-    if (typeof args.content?.startId !== "string" || args.content.startId.trim().length === 0) {
-        throw new Error("content.startId is required and must be a non-empty string")
-    }
-
-    if (typeof args.content?.endId !== "string" || args.content.endId.trim().length === 0) {
-        throw new Error("content.endId is required and must be a non-empty string")
+    if (typeof args.content?.targetId !== "string" || args.content.targetId.trim().length === 0) {
+        throw new Error("content.targetId is required and must be a non-empty string")
     }
 
     if (typeof args.content?.summary !== "string" || args.content.summary.trim().length === 0) {
@@ -159,45 +152,39 @@ export function buildSearchContext(state: SessionState, rawMessages: WithParts[]
     }
 }
 
-export function resolveBoundaryIds(
+function resolveMessageBlockId(state: SessionState, messageId: string): number | null {
+    const direct = state.messageIds.blockByRawId.get(messageId)
+    if (typeof direct === "number" && Number.isInteger(direct) && direct > 0) {
+        return direct
+    }
+
+    const entry = state.prune.messages.byMessageId.get(messageId)
+    if (!entry) {
+        return null
+    }
+
+    const blockIds = entry.allBlockIds
+        .filter((id) => Number.isInteger(id) && id > 0)
+        .sort((a, b) => a - b)
+    if (blockIds.length === 0) {
+        return null
+    }
+
+    return blockIds[0] || null
+}
+
+export function resolveTargetId(
     context: SearchContext,
     state: SessionState,
-    startId: string,
-    endId: string,
-): { startReference: BoundaryReference; endReference: BoundaryReference } {
+    targetId: string,
+): BoundaryReference {
     const lookup = buildBoundaryReferenceLookup(context, state)
     const issues: string[] = []
-    const parsedStartId = parseBoundaryId(startId)
-    const parsedEndId = parseBoundaryId(endId)
+    const parsedTargetId = parseBoundaryId(targetId)
 
-    if (parsedStartId === null) {
-        issues.push("startId is invalid. Use an injected message ID (mNNNN) or block ID (bN).")
-    }
-
-    if (parsedEndId === null) {
-        issues.push("endId is invalid. Use an injected message ID (mNNNN) or block ID (bN).")
-    }
-
-    if (issues.length > 0) {
-        throwCombinedIssues(issues)
-    }
-
-    if (!parsedStartId || !parsedEndId) {
-        throw new Error("Invalid boundary ID(s)")
-    }
-
-    const startReference = lookup.get(parsedStartId.ref)
-    const endReference = lookup.get(parsedEndId.ref)
-
-    if (!startReference) {
+    if (parsedTargetId === null) {
         issues.push(
-            `startId ${parsedStartId.ref} is not available in the current conversation context. Choose an injected ID visible in context.`,
-        )
-    }
-
-    if (!endReference) {
-        issues.push(
-            `endId ${parsedEndId.ref} is not available in the current conversation context. Choose an injected ID visible in context.`,
+            "targetId is invalid. Use an injected block-scoped message ID (bNmNNNN) or block ID (bN).",
         )
     }
 
@@ -205,17 +192,43 @@ export function resolveBoundaryIds(
         throwCombinedIssues(issues)
     }
 
-    if (!startReference || !endReference) {
-        throw new Error("Failed to resolve boundary IDs")
+    if (!parsedTargetId) {
+        throw new Error("Invalid target ID")
     }
 
-    if (startReference.rawIndex > endReference.rawIndex) {
+    const targetReference = lookup.get(parsedTargetId.ref)
+
+    if (!targetReference) {
+        issues.push(
+            `targetId ${parsedTargetId.ref} is not available in the current conversation context. Choose an injected ID visible in context.`,
+        )
+    }
+
+    if (issues.length > 0) {
+        throwCombinedIssues(issues)
+    }
+
+    if (!targetReference) {
+        throw new Error("Failed to resolve target ID")
+    }
+
+    if (targetReference.kind === "compressed-block") {
         throw new Error(
-            `startId ${parsedStartId.ref} appears after endId ${parsedEndId.ref} in the conversation. Start must come before end.`,
+            `targetId ${parsedTargetId.ref} refers to an existing compressed block. Choose a visible raw message ID from the block you want to compress.`,
         )
     }
 
-    return { startReference, endReference }
+    const blockId = targetReference.blockId || parsedTargetId.blockId
+    if (!blockId) {
+        throw new Error(
+            `targetId ${parsedTargetId.ref} does not include a block ID. Choose an injected block-scoped message ID like b${state.prune.messages.currentBlockId}m0001.`,
+        )
+    }
+
+    return {
+        ...targetReference,
+        blockId,
+    }
 }
 
 function buildBoundaryReferenceLookup(
@@ -241,6 +254,7 @@ function buildBoundaryReferenceLookup(
             kind: "message",
             rawIndex,
             messageId,
+            blockId: resolveMessageBlockId(state, messageId) || undefined,
         })
     }
 
@@ -274,31 +288,40 @@ function buildBoundaryReferenceLookup(
     return lookup
 }
 
-export function resolveRange(
+export function resolveBlock(
     context: SearchContext,
-    startReference: BoundaryReference,
-    endReference: BoundaryReference,
-): RangeResolution {
-    const startRawIndex = startReference.rawIndex
-    const endRawIndex = endReference.rawIndex
+    state: SessionState,
+    targetReference: BoundaryReference,
+): BlockResolution {
+    if (
+        targetReference.kind !== "message" ||
+        !targetReference.messageId ||
+        !targetReference.blockId
+    ) {
+        throw new Error("Failed to resolve target block from raw messages")
+    }
+
     const messageIds: string[] = []
     const messageSeen = new Set<string>()
     const toolIds: string[] = []
     const toolSeen = new Set<string>()
-    const requiredBlockIds: number[] = []
-    const requiredBlockSeen = new Set<number>()
     const messageTokenById = new Map<string, number>()
+    let anchorMessageId = ""
 
-    for (let index = startRawIndex; index <= endRawIndex; index++) {
-        const rawMessage = context.rawMessages[index]
-        if (!rawMessage) {
-            continue
-        }
+    for (const rawMessage of context.rawMessages) {
         if (rawMessage.info.role === "user" && isIgnoredUserMessage(rawMessage)) {
             continue
         }
 
         const messageId = rawMessage.info.id
+        if (resolveMessageBlockId(state, messageId) !== targetReference.blockId) {
+            continue
+        }
+
+        if (!anchorMessageId) {
+            anchorMessageId = messageId
+        }
+
         if (!messageSeen.has(messageId)) {
             messageSeen.add(messageId)
             messageIds.push(messageId)
@@ -321,61 +344,21 @@ export function resolveRange(
         }
     }
 
-    const rangeMessageIdSet = new Set(messageIds)
-    const summariesInRange: Array<{ blockId: number; rawIndex: number }> = []
-    for (const summary of context.summaryByBlockId.values()) {
-        if (!rangeMessageIdSet.has(summary.anchorMessageId)) {
-            continue
-        }
-
-        const anchorIndex = context.rawIndexById.get(summary.anchorMessageId)
-        if (anchorIndex === undefined) {
-            continue
-        }
-
-        summariesInRange.push({
-            blockId: summary.blockId,
-            rawIndex: anchorIndex,
-        })
-    }
-
-    summariesInRange.sort((a, b) => a.rawIndex - b.rawIndex || a.blockId - b.blockId)
-    for (const summary of summariesInRange) {
-        if (requiredBlockSeen.has(summary.blockId)) {
-            continue
-        }
-        requiredBlockSeen.add(summary.blockId)
-        requiredBlockIds.push(summary.blockId)
-    }
-
     if (messageIds.length === 0) {
         throw new Error(
-            "Failed to map boundary matches back to raw messages. Choose boundaries that include original conversation messages.",
+            "Failed to map target block back to raw messages. Choose a visible raw message ID from the block you want to compress.",
         )
     }
 
     return {
-        startReference,
-        endReference,
+        targetReference,
+        blockId: targetReference.blockId,
+        anchorMessageId,
         messageIds,
         messageTokenById,
         toolIds,
-        requiredBlockIds,
+        requiredBlockIds: [],
     }
-}
-
-export function resolveAnchorMessageId(startReference: BoundaryReference): string {
-    if (startReference.kind === "compressed-block") {
-        if (!startReference.anchorMessageId) {
-            throw new Error("Failed to map boundary matches back to raw messages")
-        }
-        return startReference.anchorMessageId
-    }
-
-    if (!startReference.messageId) {
-        throw new Error("Failed to map boundary matches back to raw messages")
-    }
-    return startReference.messageId
 }
 
 export function parseBlockPlaceholders(summary: string): ParsedBlockPlaceholder[] {
@@ -405,25 +388,8 @@ export function parseBlockPlaceholders(summary: string): ParsedBlockPlaceholder[
 export function validateSummaryPlaceholders(
     placeholders: ParsedBlockPlaceholder[],
     requiredBlockIds: number[],
-    startReference: BoundaryReference,
-    endReference: BoundaryReference,
     summaryByBlockId: Map<number, CompressionBlock>,
 ): number[] {
-    const boundaryOptionalIds = new Set<number>()
-    if (startReference.kind === "compressed-block") {
-        if (startReference.blockId === undefined) {
-            throw new Error("Failed to map boundary matches back to raw messages")
-        }
-        boundaryOptionalIds.add(startReference.blockId)
-    }
-    if (endReference.kind === "compressed-block") {
-        if (endReference.blockId === undefined) {
-            throw new Error("Failed to map boundary matches back to raw messages")
-        }
-        boundaryOptionalIds.add(endReference.blockId)
-    }
-
-    const strictRequiredIds = requiredBlockIds.filter((id) => !boundaryOptionalIds.has(id))
     const requiredSet = new Set(requiredBlockIds)
     const keptPlaceholderIds = new Set<number>()
     const validPlaceholders: ParsedBlockPlaceholder[] = []
@@ -442,15 +408,13 @@ export function validateSummaryPlaceholders(
     placeholders.length = 0
     placeholders.push(...validPlaceholders)
 
-    return strictRequiredIds.filter((id) => !keptPlaceholderIds.has(id))
+    return requiredBlockIds.filter((id) => !keptPlaceholderIds.has(id))
 }
 
 export function injectBlockPlaceholders(
     summary: string,
     placeholders: ParsedBlockPlaceholder[],
     summaryByBlockId: Map<number, CompressionBlock>,
-    startReference: BoundaryReference,
-    endReference: BoundaryReference,
 ): InjectedSummaryResult {
     let cursor = 0
     let expanded = summary
@@ -480,23 +444,6 @@ export function injectBlockPlaceholders(
         expanded += summary.slice(cursor)
     }
 
-    expanded = injectBoundarySummaryIfMissing(
-        expanded,
-        startReference,
-        "start",
-        summaryByBlockId,
-        consumed,
-        consumedSeen,
-    )
-    expanded = injectBoundarySummaryIfMissing(
-        expanded,
-        endReference,
-        "end",
-        summaryByBlockId,
-        consumed,
-        consumedSeen,
-    )
-
     return {
         expandedSummary: expanded,
         consumedBlockIds: consumed,
@@ -504,14 +451,14 @@ export function injectBlockPlaceholders(
 }
 
 export function allocateBlockId(state: SessionState): number {
-    const next = state.prune.messages.nextBlockId
-    if (!Number.isInteger(next) || next < 1) {
-        state.prune.messages.nextBlockId = 2
+    const current = state.prune.messages.currentBlockId
+    if (!Number.isInteger(current) || current < 1) {
+        state.prune.messages.currentBlockId = 2
+        state.prune.messages.nextBlockId = 3
         return 1
     }
 
-    state.prune.messages.nextBlockId = next + 1
-    return next
+    return current
 }
 
 export function wrapCompressedSummary(blockId: number, summary: string): string {
@@ -527,8 +474,7 @@ export function wrapCompressedSummary(blockId: number, summary: string): string 
 export function applyCompressionState(
     state: SessionState,
     input: CompressionStateInput,
-    range: RangeResolution,
-    anchorMessageId: string,
+    range: BlockResolution,
     blockId: number,
     summary: string,
     consumedBlockIds: number[],
@@ -580,9 +526,8 @@ export function applyCompressionState(
         deactivatedByUser: false,
         compressedTokens: 0,
         topic: input.topic,
-        startId: input.startId,
-        endId: input.endId,
-        anchorMessageId,
+        targetId: input.targetId,
+        anchorMessageId: range.anchorMessageId,
         compressMessageId: input.compressMessageId,
         includedBlockIds: included,
         consumedBlockIds: consumed,
@@ -597,7 +542,7 @@ export function applyCompressionState(
 
     messagesState.blocksById.set(blockId, block)
     messagesState.activeBlockIds.add(blockId)
-    messagesState.activeByAnchorMessageId.set(anchorMessageId, blockId)
+    messagesState.activeByAnchorMessageId.set(range.anchorMessageId, blockId)
 
     const deactivatedAt = Date.now()
     for (const consumedBlockId of consumed) {
@@ -739,53 +684,9 @@ function restoreSummary(summary: string): string {
         .replace(/(?:\r?\n)+$/, "")
 }
 
-function injectBoundarySummaryIfMissing(
-    summary: string,
-    reference: BoundaryReference,
-    position: "start" | "end",
-    summaryByBlockId: Map<number, CompressionBlock>,
-    consumed: number[],
-    consumedSeen: Set<number>,
-): string {
-    if (reference.kind !== "compressed-block" || reference.blockId === undefined) {
-        return summary
-    }
-    if (consumedSeen.has(reference.blockId)) {
-        return summary
-    }
-
-    const target = summaryByBlockId.get(reference.blockId)
-    if (!target) {
-        throw new Error(`Compressed block not found: ${formatBlockPlaceholder(reference.blockId)}`)
-    }
-
-    const injectedBody = restoreSummary(target.summary)
-    const next =
-        position === "start"
-            ? mergeWithSpacing(injectedBody, summary)
-            : mergeWithSpacing(summary, injectedBody)
-
-    consumedSeen.add(reference.blockId)
-    consumed.push(reference.blockId)
-    return next
-}
-
-function mergeWithSpacing(left: string, right: string): string {
-    const l = left.trim()
-    const r = right.trim()
-
-    if (!l) {
-        return right
-    }
-    if (!r) {
-        return left
-    }
-    return `${l}\n\n${r}`
-}
-
 export function appendProtectedUserMessages(
     summary: string,
-    range: RangeResolution,
+    range: BlockResolution,
     searchContext: SearchContext,
     state: SessionState,
     enabled: boolean,
@@ -828,7 +729,7 @@ export async function appendProtectedTools(
     state: SessionState,
     allowSubAgents: boolean,
     summary: string,
-    range: RangeResolution,
+    range: BlockResolution,
     searchContext: SearchContext,
     protectedTools: string[],
     protectedFilePatterns: string[] = [],

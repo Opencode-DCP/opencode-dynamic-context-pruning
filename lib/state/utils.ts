@@ -13,6 +13,7 @@ interface PersistedPruneMessagesState {
     blocksById?: Record<string, CompressionBlock>
     activeBlockIds?: number[]
     activeByAnchorMessageId?: Record<string, number>
+    currentBlockId?: number
     nextBlockId?: number
 }
 
@@ -69,7 +70,8 @@ export function createPruneMessagesState(): PruneMessagesState {
         blocksById: new Map<number, CompressionBlock>(),
         activeBlockIds: new Set<number>(),
         activeByAnchorMessageId: new Map<string, number>(),
-        nextBlockId: 1,
+        currentBlockId: 1,
+        nextBlockId: 2,
     }
 }
 
@@ -83,6 +85,12 @@ export function loadPruneMessagesState(
 
     if (typeof persisted.nextBlockId === "number" && Number.isInteger(persisted.nextBlockId)) {
         state.nextBlockId = Math.max(1, persisted.nextBlockId)
+    }
+    if (
+        typeof persisted.currentBlockId === "number" &&
+        Number.isInteger(persisted.currentBlockId)
+    ) {
+        state.currentBlockId = Math.max(0, persisted.currentBlockId)
     }
 
     if (persisted.byMessageId && typeof persisted.byMessageId === "object") {
@@ -141,6 +149,11 @@ export function loadPruneMessagesState(
                     ? [...new Set(value.filter((item): item is string => typeof item === "string"))]
                     : []
 
+            const legacyBlock = block as CompressionBlock & {
+                startId?: unknown
+                endId?: unknown
+            }
+
             state.blocksById.set(blockId, {
                 blockId,
                 active: block.active === true,
@@ -151,8 +164,14 @@ export function loadPruneMessagesState(
                         ? Math.max(0, block.compressedTokens)
                         : 0,
                 topic: typeof block.topic === "string" ? block.topic : "",
-                startId: typeof block.startId === "string" ? block.startId : "",
-                endId: typeof block.endId === "string" ? block.endId : "",
+                targetId:
+                    typeof block.targetId === "string"
+                        ? block.targetId
+                        : typeof legacyBlock.endId === "string"
+                          ? legacyBlock.endId
+                          : typeof legacyBlock.startId === "string"
+                            ? legacyBlock.startId
+                            : "",
                 anchorMessageId:
                     typeof block.anchorMessageId === "string" ? block.anchorMessageId : "",
                 compressMessageId:
@@ -210,6 +229,13 @@ export function loadPruneMessagesState(
         if (blockId >= state.nextBlockId) {
             state.nextBlockId = blockId + 1
         }
+    }
+
+    if (state.currentBlockId < 1) {
+        state.currentBlockId = Math.max(1, state.nextBlockId - 1)
+    }
+    if (state.nextBlockId <= state.currentBlockId) {
+        state.nextBlockId = state.currentBlockId + 1
     }
 
     return state

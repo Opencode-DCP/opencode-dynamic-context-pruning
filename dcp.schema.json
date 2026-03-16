@@ -216,7 +216,7 @@
                 "flatSchema": {
                     "type": "boolean",
                     "default": false,
-                    "description": "When true, the compress tool schema uses 4 flat string parameters (topic, startId, endId, summary) instead of the nested content object. This simplifies tool calls but changes TUI display."
+                    "description": "When true, the compress tool schema uses 3 flat string parameters (topic, targetId, summary) instead of the nested content object. This simplifies tool calls but changes TUI display."
                 },
                 "protectedTools": {
                     "type": "array",

@@ -13,9 +13,8 @@ import {
     COMPRESSED_BLOCK_HEADER,
     injectBlockPlaceholders,
     parseBlockPlaceholders,
-    resolveAnchorMessageId,
-    resolveBoundaryIds,
-    resolveRange,
+    resolveBlock,
+    resolveTargetId,
     normalizeCompressArgs,
     validateCompressArgs,
     validateSummaryPlaceholders,
@@ -38,19 +37,14 @@ function buildNestedSchema() {
             .describe("Short label (3-5 words) for display - e.g., 'Auth System Exploration'"),
         content: tool.schema
             .object({
-                startId: tool.schema
+                targetId: tool.schema
                     .string()
-                    .describe(
-                        "Message or block ID marking the beginning of range (e.g. m0001, b2)",
-                    ),
-                endId: tool.schema
-                    .string()
-                    .describe("Message or block ID marking the end of range (e.g. m0012, b5)"),
+                    .describe("Block-scoped message or block ID to compress (e.g. b12m0123, b12)"),
                 summary: tool.schema
                     .string()
-                    .describe("Complete technical summary replacing all content in range"),
+                    .describe("Complete technical summary replacing the selected block"),
             })
-            .describe("Compression details: ID boundaries and replacement summary"),
+            .describe("Compression details: block target and replacement summary"),
     }
 }
 
@@ -60,15 +54,12 @@ function buildFlatSchema() {
         topic: tool.schema
             .string()
             .describe("Short label (3-5 words) for display - e.g., 'Auth System Exploration'"),
-        startId: tool.schema
+        targetId: tool.schema
             .string()
-            .describe("Message or block ID marking the beginning of range (e.g. m0001, b2)"),
-        endId: tool.schema
-            .string()
-            .describe("Message or block ID marking the end of range (e.g. m0012, b5)"),
+            .describe("Block-scoped message or block ID to compress (e.g. b12m0123, b12)"),
         summary: tool.schema
             .string()
-            .describe("Complete technical summary replacing all content in range"),
+            .describe("Complete technical summary replacing the selected block"),
     }
 }
 
@@ -121,22 +112,18 @@ export function createCompressTool(ctx: ToolContext): ReturnType<typeof tool> {
 
             const searchContext = buildSearchContext(ctx.state, rawMessages)
 
-            const { startReference, endReference } = resolveBoundaryIds(
+            const targetReference = resolveTargetId(
                 searchContext,
                 ctx.state,
-                compressArgs.content.startId,
-                compressArgs.content.endId,
+                compressArgs.content.targetId,
             )
 
-            const range = resolveRange(searchContext, startReference, endReference)
-            const anchorMessageId = resolveAnchorMessageId(range.startReference)
+            const range = resolveBlock(searchContext, ctx.state, targetReference)
 
             const parsedPlaceholders = parseBlockPlaceholders(compressArgs.content.summary)
             const missingRequiredBlockIds = validateSummaryPlaceholders(
                 parsedPlaceholders,
                 range.requiredBlockIds,
-                range.startReference,
-                range.endReference,
                 searchContext.summaryByBlockId,
             )
 
@@ -144,8 +131,6 @@ export function createCompressTool(ctx: ToolContext): ReturnType<typeof tool> {
                 compressArgs.content.summary,
                 parsedPlaceholders,
                 searchContext.summaryByBlockId,
-                range.startReference,
-                range.endReference,
             )
 
             const summaryWithUserMessages = appendProtectedUserMessages(
@@ -184,12 +169,10 @@ export function createCompressTool(ctx: ToolContext): ReturnType<typeof tool> {
                 ctx.state,
                 {
                     topic: compressArgs.topic,
-                    startId: compressArgs.content.startId,
-                    endId: compressArgs.content.endId,
+                    targetId: compressArgs.content.targetId,
                     compressMessageId: toolCtx.messageID,
                 },
                 range,
-                anchorMessageId,
                 blockId,
                 storedSummary,
                 finalSummaryResult.consumedBlockIds,

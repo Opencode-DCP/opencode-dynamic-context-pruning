@@ -28,9 +28,9 @@ DCP reduces context size through a compress tool and automatic cleanup. Your ses
 
 ### Compress
 
-Compress is a tool exposed to your model that selects a conversation range and replaces it with a technical summary. You can think of this as a much smarter version of Opencode's compaction process. Instead of triggering statically when your session reaches its maximum context and on the entire coding session, Compress allows the model to pick when to activate based on task completion, and to only compress a subset of messages containing the completed task. This allows the summaries replacing the session content to be much more focused and precise than Opencode's native compaction.
+Compress is a tool exposed to your model that selects a conversation block and replaces it with a technical summary. You can think of this as a much smarter version of Opencode's compaction process. Instead of triggering statically when your session reaches its maximum context and on the entire coding session, Compress allows the model to pick when to activate based on task completion, and to only compress the specific block containing that completed task. This keeps the replacement summaries focused and precise while avoiding the old range-boundary bookkeeping.
 
-When a new compression overlaps an earlier one, the earlier summary is nested inside the new one — so information is preserved through layers of compression rather than diluted away. Additionally, protected tool outputs (such as subagents and skills) and protected file patterns are always kept in compression summaries, ensuring that the most important information is never lost. You can also enable `protectUserMessages` to preserve your messages verbatim during compression, though note that large prompts (e.g. copy-pasting log files in the prompt) will then never be compressed away.
+Each visible message is tagged with a block-scoped ID like `b12m0123`, so the model can target a whole block by choosing any message inside it. Previously compressed blocks still use `bN` placeholders inside summaries. Additionally, protected tool outputs (such as subagents and skills) and protected file patterns are always kept in compression summaries, ensuring that the most important information is never lost. You can also enable `protectUserMessages` to preserve your messages verbatim during compression, though note that large prompts (e.g. copy-pasting log files in the prompt) will then never be compressed away.
 
 ### Deduplication
 
@@ -176,7 +176,7 @@ DCP provides a `/dcp` slash command:
 - `/dcp stats` — Shows cumulative pruning statistics across all sessions.
 - `/dcp sweep` — Prunes all tools since the last user message. Accepts an optional count: `/dcp sweep 10` prunes the last 10 tools. Respects `commands.protectedTools`.
 - `/dcp manual [on|off]` — Toggle manual mode or set explicit state. When on, the AI will not autonomously use context management tools.
-- `/dcp compress [focus]` — Trigger a single compress tool execution. Optional focus text directs what range to compress.
+- `/dcp compress [focus]` — Trigger a single compress tool execution. Optional focus text directs what block to compress.
 - `/dcp decompress <n>` — Restore a specific active compression by ID (for example `/dcp decompress 2`). Running without an argument shows available compression IDs, token sizes, and topics.
 - `/dcp recompress <n>` — Re-apply a user-decompressed compression by ID (for example `/dcp recompress 2`). Running without an argument shows recompressible IDs, token sizes, and topics.
 

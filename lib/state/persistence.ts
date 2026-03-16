@@ -17,6 +17,7 @@ export interface PersistedPruneMessagesState {
     blocksById: Record<string, CompressionBlock>
     activeBlockIds: number[]
     activeByAnchorMessageId: Record<string, number>
+    currentBlockId: number
     nextBlockId: number
 }
 
@@ -84,6 +85,7 @@ export async function saveSessionState(
                     activeByAnchorMessageId: Object.fromEntries(
                         sessionState.prune.messages.activeByAnchorMessageId,
                     ),
+                    currentBlockId: sessionState.prune.messages.currentBlockId,
                     nextBlockId: sessionState.prune.messages.nextBlockId,
                 },
             },

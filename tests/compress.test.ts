@@ -7,6 +7,7 @@ import { createCompressTool } from "../lib/tools/compress"
 import { createSessionState, type WithParts } from "../lib/state"
 import type { PluginConfig } from "../lib/config"
 import { Logger } from "../lib/logger"
+import { assignMessageRefs } from "../lib/message-ids"
 
 const testDataHome = join(tmpdir(), `opencode-dcp-tests-${process.pid}`)
 const testConfigHome = join(tmpdir(), `opencode-dcp-config-tests-${process.pid}`)
@@ -131,9 +132,12 @@ test("compress rebuilds subagent message refs after session state was reset", as
     const rawMessages = buildMessages(sessionID)
     const state = createSessionState()
     state.sessionId = "ses_other"
-    state.messageIds.byRawId.set("other-message", "m0001")
-    state.messageIds.byRef.set("m0001", "other-message")
+    state.messageIds.byRawId.set("other-message", "b1m0001")
+    state.messageIds.byRef.set("b1m0001", "other-message")
+    state.messageIds.blockByRawId.set("other-message", 1)
     state.messageIds.nextRef = 2
+    state.prune.messages.currentBlockId = 1
+    state.prune.messages.nextBlockId = 2
 
     const logger = new Logger(false)
     const tool = createCompressTool({
@@ -158,8 +162,7 @@ test("compress rebuilds subagent message refs after session state was reset", as
         {
             topic: "Subagent race fix",
             content: {
-                startId: "m0001",
-                endId: "m0002",
+                targetId: "b1m0001",
                 summary: "Captured the initial investigation and follow-up request.",
             },
         },
@@ -168,13 +171,50 @@ test("compress rebuilds subagent message refs after session state was reset", as
             metadata: () => {},
             sessionID,
             messageID: "msg-compress",
-        },
+        } as any,
     )
 
     assert.equal(result, "Compressed 2 messages into [Compressed conversation section].")
     assert.equal(state.sessionId, sessionID)
     assert.equal(state.isSubAgent, true)
-    assert.equal(state.messageIds.byRef.get("m0001"), "msg-assistant-1")
-    assert.equal(state.messageIds.byRef.get("m0002"), "msg-user-2")
+    assert.equal(state.messageIds.byRef.get("b1m0001"), "msg-assistant-1")
+    assert.equal(state.messageIds.byRef.get("b1m0002"), "msg-user-2")
+    assert.equal(state.messageIds.blockByRawId.get("msg-assistant-1"), 1)
+    assert.equal(state.messageIds.blockByRawId.get("msg-user-2"), 1)
     assert.equal(state.prune.messages.blocksById.size, 1)
+    assert.equal(state.prune.messages.blocksById.get(1)?.targetId, "b1m0001")
+    assert.equal(state.prune.messages.currentBlockId, 1)
+})
+
+test("new fetch assigns unseen messages to a new stable block", () => {
+    const sessionID = `ses_block_fetch_${Date.now()}`
+    const state = createSessionState()
+    state.sessionId = sessionID
+
+    const first = buildMessages(sessionID)
+    const second = [
+        ...first,
+        {
+            info: {
+                id: "msg-assistant-2",
+                role: "assistant",
+                sessionID,
+                agent: "codebase-analyzer",
+                time: { created: 4 },
+            } as WithParts["info"],
+            parts: [textPart("msg-assistant-2", sessionID, "part-4", "Next fetch content")],
+        },
+    ]
+
+    assignMessageRefs(state, first)
+    assert.equal(state.messageIds.byRawId.get("msg-subagent-prompt"), "b1m0001")
+    assert.equal(state.messageIds.byRawId.get("msg-assistant-1"), "b1m0002")
+    assert.equal(state.messageIds.byRawId.get("msg-user-2"), "b1m0003")
+    assert.equal(state.prune.messages.currentBlockId, 1)
+
+    assignMessageRefs(state, second)
+    assert.equal(state.messageIds.byRawId.get("msg-assistant-2"), "b2m0004")
+    assert.equal(state.messageIds.blockByRawId.get("msg-assistant-2"), 2)
+    assert.equal(state.prune.messages.currentBlockId, 2)
+    assert.equal(state.prune.messages.nextBlockId, 3)
 })
