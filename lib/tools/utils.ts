@@ -17,29 +17,75 @@ const BLOCK_PLACEHOLDER_REGEX = /\(b(\d+)\)|\{block_(\d+)\}/gi
 
 export interface CompressToolArgs {
     topic: string
-    content: {
-        targetId: string
-        summary: string
-    }
+    content: CompressionInstruction[]
 }
 
 export interface FlatCompressToolArgs {
     topic: string
+    compressions: CompressionInstruction[]
+}
+
+export interface CompressionInstruction {
+    description: string
     targetId: string
     summary: string
 }
 
 export function normalizeCompressArgs(args: Record<string, unknown>): CompressToolArgs {
-    if ("content" in args && typeof args.content === "object" && args.content !== null) {
-        return args as unknown as CompressToolArgs
+    if (Array.isArray(args.content)) {
+        return {
+            topic: args.topic as string,
+            content: args.content as CompressionInstruction[],
+        }
+    }
+
+    if (
+        "content" in args &&
+        typeof args.content === "object" &&
+        args.content !== null &&
+        Array.isArray((args.content as { compressions?: unknown }).compressions)
+    ) {
+        return {
+            topic: args.topic as string,
+            content: (args.content as { compressions: CompressionInstruction[] }).compressions,
+        }
+    }
+
+    if (Array.isArray(args.compressions)) {
+        return {
+            topic: args.topic as string,
+            content: args.compressions as CompressionInstruction[],
+        }
+    }
+
+    if (
+        "content" in args &&
+        typeof args.content === "object" &&
+        args.content !== null &&
+        "targetId" in (args.content as Record<string, unknown>)
+    ) {
+        const content = args.content as { targetId: string; summary: string; description?: string }
+        return {
+            topic: args.topic as string,
+            content: [
+                {
+                    description: content.description || (args.topic as string),
+                    targetId: content.targetId,
+                    summary: content.summary,
+                },
+            ],
+        }
     }
 
     return {
         topic: args.topic as string,
-        content: {
-            targetId: args.targetId as string,
-            summary: args.summary as string,
-        },
+        content: [
+            {
+                description: (args.description as string) || (args.topic as string),
+                targetId: args.targetId as string,
+                summary: args.summary as string,
+            },
+        ],
     }
 }
 
@@ -104,12 +150,33 @@ export function validateCompressArgs(args: CompressToolArgs): void {
         throw new Error("topic is required and must be a non-empty string")
     }
 
-    if (typeof args.content?.targetId !== "string" || args.content.targetId.trim().length === 0) {
-        throw new Error("content.targetId is required and must be a non-empty string")
+    if (!Array.isArray(args.content) || args.content.length === 0) {
+        throw new Error("content is required and must contain at least one compression entry")
     }
 
-    if (typeof args.content?.summary !== "string" || args.content.summary.trim().length === 0) {
-        throw new Error("content.summary is required and must be a non-empty string")
+    const seen = new Set<string>()
+    for (const [index, item] of args.content.entries()) {
+        if (typeof item.description !== "string" || item.description.trim().length === 0) {
+            throw new Error(
+                `content[${index}].description is required and must be a non-empty string`,
+            )
+        }
+
+        if (typeof item.targetId !== "string" || item.targetId.trim().length === 0) {
+            throw new Error(`content[${index}].targetId is required and must be a non-empty string`)
+        }
+
+        if (typeof item.summary !== "string" || item.summary.trim().length === 0) {
+            throw new Error(`content[${index}].summary is required and must be a non-empty string`)
+        }
+
+        const key = item.targetId.trim().toLowerCase()
+        if (seen.has(key)) {
+            throw new Error(
+                `content[${index}].targetId duplicates another compression target in this call`,
+            )
+        }
+        seen.add(key)
     }
 }
 
@@ -450,7 +517,14 @@ export function injectBlockPlaceholders(
     }
 }
 
-export function allocateBlockId(state: SessionState): number {
+export function allocateBlockId(state: SessionState, blockId?: number): number {
+    if (Number.isInteger(blockId) && blockId && blockId > 0) {
+        if (state.prune.messages.nextBlockId <= blockId) {
+            state.prune.messages.nextBlockId = blockId + 1
+        }
+        return blockId
+    }
+
     const current = state.prune.messages.currentBlockId
     if (!Number.isInteger(current) || current < 1) {
         state.prune.messages.currentBlockId = 2
@@ -680,7 +754,7 @@ function restoreSummary(summary: string): string {
     const afterHeader = summary.slice(headerMatch[0].length)
     const withoutLeadingBreaks = afterHeader.replace(/^(?:\r?\n)+/, "")
     return withoutLeadingBreaks
-        .replace(/(?:\r?\n)*<dcp-message-id>b\d+<\/dcp-message-id>\s*$/i, "")
+        .replace(/(?:\r?\n)*<dcp-message-id(?:\s+[^>]*)?>b\d+<\/dcp-message-id>\s*$/i, "")
         .replace(/(?:\r?\n)+$/, "")
 }
 

@@ -238,6 +238,7 @@ const filterCompressedRanges = (
 function assignVisibleMessageBlocks(state: SessionState, messages: WithParts[]): void {
     const activeBlocks = Array.from(state.prune.messages.activeBlockIds).sort((a, b) => a - b)
     const explicit = new Set<string>()
+    let currentBlockId = state.prune.messages.currentBlockId
 
     for (const blockId of activeBlocks) {
         const block = state.prune.messages.blocksById.get(blockId)
@@ -253,10 +254,24 @@ function assignVisibleMessageBlocks(state: SessionState, messages: WithParts[]):
     for (const message of messages) {
         const messageId = message.info.id
         if (explicit.has(messageId)) {
+            const blockId = state.messageIds.blockByRawId.get(messageId)
+            if (blockId) {
+                currentBlockId = Math.max(currentBlockId, blockId)
+            }
             continue
         }
         if (!state.messageIds.blockByRawId.has(messageId)) {
-            state.messageIds.blockByRawId.set(messageId, state.prune.messages.currentBlockId)
+            state.messageIds.blockByRawId.set(messageId, currentBlockId)
+            continue
         }
+        const blockId = state.messageIds.blockByRawId.get(messageId)
+        if (blockId) {
+            currentBlockId = Math.max(currentBlockId, blockId)
+        }
+    }
+
+    state.prune.messages.currentBlockId = currentBlockId
+    if (state.prune.messages.nextBlockId <= currentBlockId) {
+        state.prune.messages.nextBlockId = currentBlockId + 1
     }
 }

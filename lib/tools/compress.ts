@@ -31,35 +31,45 @@ import { NESTED_FORMAT_OVERLAY, FLAT_FORMAT_OVERLAY } from "../prompts/internal-
 // This schema looks better in the TUI (non primitive args aren't displayed), but LLMs are more likely to fail
 // the tool call
 function buildNestedSchema() {
+    const item = tool.schema.object({
+        description: tool.schema
+            .string()
+            .describe("Short per-block label for display - e.g., 'Auth System Exploration'"),
+        targetId: tool.schema
+            .string()
+            .describe("Visible raw block-scoped message ID to compress (e.g. b12m0123)"),
+        summary: tool.schema
+            .string()
+            .describe("Complete technical summary replacing the selected block"),
+    })
+
     return {
         topic: tool.schema
             .string()
-            .describe("Short label (3-5 words) for display - e.g., 'Auth System Exploration'"),
-        content: tool.schema
-            .object({
-                targetId: tool.schema
-                    .string()
-                    .describe("Block-scoped message or block ID to compress (e.g. b12m0123, b12)"),
-                summary: tool.schema
-                    .string()
-                    .describe("Complete technical summary replacing the selected block"),
-            })
-            .describe("Compression details: block target and replacement summary"),
+            .describe("Overall batch label - e.g., 'Compressing 5 blocks about auth flow'"),
+        content: tool.schema.array(item).describe("One compression entry per selected block"),
     }
 }
 
 // Simpler schema for models that are not as good at tool calling reliably
 function buildFlatSchema() {
-    return {
-        topic: tool.schema
+    const item = tool.schema.object({
+        description: tool.schema
             .string()
-            .describe("Short label (3-5 words) for display - e.g., 'Auth System Exploration'"),
+            .describe("Short per-block label for display - e.g., 'Auth System Exploration'"),
         targetId: tool.schema
             .string()
-            .describe("Block-scoped message or block ID to compress (e.g. b12m0123, b12)"),
+            .describe("Visible raw block-scoped message ID to compress (e.g. b12m0123)"),
         summary: tool.schema
             .string()
             .describe("Complete technical summary replacing the selected block"),
+    })
+
+    return {
+        topic: tool.schema
+            .string()
+            .describe("Overall batch label - e.g., 'Compressing 5 blocks about auth flow'"),
+        compressions: tool.schema.array(item).describe("One compression entry per selected block"),
     }
 }
 
@@ -110,98 +120,121 @@ export function createCompressTool(ctx: ToolContext): ReturnType<typeof tool> {
             // supersedeWrites(ctx.state, ctx.logger, ctx.config, rawMessages)
             purgeErrors(ctx.state, ctx.logger, ctx.config, rawMessages)
 
-            const searchContext = buildSearchContext(ctx.state, rawMessages)
+            const resolvedTargets = new Map<string, number>()
+            for (const item of compressArgs.content) {
+                const searchContext = buildSearchContext(ctx.state, rawMessages)
+                const targetReference = resolveTargetId(searchContext, ctx.state, item.targetId)
+                const blockId = targetReference.blockId
+                if (!blockId) {
+                    throw new Error(`Failed to resolve block for targetId ${item.targetId}`)
+                }
+                const prior = resolvedTargets.get(String(blockId))
+                if (prior !== undefined) {
+                    throw new Error(
+                        `Multiple compression entries target the same block b${blockId}. Choose only one visible message ID per block.`,
+                    )
+                }
+                resolvedTargets.set(String(blockId), blockId)
+            }
 
-            const targetReference = resolveTargetId(
-                searchContext,
-                ctx.state,
-                compressArgs.content.targetId,
-            )
+            let compressedMessageCount = 0
+            let compressedBlockCount = 0
 
-            const range = resolveBlock(searchContext, ctx.state, targetReference)
+            for (const item of compressArgs.content) {
+                const searchContext = buildSearchContext(ctx.state, rawMessages)
 
-            const parsedPlaceholders = parseBlockPlaceholders(compressArgs.content.summary)
-            const missingRequiredBlockIds = validateSummaryPlaceholders(
-                parsedPlaceholders,
-                range.requiredBlockIds,
-                searchContext.summaryByBlockId,
-            )
+                const targetReference = resolveTargetId(searchContext, ctx.state, item.targetId)
+                const range = resolveBlock(searchContext, ctx.state, targetReference)
 
-            const injected = injectBlockPlaceholders(
-                compressArgs.content.summary,
-                parsedPlaceholders,
-                searchContext.summaryByBlockId,
-            )
+                const parsedPlaceholders = parseBlockPlaceholders(item.summary)
+                const missingRequiredBlockIds = validateSummaryPlaceholders(
+                    parsedPlaceholders,
+                    range.requiredBlockIds,
+                    searchContext.summaryByBlockId,
+                )
 
-            const summaryWithUserMessages = appendProtectedUserMessages(
-                injected.expandedSummary,
-                range,
-                searchContext,
-                ctx.state,
-                ctx.config.compress.protectUserMessages,
-            )
+                const injected = injectBlockPlaceholders(
+                    item.summary,
+                    parsedPlaceholders,
+                    searchContext.summaryByBlockId,
+                )
 
-            const summaryWithProtectedTools = await appendProtectedTools(
-                ctx.client,
-                ctx.state,
-                ctx.config.experimental.allowSubAgents,
-                summaryWithUserMessages,
-                range,
-                searchContext,
-                ctx.config.compress.protectedTools,
-                ctx.config.protectedFilePatterns,
-            )
+                const summaryWithUserMessages = appendProtectedUserMessages(
+                    injected.expandedSummary,
+                    range,
+                    searchContext,
+                    ctx.state,
+                    ctx.config.compress.protectUserMessages,
+                )
 
-            const finalSummaryResult = appendMissingBlockSummaries(
-                summaryWithProtectedTools,
-                missingRequiredBlockIds,
-                searchContext.summaryByBlockId,
-                injected.consumedBlockIds,
-            )
+                const summaryWithProtectedTools = await appendProtectedTools(
+                    ctx.client,
+                    ctx.state,
+                    ctx.config.experimental.allowSubAgents,
+                    summaryWithUserMessages,
+                    range,
+                    searchContext,
+                    ctx.config.compress.protectedTools,
+                    ctx.config.protectedFilePatterns,
+                )
 
-            const finalSummary = finalSummaryResult.expandedSummary
+                const finalSummaryResult = appendMissingBlockSummaries(
+                    summaryWithProtectedTools,
+                    missingRequiredBlockIds,
+                    searchContext.summaryByBlockId,
+                    injected.consumedBlockIds,
+                )
 
-            const blockId = allocateBlockId(ctx.state)
-            const storedSummary = wrapCompressedSummary(blockId, finalSummary)
-            const summaryTokens = countTokens(storedSummary)
+                const finalSummary = finalSummaryResult.expandedSummary
+                const blockId = allocateBlockId(ctx.state, range.blockId)
+                const storedSummary = wrapCompressedSummary(blockId, finalSummary)
+                const summaryTokens = countTokens(storedSummary)
 
-            const applied = applyCompressionState(
-                ctx.state,
-                {
-                    topic: compressArgs.topic,
-                    targetId: compressArgs.content.targetId,
-                    compressMessageId: toolCtx.messageID,
-                },
-                range,
-                blockId,
-                storedSummary,
-                finalSummaryResult.consumedBlockIds,
-            )
+                const applied = applyCompressionState(
+                    ctx.state,
+                    {
+                        topic: item.description,
+                        targetId: item.targetId,
+                        compressMessageId: toolCtx.messageID,
+                    },
+                    range,
+                    blockId,
+                    storedSummary,
+                    finalSummaryResult.consumedBlockIds,
+                )
+
+                compressedMessageCount += applied.messageIds.length
+                compressedBlockCount++
+
+                const params = getCurrentParams(ctx.state, rawMessages, ctx.logger)
+                const totalSessionTokens = getCurrentTokenUsage(rawMessages)
+                const sessionMessageIds = rawMessages
+                    .filter((msg) => !(msg.info.role === "user" && isIgnoredUserMessage(msg)))
+                    .map((msg) => msg.info.id)
+
+                await sendCompressNotification(
+                    ctx.client,
+                    ctx.logger,
+                    ctx.config,
+                    ctx.state,
+                    toolCtx.sessionID,
+                    blockId,
+                    item.summary,
+                    summaryTokens,
+                    totalSessionTokens,
+                    sessionMessageIds,
+                    params,
+                )
+            }
 
             ctx.state.manualMode = ctx.state.manualMode ? "active" : false
             await saveSessionState(ctx.state, ctx.logger)
 
-            const params = getCurrentParams(ctx.state, rawMessages, ctx.logger)
-            const totalSessionTokens = getCurrentTokenUsage(rawMessages)
-            const sessionMessageIds = rawMessages
-                .filter((msg) => !(msg.info.role === "user" && isIgnoredUserMessage(msg)))
-                .map((msg) => msg.info.id)
+            if (compressedBlockCount === 1) {
+                return `Compressed ${compressedMessageCount} messages into ${COMPRESSED_BLOCK_HEADER}.`
+            }
 
-            await sendCompressNotification(
-                ctx.client,
-                ctx.logger,
-                ctx.config,
-                ctx.state,
-                toolCtx.sessionID,
-                blockId,
-                compressArgs.content.summary,
-                summaryTokens,
-                totalSessionTokens,
-                sessionMessageIds,
-                params,
-            )
-
-            return `Compressed ${applied.messageIds.length} messages into ${COMPRESSED_BLOCK_HEADER}.`
+            return `Compressed ${compressedMessageCount} messages across ${compressedBlockCount} blocks into ${COMPRESSED_BLOCK_HEADER}.`
         },
     })
 }

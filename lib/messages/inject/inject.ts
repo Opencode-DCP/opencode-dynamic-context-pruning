@@ -2,9 +2,11 @@ import type { SessionState, WithParts } from "../../state"
 import type { Logger } from "../../logger"
 import type { PluginConfig } from "../../config"
 import type { RuntimePrompts } from "../../prompts/store"
-import { formatMessageIdTag } from "../../message-ids"
+import type { AssistantMessage } from "@opencode-ai/sdk/v2"
+import { formatMessageIdTag, type MessageIdTagMeta } from "../../message-ids"
 import { compressPermission, getLastUserMessage } from "../../shared-utils"
 import { saveSessionState } from "../../state/persistence"
+import { countAllMessageTokens } from "../../strategies/utils"
 import {
     appendIdToTool,
     createSyntheticTextPart,
@@ -143,6 +145,8 @@ export const injectMessageIds = (
         return
     }
 
+    const tagMetaByBlockId = getBlockTagMetaMap(state, messages)
+
     for (const message of messages) {
         if (message.info.role === "user" && isIgnoredUserMessage(message)) {
             continue
@@ -153,7 +157,11 @@ export const injectMessageIds = (
             continue
         }
 
-        const tag = formatMessageIdTag(messageRef)
+        const blockId = state.messageIds.blockByRawId.get(message.info.id)
+        const tag = formatMessageIdTag(
+            messageRef,
+            blockId ? tagMetaByBlockId.get(blockId) : undefined,
+        )
 
         if (message.info.role === "user") {
             message.parts.push(createSyntheticTextPart(message, tag))
@@ -177,4 +185,100 @@ export const injectMessageIds = (
             message.parts.splice(firstToolIndex, 0, syntheticPart)
         }
     }
+}
+
+function getBlockTagMetaMap(
+    state: SessionState,
+    messages: WithParts[],
+): Map<number, MessageIdTagMeta> {
+    const messagesByBlockId = new Map<number, WithParts[]>()
+
+    for (const message of messages) {
+        if (message.info.role === "user" && isIgnoredUserMessage(message)) {
+            continue
+        }
+
+        const blockId = state.messageIds.blockByRawId.get(message.info.id)
+        if (!blockId) {
+            continue
+        }
+
+        const bucket = messagesByBlockId.get(blockId)
+        if (bucket) {
+            bucket.push(message)
+            continue
+        }
+
+        messagesByBlockId.set(blockId, [message])
+    }
+
+    const fallbackTokensByBlockId = new Map<number, number>()
+    for (const [blockId, blockMessages] of messagesByBlockId) {
+        const tokens = blockMessages.reduce(
+            (sum, message) => sum + countAllMessageTokens(message),
+            0,
+        )
+        fallbackTokensByBlockId.set(blockId, tokens)
+    }
+
+    const tagMetaByBlockId = new Map<number, MessageIdTagMeta>()
+    let previousRequestTokens = state.systemPromptTokens || 0
+
+    for (const message of messages) {
+        const blockId = state.messageIds.blockByRawId.get(message.info.id)
+        if (!blockId || message.info.role !== "assistant") {
+            continue
+        }
+
+        const requestTokens = getRequestTokens(message)
+        if (requestTokens <= 0) {
+            continue
+        }
+
+        const fallbackTokens = fallbackTokensByBlockId.get(blockId) || 0
+        const deltaTokens = Math.max(0, requestTokens - previousRequestTokens)
+        const tokens = Math.max(fallbackTokens, deltaTokens)
+        tagMetaByBlockId.set(blockId, {
+            tokens,
+            priority: classifyPriority(tokens),
+        })
+        previousRequestTokens = requestTokens
+    }
+
+    for (const [blockId, fallbackTokens] of fallbackTokensByBlockId) {
+        if (tagMetaByBlockId.has(blockId)) {
+            continue
+        }
+        tagMetaByBlockId.set(blockId, {
+            tokens: fallbackTokens,
+            priority: classifyPriority(fallbackTokens),
+        })
+    }
+
+    return tagMetaByBlockId
+}
+
+function getRequestTokens(message: WithParts): number {
+    const info = message.info as AssistantMessage
+    return (
+        (info.tokens?.input || 0) +
+        (info.tokens?.cache?.read || 0) +
+        (info.tokens?.cache?.write || 0)
+    )
+}
+
+function classifyPriority(tokens: number): string {
+    if (tokens >= 8000) {
+        return "very high"
+    }
+    if (tokens >= 5000) {
+        return "high"
+    }
+    if (tokens >= 3000) {
+        return "medium"
+    }
+    if (tokens >= 1000) {
+        return "low"
+    }
+    return "none"
 }

@@ -180,6 +180,7 @@ export function buildCompressedBlockGuidance(state: SessionState): string {
     return [
         "Compressed block context:",
         `- Active compressed blocks in this session: ${blockCount} (${blockList})`,
+        "- Visible message-id tags may include `priority` and `tokens` metadata. Favor closed blocks with higher priority when choosing what to compress.",
         "- If your selected compression block includes any listed block, include each required placeholder exactly once in the summary using \`(bN)\`.",
     ].join("\n")
 }

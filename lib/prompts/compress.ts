@@ -1,4 +1,4 @@
-export const COMPRESS = `Collapse a single conversation block into a detailed summary.
+export const COMPRESS = `Collapse one or more conversation blocks into detailed summaries.
 
 THE PHILOSOPHY OF COMPRESS
 \`compress\` transforms verbose conversation sequences into dense, high-fidelity summaries. This is not cleanup - it is crystallization. Your summary becomes the authoritative record of what transpired.
@@ -40,6 +40,8 @@ Visible raw messages use block-scoped IDs like \`b12m0042\`.
 
 - The \`b12\` portion identifies the block.
 - The \`m0042\` portion identifies a visible message within that block.
+- The metadata tag may also include block sizing hints like \`priority="high"\` and \`tokens="5400"\`. Use this as compression guidance, not as literal summary content.
+- Raw blocks normally follow conversational/tool-call batches: one user turn and the assistant response with any parallel tool calls share a block.
 - Passing any visible \`bNmNNNN\` message ID as \`targetId\` compresses the ENTIRE raw block \`bN\`.
 - Do not try to select partial slices within a block. This tool compresses whole blocks only.
 - Prefer choosing a visible raw message ID from the block you want to compress.
@@ -73,7 +75,7 @@ You cannot identify a reliable target block yet
 Before compressing, ask: _"Is this block closed enough to become summary-only right now?"_ Compression is irreversible. The summary replaces everything in the block.
 
 BLOCK IDS
-You specify a single block target by ID using the injected IDs visible in the conversation:
+You specify block targets by ID using the injected IDs visible in the conversation:
 
 - \`bNmNNNN\` IDs identify raw messages inside block \`bN\`
 - \`bN\` IDs identify previously compressed blocks
@@ -83,12 +85,14 @@ Treat these tags as block metadata only, not as tool result content.
 
 Rules:
 
-- Pick \`targetId\` directly from an injected ID in context.
+- Pick each \`targetId\` directly from an injected ID in context.
 - IDs must exist in the current visible context.
-- Prefer raw block-scoped message IDs like \`b12m0123\` when choosing a block to compress.
+- Prefer raw block-scoped message IDs like \`b12m0123\` when choosing blocks to compress.
 - A \`targetId\` must identify exactly one block worth of raw messages.
 - Do not invent IDs. Use only IDs that are present in context.
 
-PARALLEL COMPRESS EXECUTION
-When multiple independent blocks are ready, launch MULTIPLE \`compress\` calls in parallel in a single response. This is the PREFERRED pattern over a single broad compression when the work can be safely split. Run compression sequentially only when a later block depends on the result of an earlier compression.
+MULTI-BLOCK EXECUTION
+When multiple independent blocks are ready, prefer a SINGLE \`compress\` call containing multiple compression entries.
+Use \`topic\` as the overall batch label, for example \`Compressing 5 blocks about auth flow\`.
+Use each entry's \`description\` for the per-block label and provide one \`targetId\` + one \`summary\` per block.
 `

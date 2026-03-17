@@ -10,6 +10,11 @@ const MESSAGE_REF_WIDTH = 4
 const MESSAGE_REF_MIN_INDEX = 1
 export const MESSAGE_REF_MAX_INDEX = 9999
 
+export interface MessageIdTagMeta {
+    priority: string
+    tokens: number
+}
+
 export type ParsedBoundaryId =
     | {
           kind: "message"
@@ -135,8 +140,14 @@ export function parseBoundaryId(id: string): ParsedBoundaryId | null {
     return null
 }
 
-export function formatMessageIdTag(ref: string): string {
-    return `\n<${MESSAGE_ID_TAG_NAME}>${ref}</${MESSAGE_ID_TAG_NAME}>`
+export function formatMessageIdTag(ref: string, meta?: MessageIdTagMeta): string {
+    if (!meta) {
+        return `\n<${MESSAGE_ID_TAG_NAME}>${ref}</${MESSAGE_ID_TAG_NAME}>`
+    }
+
+    const priority = meta.priority.replace(/"/g, "&quot;")
+    const tokens = Math.max(0, Math.round(meta.tokens))
+    return `\n<${MESSAGE_ID_TAG_NAME} priority="${priority}" tokens="${tokens}">${ref}</${MESSAGE_ID_TAG_NAME}>`
 }
 
 export function assignMessageRefs(state: SessionState, messages: WithParts[]): number {
@@ -153,8 +164,6 @@ export function assignMessageRefs(state: SessionState, messages: WithParts[]): n
         messagesState.nextBlockId = messagesState.currentBlockId + 1
     }
 
-    prepareFetchBlock(state, messages)
-
     for (const block of messagesState.blocksById.values()) {
         for (const messageId of block.directMessageIds) {
             if (!state.messageIds.blockByRawId.has(messageId)) {
@@ -162,6 +171,9 @@ export function assignMessageRefs(state: SessionState, messages: WithParts[]): n
             }
         }
     }
+
+    let lastRole: "user" | "assistant" | "other" | null = null
+    let lastBlockId: number | null = null
 
     for (const message of messages) {
         if (message.info.role === "user" && isIgnoredUserMessage(message)) {
@@ -183,46 +195,106 @@ export function assignMessageRefs(state: SessionState, messages: WithParts[]): n
             const parsedExisting = parseBlockMessageRef(existingRef)
             if (parsedExisting) {
                 state.messageIds.blockByRawId.set(rawMessageId, parsedExisting.blockId)
+                syncCurrentBlock(state, parsedExisting.blockId)
+                lastBlockId = parsedExisting.blockId
+            } else {
+                const existingBlockId = state.messageIds.blockByRawId.get(rawMessageId)
+                if (existingBlockId) {
+                    syncCurrentBlock(state, existingBlockId)
+                    lastBlockId = existingBlockId
+                }
             }
             if (state.messageIds.byRef.get(existingRef) !== rawMessageId) {
                 state.messageIds.byRef.set(existingRef, rawMessageId)
             }
+            lastRole = normalizeRole(message.info.role)
             continue
         }
 
+        const blockId = resolveVisibleBlockId(state, message.info.role, lastRole, lastBlockId)
         const suffix = allocateNextMessageRef(state)
-        const blockId =
-            state.messageIds.blockByRawId.get(rawMessageId) ?? messagesState.currentBlockId
         const ref = formatBlockMessageRef(blockId, parseMessageRef(suffix) || MESSAGE_REF_MIN_INDEX)
         state.messageIds.byRawId.set(rawMessageId, ref)
         state.messageIds.byRef.set(ref, rawMessageId)
         state.messageIds.blockByRawId.set(rawMessageId, blockId)
+        syncCurrentBlock(state, blockId)
+        lastRole = normalizeRole(message.info.role)
+        lastBlockId = blockId
         assigned++
     }
 
     return assigned
 }
 
-function prepareFetchBlock(state: SessionState, messages: WithParts[]): void {
-    const hasUnseen = messages.some((message) => {
-        if (message.info.role === "user" && isIgnoredUserMessage(message)) {
-            return false
+function resolveVisibleBlockId(
+    state: SessionState,
+    role: string,
+    lastRole: "user" | "assistant" | "other" | null,
+    lastBlockId: number | null,
+): number {
+    const currentRole = normalizeRole(role)
+    if (currentRole === "user") {
+        if (lastRole === "user" && lastBlockId) {
+            return lastBlockId
         }
-        return !state.messageIds.byRawId.has(message.info.id)
-    })
-
-    if (!hasUnseen) {
-        return
+        return startNewBlock(state)
     }
 
+    if (currentRole === "assistant") {
+        if (lastRole === "user" && lastBlockId) {
+            return lastBlockId
+        }
+        return startNewBlock(state)
+    }
+
+    if (lastBlockId) {
+        return lastBlockId
+    }
+
+    return startNewBlock(state)
+}
+
+function normalizeRole(role: string): "user" | "assistant" | "other" {
+    if (role === "user") {
+        return "user"
+    }
+    if (role === "assistant") {
+        return "assistant"
+    }
+    return "other"
+}
+
+function startNewBlock(state: SessionState): number {
     const current = state.prune.messages.currentBlockId
-    const inUse = Array.from(state.messageIds.blockByRawId.values()).some((id) => id === current)
-    if (!inUse) {
-        return
+    if (!blockIdInUse(state, current)) {
+        syncCurrentBlock(state, current)
+        return current
     }
 
-    state.prune.messages.currentBlockId = state.prune.messages.nextBlockId
-    state.prune.messages.nextBlockId = state.prune.messages.currentBlockId + 1
+    const blockId = state.prune.messages.nextBlockId
+    state.prune.messages.currentBlockId = blockId
+    state.prune.messages.nextBlockId = blockId + 1
+    return blockId
+}
+
+function blockIdInUse(state: SessionState, blockId: number): boolean {
+    if (!Number.isInteger(blockId) || blockId < 1) {
+        return false
+    }
+    if (state.prune.messages.blocksById.has(blockId)) {
+        return true
+    }
+    return Array.from(state.messageIds.blockByRawId.values()).some((id) => id === blockId)
+}
+
+function syncCurrentBlock(state: SessionState, blockId: number): void {
+    if (!Number.isInteger(blockId) || blockId < 1) {
+        return
+    }
+    state.prune.messages.currentBlockId = blockId
+    if (state.prune.messages.nextBlockId <= blockId) {
+        state.prune.messages.nextBlockId = blockId + 1
+    }
 }
 
 function allocateNextMessageRef(state: SessionState): string {

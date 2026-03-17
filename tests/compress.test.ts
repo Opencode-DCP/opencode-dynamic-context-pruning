@@ -8,6 +8,7 @@ import { createSessionState, type WithParts } from "../lib/state"
 import type { PluginConfig } from "../lib/config"
 import { Logger } from "../lib/logger"
 import { assignMessageRefs } from "../lib/message-ids"
+import { injectMessageIds } from "../lib/messages"
 
 const testDataHome = join(tmpdir(), `opencode-dcp-tests-${process.pid}`)
 const testConfigHome = join(tmpdir(), `opencode-dcp-config-tests-${process.pid}`)
@@ -77,6 +78,36 @@ function textPart(messageID: string, sessionID: string, id: string, text: string
         sessionID,
         type: "text" as const,
         text,
+    }
+}
+
+function toolPart(
+    messageID: string,
+    sessionID: string,
+    id: string,
+    tool: string,
+    callID: string,
+    input: Record<string, unknown>,
+    output: string,
+) {
+    return {
+        id,
+        messageID,
+        sessionID,
+        type: "tool" as const,
+        tool,
+        callID,
+        state: {
+            status: "completed" as const,
+            input,
+            output,
+            title: tool,
+            metadata: {},
+            time: {
+                start: 0,
+                end: 0,
+            },
+        },
     }
 }
 
@@ -161,10 +192,13 @@ test("compress rebuilds subagent message refs after session state was reset", as
     const result = await tool.execute(
         {
             topic: "Subagent race fix",
-            content: {
-                targetId: "b1m0001",
-                summary: "Captured the initial investigation and follow-up request.",
-            },
+            content: [
+                {
+                    description: "Initial investigation",
+                    targetId: "b1m0001",
+                    summary: "Captured the initial investigation and follow-up request.",
+                },
+            ],
         },
         {
             ask: async () => {},
@@ -174,26 +208,59 @@ test("compress rebuilds subagent message refs after session state was reset", as
         } as any,
     )
 
-    assert.equal(result, "Compressed 2 messages into [Compressed conversation section].")
+    assert.equal(result, "Compressed 1 messages into [Compressed conversation section].")
     assert.equal(state.sessionId, sessionID)
     assert.equal(state.isSubAgent, true)
     assert.equal(state.messageIds.byRef.get("b1m0001"), "msg-assistant-1")
-    assert.equal(state.messageIds.byRef.get("b1m0002"), "msg-user-2")
+    assert.equal(state.messageIds.byRef.get("b2m0002"), "msg-user-2")
     assert.equal(state.messageIds.blockByRawId.get("msg-assistant-1"), 1)
-    assert.equal(state.messageIds.blockByRawId.get("msg-user-2"), 1)
+    assert.equal(state.messageIds.blockByRawId.get("msg-user-2"), 2)
     assert.equal(state.prune.messages.blocksById.size, 1)
     assert.equal(state.prune.messages.blocksById.get(1)?.targetId, "b1m0001")
-    assert.equal(state.prune.messages.currentBlockId, 1)
+    assert.equal(state.prune.messages.currentBlockId, 2)
 })
 
-test("new fetch assigns unseen messages to a new stable block", () => {
-    const sessionID = `ses_block_fetch_${Date.now()}`
-    const state = createSessionState()
-    state.sessionId = sessionID
-
-    const first = buildMessages(sessionID)
-    const second = [
-        ...first,
+test("compress can handle multiple blocks in one tool call", async () => {
+    const sessionID = `ses_multi_compress_${Date.now()}`
+    const rawMessages: WithParts[] = [
+        {
+            info: {
+                id: "msg-user-1",
+                role: "user",
+                sessionID,
+                agent: "codebase-analyzer",
+                model: {
+                    providerID: "anthropic",
+                    modelID: "claude-test",
+                },
+                time: { created: 1 },
+            } as WithParts["info"],
+            parts: [textPart("msg-user-1", sessionID, "part-1", "first task")],
+        },
+        {
+            info: {
+                id: "msg-assistant-1",
+                role: "assistant",
+                sessionID,
+                agent: "codebase-analyzer",
+                time: { created: 2 },
+            } as WithParts["info"],
+            parts: [textPart("msg-assistant-1", sessionID, "part-2", "first reply")],
+        },
+        {
+            info: {
+                id: "msg-user-2",
+                role: "user",
+                sessionID,
+                agent: "codebase-analyzer",
+                model: {
+                    providerID: "anthropic",
+                    modelID: "claude-test",
+                },
+                time: { created: 3 },
+            } as WithParts["info"],
+            parts: [textPart("msg-user-2", sessionID, "part-3", "second task")],
+        },
         {
             info: {
                 id: "msg-assistant-2",
@@ -202,19 +269,276 @@ test("new fetch assigns unseen messages to a new stable block", () => {
                 agent: "codebase-analyzer",
                 time: { created: 4 },
             } as WithParts["info"],
-            parts: [textPart("msg-assistant-2", sessionID, "part-4", "Next fetch content")],
+            parts: [textPart("msg-assistant-2", sessionID, "part-4", "second reply")],
+        },
+    ]
+
+    const state = createSessionState()
+    state.sessionId = sessionID
+
+    const logger = new Logger(false)
+    const tool = createCompressTool({
+        client: {
+            session: {
+                messages: async () => ({ data: rawMessages }),
+                get: async () => ({ data: {} }),
+            },
+        },
+        state,
+        logger,
+        config: buildConfig(),
+        prompts: {
+            reload() {},
+            getRuntimePrompts() {
+                return { compress: "" }
+            },
+        },
+    } as any)
+
+    const result = await tool.execute(
+        {
+            topic: "Compressing two finished blocks",
+            content: [
+                {
+                    description: "First finished task",
+                    targetId: "b1m0001",
+                    summary: "Captured the first task and its completed response.",
+                },
+                {
+                    description: "Second finished task",
+                    targetId: "b2m0003",
+                    summary: "Captured the second task and its completed response.",
+                },
+            ],
+        },
+        {
+            ask: async () => {},
+            metadata: () => {},
+            sessionID,
+            messageID: "msg-compress-batch",
+        } as any,
+    )
+
+    assert.equal(
+        result,
+        "Compressed 4 messages across 2 blocks into [Compressed conversation section].",
+    )
+    assert.equal(state.prune.messages.blocksById.size, 2)
+    assert.equal(state.prune.messages.blocksById.get(1)?.topic, "First finished task")
+    assert.equal(state.prune.messages.blocksById.get(2)?.topic, "Second finished task")
+    assert.equal(state.prune.messages.blocksById.get(1)?.targetId, "b1m0001")
+    assert.equal(state.prune.messages.blocksById.get(2)?.targetId, "b2m0003")
+})
+
+test("new turns and tool batches create new stable blocks", () => {
+    const sessionID = `ses_block_turns_${Date.now()}`
+    const state = createSessionState()
+    state.sessionId = sessionID
+
+    const first = [
+        {
+            info: {
+                id: "msg-user-1",
+                role: "user",
+                sessionID,
+                agent: "codebase-analyzer",
+                model: {
+                    providerID: "anthropic",
+                    modelID: "claude-test",
+                },
+                time: { created: 1 },
+            } as WithParts["info"],
+            parts: [textPart("msg-user-1", sessionID, "part-1", "first request")],
+        },
+        {
+            info: {
+                id: "msg-assistant-1",
+                role: "assistant",
+                sessionID,
+                agent: "codebase-analyzer",
+                time: { created: 2 },
+            } as WithParts["info"],
+            parts: [
+                textPart("msg-assistant-1", sessionID, "part-2", "first reply"),
+                toolPart(
+                    "msg-assistant-1",
+                    sessionID,
+                    "tool-part-1",
+                    "bash",
+                    "call-1",
+                    { command: "pwd" },
+                    "ok",
+                ),
+            ],
+        },
+    ]
+    const second = [
+        ...first,
+        {
+            info: {
+                id: "msg-user-2",
+                role: "user",
+                sessionID,
+                agent: "codebase-analyzer",
+                model: {
+                    providerID: "anthropic",
+                    modelID: "claude-test",
+                },
+                time: { created: 3 },
+            } as WithParts["info"],
+            parts: [textPart("msg-user-2", sessionID, "part-3", "second request")],
+        },
+        {
+            info: {
+                id: "msg-assistant-2",
+                role: "assistant",
+                sessionID,
+                agent: "codebase-analyzer",
+                time: { created: 4 },
+            } as WithParts["info"],
+            parts: [
+                textPart("msg-assistant-2", sessionID, "part-4", "second reply"),
+                toolPart(
+                    "msg-assistant-2",
+                    sessionID,
+                    "tool-part-2",
+                    "read",
+                    "call-2",
+                    { filePath: "/tmp/x" },
+                    "done",
+                ),
+                toolPart(
+                    "msg-assistant-2",
+                    sessionID,
+                    "tool-part-3",
+                    "grep",
+                    "call-3",
+                    { pattern: "x" },
+                    "match",
+                ),
+            ],
         },
     ]
 
     assignMessageRefs(state, first)
-    assert.equal(state.messageIds.byRawId.get("msg-subagent-prompt"), "b1m0001")
+    assert.equal(state.messageIds.byRawId.get("msg-user-1"), "b1m0001")
     assert.equal(state.messageIds.byRawId.get("msg-assistant-1"), "b1m0002")
-    assert.equal(state.messageIds.byRawId.get("msg-user-2"), "b1m0003")
     assert.equal(state.prune.messages.currentBlockId, 1)
 
     assignMessageRefs(state, second)
+    assert.equal(state.messageIds.byRawId.get("msg-user-2"), "b2m0003")
     assert.equal(state.messageIds.byRawId.get("msg-assistant-2"), "b2m0004")
+    assert.equal(state.messageIds.blockByRawId.get("msg-user-2"), 2)
     assert.equal(state.messageIds.blockByRawId.get("msg-assistant-2"), 2)
     assert.equal(state.prune.messages.currentBlockId, 2)
     assert.equal(state.prune.messages.nextBlockId, 3)
+})
+
+test("injectMessageIds annotates block tags with priority and tokens", () => {
+    const sessionID = `ses_block_priority_${Date.now()}`
+    const state = createSessionState()
+    state.sessionId = sessionID
+    state.systemPromptTokens = 200
+
+    const messages: WithParts[] = [
+        {
+            info: {
+                id: "msg-user-1",
+                role: "user",
+                sessionID,
+                agent: "codebase-analyzer",
+                model: {
+                    providerID: "anthropic",
+                    modelID: "claude-test",
+                },
+                time: { created: 1 },
+            } as WithParts["info"],
+            parts: [textPart("msg-user-1", sessionID, "part-1", "small request")],
+        },
+        {
+            info: {
+                id: "msg-assistant-1",
+                role: "assistant",
+                sessionID,
+                agent: "codebase-analyzer",
+                time: { created: 2 },
+                tokens: {
+                    input: 800,
+                    output: 120,
+                    reasoning: 0,
+                    cache: {
+                        read: 0,
+                        write: 0,
+                    },
+                },
+            } as WithParts["info"],
+            parts: [textPart("msg-assistant-1", sessionID, "part-2", "small reply")],
+        },
+        {
+            info: {
+                id: "msg-user-2",
+                role: "user",
+                sessionID,
+                agent: "codebase-analyzer",
+                model: {
+                    providerID: "anthropic",
+                    modelID: "claude-test",
+                },
+                time: { created: 3 },
+            } as WithParts["info"],
+            parts: [textPart("msg-user-2", sessionID, "part-3", "big request")],
+        },
+        {
+            info: {
+                id: "msg-assistant-2",
+                role: "assistant",
+                sessionID,
+                agent: "codebase-analyzer",
+                time: { created: 4 },
+                tokens: {
+                    input: 9500,
+                    output: 300,
+                    reasoning: 0,
+                    cache: {
+                        read: 0,
+                        write: 0,
+                    },
+                },
+            } as WithParts["info"],
+            parts: [
+                textPart("msg-assistant-2", sessionID, "part-4", "big reply"),
+                toolPart(
+                    "msg-assistant-2",
+                    sessionID,
+                    "tool-part-1",
+                    "bash",
+                    "call-1",
+                    { command: "long command" },
+                    "large output",
+                ),
+            ],
+        },
+    ]
+
+    assignMessageRefs(state, messages)
+    injectMessageIds(state, buildConfig(), messages)
+
+    const firstUserPart = messages[0]?.parts[messages[0].parts.length - 1]
+    const secondToolPart = messages[3]?.parts.find((part) => part.type === "tool")
+
+    assert.equal(firstUserPart?.type, "text")
+    if (firstUserPart?.type === "text") {
+        assert.match(
+            firstUserPart.text,
+            /<dcp-message-id priority="none" tokens="600">b1m0001<\/dcp-message-id>/,
+        )
+    }
+
+    assert.equal(secondToolPart?.type, "tool")
+    if (secondToolPart?.type === "tool" && secondToolPart.state.status === "completed") {
+        assert.match(
+            String(secondToolPart.state.output),
+            /<dcp-message-id priority="very high" tokens="8700">b2m0004<\/dcp-message-id>/,
+        )
+    }
 })
