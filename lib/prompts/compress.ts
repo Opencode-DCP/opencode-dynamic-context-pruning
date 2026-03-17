@@ -93,6 +93,7 @@ Rules:
 
 MULTI-BLOCK EXECUTION
 When multiple independent blocks are ready, prefer a SINGLE \`compress\` call containing multiple compression entries.
+Do this instead of launching separate parallel \`compress\` calls.
 Use \`topic\` as the overall batch label, for example \`Compressing 5 blocks about auth flow\`.
 Use each entry's \`description\` for the per-block label and provide one \`targetId\` + one \`summary\` per block.
 `
