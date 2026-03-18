@@ -11,7 +11,12 @@ import {
     injectExtendedSubAgentResults,
     stripStaleMetadata,
 } from "./messages"
-import { buildToolIdList, isIgnoredUserMessage, stripHallucinations } from "./messages/utils"
+import {
+    buildToolIdList,
+    isIgnoredUserMessage,
+    sanitizeVisibleOutput,
+    stripHallucinations,
+} from "./messages/utils"
 import { checkSession } from "./state"
 import { renderSystemPrompt } from "./prompts"
 import { handleStatsCommand } from "./commands/stats"
@@ -32,9 +37,6 @@ const INTERNAL_AGENT_SIGNATURES = [
     "You are a helpful AI assistant tasked with summarizing conversations",
     "Summarize what was done in this conversation",
 ]
-
-const DCP_MESSAGE_ID_TAG_REGEX = /<dcp-message-id>(?:m\d+|b\d+)<\/dcp-message-id>/g
-const DCP_SYSTEM_REMINDER_REGEX = /<dcp-system-reminder\b[^>]*>[\s\S]*?<\/dcp-system-reminder>/g
 
 function applyManualPrompt(state: SessionState, messages: WithParts[], logger: Logger): void {
     const pending = state.pendingManualTrigger
@@ -125,7 +127,7 @@ export function createChatMessageTransformHandler(
     prompts: PromptStore,
     hostPermissions: HostPermissionSnapshot,
 ) {
-    return async (input: {}, output: { messages: WithParts[] }) => {
+    return async (_input: {}, output: { messages: WithParts[] }) => {
         await checkSession(client, state, logger, output.messages, config.manualMode.enabled)
 
         syncCompressPermissionState(state, config, hostPermissions, output.messages)
@@ -280,8 +282,16 @@ export function createTextCompleteHandler() {
         _input: { sessionID: string; messageID: string; partID: string },
         output: { text: string },
     ) => {
-        output.text = output.text
-            .replace(DCP_SYSTEM_REMINDER_REGEX, "")
-            .replace(DCP_MESSAGE_ID_TAG_REGEX, "")
+        output.text = sanitizeVisibleOutput(output.text)
+    }
+}
+
+export function createToolExecuteAfterHandler() {
+    return async (
+        _input: { tool: string; sessionID: string; callID: string },
+        output: { title: string; output: string; metadata: unknown },
+    ) => {
+        output.title = sanitizeVisibleOutput(output.title)
+        output.output = sanitizeVisibleOutput(output.output)
     }
 }
