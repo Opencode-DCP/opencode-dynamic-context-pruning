@@ -61,36 +61,8 @@ export const createSyntheticTextPart = (
         messageID: userInfo.id,
         type: "text" as const,
         text: content,
+        synthetic: true,
     }
-}
-
-type MessagePart = WithParts["parts"][number]
-type ToolPart = Extract<MessagePart, { type: "tool" }>
-
-export const appendIdToTool = (part: ToolPart, tag: string): boolean => {
-    if (part.type !== "tool") {
-        return false
-    }
-    if (part.state?.status !== "completed" || typeof part.state.output !== "string") {
-        return false
-    }
-    if (part.state.output.includes(tag)) {
-        return true
-    }
-
-    part.state.output = `${part.state.output}${tag}`
-    return true
-}
-
-export const findLastToolPart = (message: WithParts): ToolPart | null => {
-    for (let i = message.parts.length - 1; i >= 0; i--) {
-        const part = message.parts[i]
-        if (part.type === "tool") {
-            return part
-        }
-    }
-
-    return null
 }
 
 export function buildToolIdList(state: SessionState, messages: WithParts[]): string[] {
@@ -129,6 +101,10 @@ export const isIgnoredUserMessage = (message: WithParts): boolean => {
 
 export const stripHallucinationsFromString = (text: string): string => {
     return text.replace(DCP_SYSTEM_REMINDER_REGEX, "").replace(DCP_MESSAGE_ID_TAG_REGEX, "")
+}
+
+export const sanitizeVisibleOutput = (text: string): string => {
+    return stripHallucinationsFromString(text).replace(/\n{3,}/g, "\n\n").trimEnd()
 }
 
 export const stripHallucinations = (messages: WithParts[]): void => {

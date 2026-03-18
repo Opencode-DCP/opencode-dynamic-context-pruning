@@ -14,6 +14,7 @@ import {
     createCommandExecuteHandler,
     createSystemPromptHandler,
     createTextCompleteHandler,
+    createToolExecuteAfterHandler,
 } from "./lib/hooks"
 import { configureClientAuth, isSecureMode } from "./lib/auth"
 
@@ -71,6 +72,7 @@ const plugin: Plugin = (async (ctx) => {
             logger.debug("Cached variant from chat.message hook", { variant: input.variant })
         },
         "experimental.text.complete": createTextCompleteHandler(),
+        "tool.execute.after": createToolExecuteAfterHandler(),
         "command.execute.before": createCommandExecuteHandler(
             ctx.client,
             state,

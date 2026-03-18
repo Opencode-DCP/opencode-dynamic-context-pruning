@@ -6,9 +6,7 @@ import { formatMessageIdTag } from "../../message-ids"
 import { compressPermission, getLastUserMessage } from "../../shared-utils"
 import { saveSessionState } from "../../state/persistence"
 import {
-    appendIdToTool,
     createSyntheticTextPart,
-    findLastToolPart,
     isIgnoredUserMessage,
 } from "../utils"
 import {
@@ -161,11 +159,6 @@ export const injectMessageIds = (
         }
 
         if (message.info.role !== "assistant") {
-            continue
-        }
-
-        const lastToolPart = findLastToolPart(message)
-        if (lastToolPart && appendIdToTool(lastToolPart, tag)) {
             continue
         }
 
