@@ -15,20 +15,15 @@ import {
 
 const BLOCK_PLACEHOLDER_REGEX = /\(b(\d+)\)|\{block_(\d+)\}/gi
 
-export interface CompressRangeToolArgs {
-    topic: string
-    content: {
-        startId: string
-        endId: string
-        summary: string
-    }
-}
-
-export interface FlatCompressRangeToolArgs {
-    topic: string
+export interface CompressRangeEntry {
     startId: string
     endId: string
     summary: string
+}
+
+export interface CompressRangeToolArgs {
+    topic: string
+    content: CompressRangeEntry[]
 }
 
 export interface CompressMessageEntry {
@@ -48,27 +43,19 @@ export interface ResolvedMessageCompression {
     anchorMessageId: string
 }
 
+export interface ResolvedRangeCompression {
+    index: number
+    entry: CompressRangeEntry
+    range: RangeResolution
+    anchorMessageId: string
+}
+
 export interface ResolvedMessageCompressionsResult {
     plans: ResolvedMessageCompression[]
     skippedIssues: string[]
 }
 
 class SoftMessageCompressionIssue extends Error {}
-
-export function normalizeCompressRangeArgs(args: Record<string, unknown>): CompressRangeToolArgs {
-    if ("content" in args && typeof args.content === "object" && args.content !== null) {
-        return args as unknown as CompressRangeToolArgs
-    }
-
-    return {
-        topic: args.topic as string,
-        content: {
-            startId: args.startId as string,
-            endId: args.endId as string,
-            summary: args.summary as string,
-        },
-    }
-}
 
 export interface BoundaryReference {
     kind: "message" | "compressed-block"
@@ -131,16 +118,25 @@ export function validateCompressRangeArgs(args: CompressRangeToolArgs): void {
         throw new Error("topic is required and must be a non-empty string")
     }
 
-    if (typeof args.content?.startId !== "string" || args.content.startId.trim().length === 0) {
-        throw new Error("content.startId is required and must be a non-empty string")
+    if (!Array.isArray(args.content) || args.content.length === 0) {
+        throw new Error("content is required and must be a non-empty array")
     }
 
-    if (typeof args.content?.endId !== "string" || args.content.endId.trim().length === 0) {
-        throw new Error("content.endId is required and must be a non-empty string")
-    }
+    for (let index = 0; index < args.content.length; index++) {
+        const entry = args.content[index]
+        const prefix = `content[${index}]`
 
-    if (typeof args.content?.summary !== "string" || args.content.summary.trim().length === 0) {
-        throw new Error("content.summary is required and must be a non-empty string")
+        if (typeof entry?.startId !== "string" || entry.startId.trim().length === 0) {
+            throw new Error(`${prefix}.startId is required and must be a non-empty string`)
+        }
+
+        if (typeof entry?.endId !== "string" || entry.endId.trim().length === 0) {
+            throw new Error(`${prefix}.endId is required and must be a non-empty string`)
+        }
+
+        if (typeof entry?.summary !== "string" || entry.summary.trim().length === 0) {
+            throw new Error(`${prefix}.summary is required and must be a non-empty string`)
+        }
     }
 }
 
@@ -437,6 +433,66 @@ export function resolveRange(
         messageTokenById,
         toolIds,
         requiredBlockIds,
+    }
+}
+
+export function resolveRangeCompressions(
+    args: CompressRangeToolArgs,
+    searchContext: SearchContext,
+    state: SessionState,
+): ResolvedRangeCompression[] {
+    return args.content.map((entry, index) => {
+        const normalizedEntry = {
+            startId: entry.startId.trim(),
+            endId: entry.endId.trim(),
+            summary: entry.summary,
+        }
+
+        const { startReference, endReference } = resolveBoundaryIds(
+            searchContext,
+            state,
+            normalizedEntry.startId,
+            normalizedEntry.endId,
+        )
+        const range = resolveRange(searchContext, startReference, endReference)
+
+        return {
+            index,
+            entry: normalizedEntry,
+            range,
+            anchorMessageId: resolveAnchorMessageId(startReference),
+        }
+    })
+}
+
+export function validateNonOverlappingRangeCompressions(plans: ResolvedRangeCompression[]): void {
+    const sortedPlans = [...plans].sort(
+        (left, right) =>
+            left.range.startReference.rawIndex - right.range.startReference.rawIndex ||
+            left.range.endReference.rawIndex - right.range.endReference.rawIndex ||
+            left.index - right.index,
+    )
+
+    const issues: string[] = []
+
+    for (let index = 1; index < sortedPlans.length; index++) {
+        const previous = sortedPlans[index - 1]
+        const current = sortedPlans[index]
+        if (!previous || !current) {
+            continue
+        }
+
+        if (current.range.startReference.rawIndex > previous.range.endReference.rawIndex) {
+            continue
+        }
+
+        issues.push(
+            `content[${previous.index}] (${previous.entry.startId}..${previous.entry.endId}) overlaps content[${current.index}] (${current.entry.startId}..${current.entry.endId}). Overlapping ranges cannot be compressed in the same batch.`,
+        )
+    }
+
+    if (issues.length > 0) {
+        throwCombinedIssues(issues)
     }
 }
 

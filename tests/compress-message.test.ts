@@ -49,7 +49,6 @@ function buildConfig(): PluginConfig {
             nudgeFrequency: 5,
             iterationNudgeThreshold: 15,
             nudgeForce: "soft",
-            flatSchema: false,
             protectedTools: ["task"],
             protectUserMessages: false,
         },
@@ -57,9 +56,6 @@ function buildConfig(): PluginConfig {
             deduplication: {
                 enabled: true,
                 protectedTools: [],
-            },
-            supersedeWrites: {
-                enabled: true,
             },
             purgeErrors: {
                 enabled: true,
@@ -144,6 +140,25 @@ function buildMessages(sessionID: string): WithParts[] {
     ]
 }
 
+test("compress message tool appends non-editable format overlay", () => {
+    const tool = createCompressMessageTool({
+        client: {},
+        state: createSessionState(),
+        logger: new Logger(false),
+        config: buildConfig(),
+        prompts: {
+            reload() {},
+            getRuntimePrompts() {
+                return { compressMessage: "", compressRange: "" }
+            },
+        },
+    } as any)
+
+    assert.match(tool.description, /THE FORMAT OF COMPRESS/)
+    assert.match(tool.description, /messageId: string/)
+    assert.match(tool.description, /Raw message ID only: mNNNN/)
+})
+
 test("compress message mode batches individual message summaries", async () => {
     const sessionID = `ses_message_compress_${Date.now()}`
     const rawMessages = buildMessages(sessionID)
@@ -209,6 +224,66 @@ test("compress message mode batches individual message summaries", async () => {
     )
     assert.match(blocks[1]?.summary || "", /Tool: task/)
     assert.match(blocks[1]?.summary || "", /task output body/)
+})
+
+test("compress message mode does not partially apply when preparation fails", async () => {
+    const sessionID = `ses_message_compress_prepare_fail_${Date.now()}`
+    const rawMessages = buildMessages(sessionID)
+    const state = createSessionState()
+    const logger = new Logger(false)
+    const config = buildConfig()
+    config.experimental.allowSubAgents = true
+
+    state.subAgentResultCache.get = (() => {
+        throw new Error("cache failure")
+    }) as typeof state.subAgentResultCache.get
+
+    const tool = createCompressMessageTool({
+        client: {
+            session: {
+                messages: async () => ({ data: rawMessages }),
+                get: async () => ({ data: { parentID: null } }),
+            },
+        },
+        state,
+        logger,
+        config,
+        prompts: {
+            reload() {},
+            getRuntimePrompts() {
+                return { compressMessage: "", compressRange: "" }
+            },
+        },
+    } as any)
+
+    await assert.rejects(
+        tool.execute(
+            {
+                topic: "Batch stale notes",
+                content: [
+                    {
+                        messageId: "m0002",
+                        topic: "Code path note",
+                        summary: "Captured the assistant's code-path findings.",
+                    },
+                    {
+                        messageId: "m0003",
+                        topic: "Task output note",
+                        summary: "Captured the assistant's task-backed follow-up.",
+                    },
+                ],
+            },
+            {
+                ask: async () => {},
+                metadata: () => {},
+                sessionID,
+                messageID: "msg-compress-message-prepare-fail",
+            },
+        ),
+        /cache failure/,
+    )
+
+    assert.equal(state.prune.messages.blocksById.size, 0)
 })
 
 test("compress message mode rejects compressed block ids", async () => {

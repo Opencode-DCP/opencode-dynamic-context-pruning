@@ -114,6 +114,7 @@ test("prompt store exposes bundled message-mode compress prompt", () => {
             /Only use raw message IDs of the form `mNNNN`\./,
         )
         assert.match(runtimePrompts.compressMessage, /Do not use compressed block placeholders/i)
+        assert.doesNotMatch(runtimePrompts.compressMessage, /THE FORMAT OF COMPRESS/)
     } finally {
         fixture.cleanup()
     }
@@ -127,7 +128,8 @@ test("prompt store exposes bundled range-mode compress prompt", () => {
 
         assert.match(runtimePrompts.compressRange, /Collapse a range in the conversation/i)
         assert.match(runtimePrompts.compressRange, /COMPRESSED BLOCK PLACEHOLDERS/)
-        assert.match(runtimePrompts.compressRange, /PARALLEL COMPRESS EXECUTION/)
+        assert.match(runtimePrompts.compressRange, /BATCHING/)
+        assert.match(runtimePrompts.compressRange, /content` array/)
     } finally {
         fixture.cleanup()
     }

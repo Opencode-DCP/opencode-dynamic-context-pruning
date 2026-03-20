@@ -10,7 +10,6 @@ import {
     fetchSessionMessages,
     formatCompressMessageIssues,
     formatCompressMessageResult,
-    COMPRESSED_BLOCK_HEADER,
     resolveMessageCompressions,
     validateCompressMessageArgs,
     type CompressMessageToolArgs,
@@ -21,8 +20,8 @@ import { getCurrentParams, getCurrentTokenUsage, countTokens } from "../strategi
 import { deduplicate, purgeErrors } from "../strategies"
 import { saveSessionState } from "../state/persistence"
 import { sendCompressNotification } from "../ui/notification"
+import { MESSAGE_FORMAT_OVERLAY } from "../prompts/internal-overlays"
 
-// Non-primitive arrays are hidden in the TUI, so keep the schema simple and explicit.
 function buildSchema() {
     return {
         topic: tool.schema
@@ -53,7 +52,7 @@ export function createCompressMessageTool(ctx: ToolContext): ReturnType<typeof t
     const runtimePrompts = ctx.prompts.getRuntimePrompts()
 
     return tool({
-        description: runtimePrompts.compressMessage,
+        description: runtimePrompts.compressMessage + MESSAGE_FORMAT_OVERLAY,
         args: buildSchema(),
         async execute(args, toolCtx) {
             if (ctx.state.manualMode && ctx.state.manualMode !== "compress-pending") {
@@ -109,6 +108,11 @@ export function createCompressMessageTool(ctx: ToolContext): ReturnType<typeof t
                 summaryTokens: number
             }> = []
 
+            const preparedPlans: Array<{
+                plan: (typeof plans)[number]
+                summaryWithProtectedTools: string
+            }> = []
+
             for (const plan of plans) {
                 const summaryWithProtectedTools = await appendProtectedTools(
                     ctx.client,
@@ -121,6 +125,13 @@ export function createCompressMessageTool(ctx: ToolContext): ReturnType<typeof t
                     ctx.config.protectedFilePatterns,
                 )
 
+                preparedPlans.push({
+                    plan,
+                    summaryWithProtectedTools,
+                })
+            }
+
+            for (const { plan, summaryWithProtectedTools } of preparedPlans) {
                 const blockId = allocateBlockId(ctx.state)
                 const storedSummary = wrapCompressedSummary(blockId, summaryWithProtectedTools)
                 const summaryTokens = countTokens(storedSummary)

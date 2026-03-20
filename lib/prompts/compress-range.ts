@@ -79,6 +79,6 @@ Rules:
 - Prefer boundaries that produce short, closed ranges.
 - Do not invent IDs. Use only IDs that are present in context.
 
-PARALLEL COMPRESS EXECUTION
-When multiple independent ranges are ready and their boundaries do not overlap, launch MULTIPLE \`compress\` calls in parallel in a single response. This is the PREFERRED pattern over a single large-range compression when the work can be safely split. Run compression sequentially only when ranges overlap or when a later range depends on the result of an earlier compression.
+BATCHING
+Do not call the tool once per range. When multiple independent ranges are ready and their boundaries do not overlap, include all of them as separate entries in the \`content\` array of a single tool call. Each entry should have its own \`startId\`, \`endId\`, and \`summary\`.
 `

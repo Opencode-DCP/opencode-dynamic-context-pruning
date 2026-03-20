@@ -23,7 +23,6 @@ export interface CompressConfig {
     nudgeFrequency: number
     iterationNudgeThreshold: number
     nudgeForce: "strong" | "soft"
-    flatSchema: boolean
     protectedTools: string[]
     protectUserMessages: boolean
 }
@@ -36,10 +35,6 @@ export interface Commands {
 export interface ManualModeConfig {
     enabled: boolean
     automaticStrategies: boolean
-}
-
-export interface SupersedeWrites {
-    enabled: boolean
 }
 
 export interface PurgeErrors {
@@ -71,7 +66,6 @@ export interface PluginConfig {
     compress: CompressConfig
     strategies: {
         deduplication: Deduplication
-        supersedeWrites: SupersedeWrites
         purgeErrors: PurgeErrors
     }
 }
@@ -124,15 +118,12 @@ export const VALID_CONFIG_KEYS = new Set([
     "compress.nudgeFrequency",
     "compress.iterationNudgeThreshold",
     "compress.nudgeForce",
-    "compress.flatSchema",
     "compress.protectedTools",
     "compress.protectUserMessages",
     "strategies",
     "strategies.deduplication",
     "strategies.deduplication.enabled",
     "strategies.deduplication.protectedTools",
-    "strategies.supersedeWrites",
-    "strategies.supersedeWrites.enabled",
     "strategies.purgeErrors",
     "strategies.purgeErrors.enabled",
     "strategies.purgeErrors.turns",
@@ -404,14 +395,6 @@ export function validateConfigTypes(config: Record<string, any>): ValidationErro
                 })
             }
 
-            if (compress.flatSchema !== undefined && typeof compress.flatSchema !== "boolean") {
-                errors.push({
-                    key: "compress.flatSchema",
-                    expected: "boolean",
-                    actual: typeof compress.flatSchema,
-                })
-            }
-
             if (compress.protectedTools !== undefined && !Array.isArray(compress.protectedTools)) {
                 errors.push({
                     key: "compress.protectedTools",
@@ -547,19 +530,6 @@ export function validateConfigTypes(config: Record<string, any>): ValidationErro
             })
         }
 
-        if (strategies.supersedeWrites) {
-            if (
-                strategies.supersedeWrites.enabled !== undefined &&
-                typeof strategies.supersedeWrites.enabled !== "boolean"
-            ) {
-                errors.push({
-                    key: "strategies.supersedeWrites.enabled",
-                    expected: "boolean",
-                    actual: typeof strategies.supersedeWrites.enabled,
-                })
-            }
-        }
-
         if (strategies.purgeErrors) {
             if (
                 strategies.purgeErrors.enabled !== undefined &&
@@ -685,7 +655,6 @@ const defaultConfig: PluginConfig = {
         nudgeFrequency: 5,
         iterationNudgeThreshold: 15,
         nudgeForce: "soft",
-        flatSchema: false,
         protectedTools: [...COMPRESS_DEFAULT_PROTECTED_TOOLS],
         protectUserMessages: false,
     },
@@ -693,9 +662,6 @@ const defaultConfig: PluginConfig = {
         deduplication: {
             enabled: true,
             protectedTools: [],
-        },
-        supersedeWrites: {
-            enabled: true,
         },
         purgeErrors: {
             enabled: true,
@@ -821,9 +787,6 @@ function mergeStrategies(
                 ]),
             ],
         },
-        supersedeWrites: {
-            enabled: override.supersedeWrites?.enabled ?? base.supersedeWrites.enabled,
-        },
         purgeErrors: {
             enabled: override.purgeErrors?.enabled ?? base.purgeErrors.enabled,
             turns: override.purgeErrors?.turns ?? base.purgeErrors.turns,
@@ -856,7 +819,6 @@ function mergeCompress(
         nudgeFrequency: override.nudgeFrequency ?? base.nudgeFrequency,
         iterationNudgeThreshold: override.iterationNudgeThreshold ?? base.iterationNudgeThreshold,
         nudgeForce: override.nudgeForce ?? base.nudgeForce,
-        flatSchema: override.flatSchema ?? base.flatSchema,
         protectedTools: [...new Set([...base.protectedTools, ...(override.protectedTools ?? [])])],
         protectUserMessages: override.protectUserMessages ?? base.protectUserMessages,
     }
@@ -925,7 +887,6 @@ function deepCloneConfig(config: PluginConfig): PluginConfig {
                 ...config.strategies.deduplication,
                 protectedTools: [...config.strategies.deduplication.protectedTools],
             },
-            supersedeWrites: { ...config.strategies.supersedeWrites },
             purgeErrors: {
                 ...config.strategies.purgeErrors,
                 protectedTools: [...config.strategies.purgeErrors.protectedTools],

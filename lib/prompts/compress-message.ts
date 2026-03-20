@@ -48,21 +48,6 @@ BATCHING
 Do not call the tool once per message. Select MANY messages in a single tool call when they are independently safe to compress.
 Each entry should summarize exactly one message, and the tool can receive as many entries as needed in one batch.
 
-THE FORMAT OF MESSAGE COMPRESS
-
-~~~json
-{
-  "topic": "overall batch label",
-  "content": [
-    {
-      "messageId": "m0001",
-      "topic": "short message label",
-      "summary": "Complete technical summary replacing that one message"
-    }
-  ]
-}
-~~~
-
 Because each message is compressed independently:
 
 - Do not describe ranges

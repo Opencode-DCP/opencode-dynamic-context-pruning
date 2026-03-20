@@ -18,28 +18,34 @@ All subsequent messages in the session will have IDs.
 </dcp-system-reminder>
 `
 
-export const NESTED_FORMAT_OVERLAY = `
+export const RANGE_FORMAT_OVERLAY = `
 THE FORMAT OF COMPRESS
 
 \`\`\`
 {
   topic: string,           // Short label (3-5 words) - e.g., "Auth System Exploration"
-  content: {
-    startId: string,       // Boundary ID at range start: mNNNN or bN
-    endId: string,         // Boundary ID at range end: mNNNN or bN
-    summary: string        // Complete technical summary replacing all content in range
-  }
+  content: [               // One or more ranges to compress
+    {
+      startId: string,     // Boundary ID at range start: mNNNN or bN
+      endId: string,       // Boundary ID at range end: mNNNN or bN
+      summary: string      // Complete technical summary replacing all content in range
+    }
+  ]
 }
 \`\`\``
 
-export const FLAT_FORMAT_OVERLAY = `
+export const MESSAGE_FORMAT_OVERLAY = `
 THE FORMAT OF COMPRESS
 
 \`\`\`
 {
-  topic: string,           // Short label (3-5 words) - e.g., "Auth System Exploration"
-  startId: string,         // Boundary ID at range start: mNNNN or bN
-  endId: string,           // Boundary ID at range end: mNNNN or bN
-  summary: string          // Complete technical summary replacing all content in range
+  topic: string,           // Short label (3-5 words) for the overall batch
+  content: [               // One or more messages to compress independently
+    {
+      messageId: string,   // Raw message ID only: mNNNN
+      topic: string,       // Short label (3-5 words) for this one message summary
+      summary: string      // Complete technical summary replacing that one message
+    }
+  ]
 }
 \`\`\``

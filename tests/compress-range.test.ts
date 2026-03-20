@@ -49,7 +49,6 @@ function buildConfig(): PluginConfig {
             nudgeFrequency: 5,
             iterationNudgeThreshold: 15,
             nudgeForce: "soft",
-            flatSchema: false,
             protectedTools: [],
             protectUserMessages: false,
         },
@@ -57,9 +56,6 @@ function buildConfig(): PluginConfig {
             deduplication: {
                 enabled: true,
                 protectedTools: [],
-            },
-            supersedeWrites: {
-                enabled: true,
             },
             purgeErrors: {
                 enabled: true,
@@ -150,7 +146,7 @@ test("compress range rebuilds subagent message refs after session state was rese
         prompts: {
             reload() {},
             getRuntimePrompts() {
-                return { compress: "" }
+                return { compressRange: "", compressMessage: "" }
             },
         },
     } as any)
@@ -158,11 +154,13 @@ test("compress range rebuilds subagent message refs after session state was rese
     const result = await tool.execute(
         {
             topic: "Subagent race fix",
-            content: {
-                startId: "m0001",
-                endId: "m0002",
-                summary: "Captured the initial investigation and follow-up request.",
-            },
+            content: [
+                {
+                    startId: "m0001",
+                    endId: "m0002",
+                    summary: "Captured the initial investigation and follow-up request.",
+                },
+            ],
         },
         {
             ask: async () => {},
@@ -178,4 +176,122 @@ test("compress range rebuilds subagent message refs after session state was rese
     assert.equal(state.messageIds.byRef.get("m0001"), "msg-assistant-1")
     assert.equal(state.messageIds.byRef.get("m0002"), "msg-user-2")
     assert.equal(state.prune.messages.blocksById.size, 1)
+})
+
+test("compress range mode batches multiple ranges into one notification", async () => {
+    const sessionID = `ses_range_compress_batch_${Date.now()}`
+    const rawMessages = buildMessages(sessionID)
+    const state = createSessionState()
+    const logger = new Logger(false)
+    const config = buildConfig()
+    config.pruneNotification = "detailed"
+    config.pruneNotificationType = "toast"
+
+    const toastCalls: string[] = []
+    const tool = createCompressRangeTool({
+        client: {
+            session: {
+                messages: async () => ({ data: rawMessages }),
+                get: async () => ({ data: { parentID: "ses_parent" } }),
+            },
+            tui: {
+                showToast: async ({ body }: { body: { message: string } }) => {
+                    toastCalls.push(body.message)
+                },
+            },
+        },
+        state,
+        logger,
+        config,
+        prompts: {
+            reload() {},
+            getRuntimePrompts() {
+                return { compressRange: "", compressMessage: "" }
+            },
+        },
+    } as any)
+
+    const result = await tool.execute(
+        {
+            topic: "Batch stale notes",
+            content: [
+                {
+                    startId: "m0001",
+                    endId: "m0001",
+                    summary: "Captured the initial assistant investigation.",
+                },
+                {
+                    startId: "m0002",
+                    endId: "m0002",
+                    summary: "Captured the follow-up user request.",
+                },
+            ],
+        },
+        {
+            ask: async () => {},
+            metadata: () => {},
+            sessionID,
+            messageID: "msg-compress-range-batch",
+        },
+    )
+
+    assert.equal(result, "Compressed 2 messages into [Compressed conversation section].")
+    assert.equal(state.prune.messages.blocksById.size, 2)
+    assert.equal(toastCalls.length, 1)
+    assert.match(toastCalls[0] || "", /Compression #1/)
+    assert.match(toastCalls[0] || "", /Topic: Batch stale notes/)
+    assert.match(toastCalls[0] || "", /Items: 2 messages/)
+})
+
+test("compress range mode rejects overlapping batched ranges", async () => {
+    const sessionID = `ses_range_compress_overlap_${Date.now()}`
+    const rawMessages = buildMessages(sessionID)
+    const state = createSessionState()
+    const logger = new Logger(false)
+    const tool = createCompressRangeTool({
+        client: {
+            session: {
+                messages: async () => ({ data: rawMessages }),
+                get: async () => ({ data: { parentID: "ses_parent" } }),
+            },
+        },
+        state,
+        logger,
+        config: buildConfig(),
+        prompts: {
+            reload() {},
+            getRuntimePrompts() {
+                return { compressRange: "", compressMessage: "" }
+            },
+        },
+    } as any)
+
+    await assert.rejects(
+        tool.execute(
+            {
+                topic: "Overlapping ranges",
+                content: [
+                    {
+                        startId: "m0001",
+                        endId: "m0002",
+                        summary: "Captured the initial investigation and follow-up request.",
+                    },
+                    {
+                        startId: "m0002",
+                        endId: "m0002",
+                        summary: "Captured the follow-up request again.",
+                    },
+                ],
+            },
+            {
+                ask: async () => {},
+                metadata: () => {},
+                sessionID,
+                messageID: "msg-compress-range-overlap",
+            },
+        ),
+        /Overlapping ranges cannot be compressed in the same batch/,
+    )
+
+    assert.equal(state.prune.messages.blocksById.size, 0)
 })
