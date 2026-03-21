@@ -270,6 +270,18 @@
                         }
                     }
                 },
+                "supersedeReads": {
+                    "type": "object",
+                    "description": "Prune stale read outputs when the same file has been subsequently written or edited",
+                    "additionalProperties": false,
+                    "properties": {
+                        "enabled": {
+                            "type": "boolean",
+                            "default": true,
+                            "description": "Enable supersede reads strategy"
+                        }
+                    }
+                },
                 "purgeErrors": {
                     "type": "object",
                     "description": "Remove tool outputs that resulted in errors",

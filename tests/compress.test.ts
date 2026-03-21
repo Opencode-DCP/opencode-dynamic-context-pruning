@@ -60,6 +60,9 @@ function buildConfig(): PluginConfig {
             supersedeWrites: {
                 enabled: true,
             },
+            supersedeReads: {
+                enabled: true,
+            },
             purgeErrors: {
                 enabled: true,
                 turns: 4,

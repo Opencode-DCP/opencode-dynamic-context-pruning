@@ -40,6 +40,10 @@ export interface SupersedeWrites {
     enabled: boolean
 }
 
+export interface SupersedeReads {
+    enabled: boolean
+}
+
 export interface PurgeErrors {
     enabled: boolean
     turns: number
@@ -70,6 +74,7 @@ export interface PluginConfig {
     strategies: {
         deduplication: Deduplication
         supersedeWrites: SupersedeWrites
+        supersedeReads: SupersedeReads
         purgeErrors: PurgeErrors
     }
 }
@@ -130,6 +135,8 @@ export const VALID_CONFIG_KEYS = new Set([
     "strategies.deduplication.protectedTools",
     "strategies.supersedeWrites",
     "strategies.supersedeWrites.enabled",
+    "strategies.supersedeReads",
+    "strategies.supersedeReads.enabled",
     "strategies.purgeErrors",
     "strategies.purgeErrors.enabled",
     "strategies.purgeErrors.turns",
@@ -545,6 +552,19 @@ export function validateConfigTypes(config: Record<string, any>): ValidationErro
             }
         }
 
+        if (strategies.supersedeReads) {
+            if (
+                strategies.supersedeReads.enabled !== undefined &&
+                typeof strategies.supersedeReads.enabled !== "boolean"
+            ) {
+                errors.push({
+                    key: "strategies.supersedeReads.enabled",
+                    expected: "boolean",
+                    actual: typeof strategies.supersedeReads.enabled,
+                })
+            }
+        }
+
         if (strategies.purgeErrors) {
             if (
                 strategies.purgeErrors.enabled !== undefined &&
@@ -681,6 +701,9 @@ const defaultConfig: PluginConfig = {
         supersedeWrites: {
             enabled: true,
         },
+        supersedeReads: {
+            enabled: true,
+        },
         purgeErrors: {
             enabled: true,
             turns: 4,
@@ -808,6 +831,9 @@ function mergeStrategies(
         supersedeWrites: {
             enabled: override.supersedeWrites?.enabled ?? base.supersedeWrites.enabled,
         },
+        supersedeReads: {
+            enabled: override.supersedeReads?.enabled ?? base.supersedeReads.enabled,
+        },
         purgeErrors: {
             enabled: override.purgeErrors?.enabled ?? base.purgeErrors.enabled,
             turns: override.purgeErrors?.turns ?? base.purgeErrors.turns,
@@ -909,6 +935,7 @@ function deepCloneConfig(config: PluginConfig): PluginConfig {
                 protectedTools: [...config.strategies.deduplication.protectedTools],
             },
             supersedeWrites: { ...config.strategies.supersedeWrites },
+            supersedeReads: { ...config.strategies.supersedeReads },
             purgeErrors: {
                 ...config.strategies.purgeErrors,
                 protectedTools: [...config.strategies.purgeErrors.protectedTools],
