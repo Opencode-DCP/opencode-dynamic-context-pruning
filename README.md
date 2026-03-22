@@ -28,9 +28,14 @@ DCP reduces context size through a compress tool and automatic cleanup. Your ses
 
 ### Compress
 
-Compress is a tool exposed to your model that selects a conversation range and replaces it with a technical summary. You can think of this as a much smarter version of Opencode's compaction process. Instead of triggering statically when your session reaches its maximum context and on the entire coding session, Compress allows the model to pick when to activate based on task completion, and to only compress a subset of messages containing the completed task. This allows the summaries replacing the session content to be much more focused and precise than Opencode's native compaction.
+Compress is a tool exposed to your model that replaces closed, stale conversation content with high-fidelity technical summaries. You can think of this as a much smarter version of Opencode's compaction process. Instead of triggering statically when your session reaches its maximum context and on the entire coding session, Compress allows the model to pick when to activate based on task completion, and to only compress the specific messages that are no longer needed verbatim.
 
-When a new compression overlaps an earlier one, the earlier summary is nested inside the new one — so information is preserved through layers of compression rather than diluted away. Additionally, protected tool outputs (such as subagents and skills) and protected file patterns are always kept in compression summaries, ensuring that the most important information is never lost. You can also enable `protectUserMessages` to preserve your messages verbatim during compression, though note that large prompts (e.g. copy-pasting log files in the prompt) will then never be compressed away.
+DCP supports two compression modes:
+
+- `range` mode compresses a contiguous span of conversation into one or more reusable block summaries.
+- `message` mode is experimental and compresses individual raw messages independently, letting the model manage context much more surgically around closed work.
+
+In `range` mode, when a new compression overlaps an earlier one, the earlier summary is nested inside the new one so information is preserved through layers of compression rather than diluted away. In both modes, protected tool outputs (such as subagents and skills) and protected file patterns are kept in compression summaries, ensuring that the most important information is never lost. You can also enable `protectUserMessages` to preserve your messages verbatim during compression, though note that large prompts (e.g. copy-pasting log files in the prompt) will then never be compressed away.
 
 ### Deduplication
 
@@ -100,7 +105,7 @@ Each level overrides the previous, so project settings take priority over global
     // Unified context compression tool and behavior settings
     "compress": {
         // Compression mode: "range" (compress spans into block summaries)
-        // or "message" (compress individual raw messages)
+        // or experimental "message" (compress individual raw messages)
         "mode": "range",
         // Permission mode: "allow" (no prompt), "ask" (prompt), "deny" (tool not registered)
         "permission": "allow",
@@ -173,16 +178,17 @@ DCP provides a `/dcp` slash command:
 - `/dcp stats` — Shows cumulative pruning statistics across all sessions.
 - `/dcp sweep` — Prunes all tools since the last user message. Accepts an optional count: `/dcp sweep 10` prunes the last 10 tools. Respects `commands.protectedTools`.
 - `/dcp manual [on|off]` — Toggle manual mode or set explicit state. When on, the AI will not autonomously use context management tools.
-- `/dcp compress [focus]` — Trigger a single compress tool execution. Optional focus text directs what range to compress.
+- `/dcp compress [focus]` — Trigger a single compress tool execution. Optional focus text directs what content to compress, following the active `compress.mode`.
 - `/dcp decompress <n>` — Restore a specific active compression by ID (for example `/dcp decompress 2`). Running without an argument shows available compression IDs, token sizes, and topics.
 - `/dcp recompress <n>` — Re-apply a user-decompressed compression by ID (for example `/dcp recompress 2`). Running without an argument shows recompressible IDs, token sizes, and topics.
 
 ### Prompt Overrides
 
-DCP exposes five editable prompts:
+DCP exposes six editable prompts:
 
 - `system`
-- `compress`
+- `compress-range`
+- `compress-message`
 - `context-limit-nudge`
 - `turn-nudge`
 - `iteration-nudge`
@@ -196,7 +202,7 @@ To customize behavior, add a file with the same name under an overrides director
 To reset an override, delete the matching file from your overrides directory.
 
 > [!NOTE]
-> `compress` prompt changes apply after plugin restart because tool descriptions are registered at startup.
+> `compress-range` and `compress-message` prompt changes apply after plugin restart because tool descriptions are registered at startup.
 
 ### Protected Tools
 
