@@ -1,9 +1,4 @@
-export const COMPRESS = `Collapse a range in the conversation into a detailed summary.
-
-THE PHILOSOPHY OF COMPRESS
-\`compress\` transforms verbose conversation sequences into dense, high-fidelity summaries. This is not cleanup - it is crystallization. Your summary becomes the authoritative record of what transpired.
-
-Think of compression as phase transitions: raw exploration becomes refined understanding. The original context served its purpose; your summary now carries that understanding forward.
+export const COMPRESS_RANGE = `Collapse a range in the conversation into a detailed summary.
 
 THE SUMMARY
 Your summary must be EXHAUSTIVE. Capture file paths, function signatures, decisions made, constraints discovered, key findings... EVERYTHING that maintains context integrity. This is not a brief note - it is an authoritative record so faithful that the original conversation adds no value.
@@ -43,25 +38,6 @@ When you use compressed block placeholders, write the surrounding summary text s
 - Do not write text that depends on the placeholder staying literal (for example, "as noted in \`(b2)\`").
 - Your final meaning must be coherent once each placeholder is replaced with its full compressed block content.
 
-THE WAYS OF COMPRESS
-Compress when a range is genuinely closed and the raw conversation has served its purpose:
-
-Research concluded and findings are clear
-Implementation finished and verified
-Exploration exhausted and patterns understood
-
-Compress smaller ranges when:
-You need to discard dead-end noise without waiting for a whole chapter to close
-You need to preserve key findings from a narrow slice while freeing context quickly
-You can bound a stale range cleanly with injected IDs
-
-Do NOT compress when:
-You may need exact code, error messages, or file contents from the range in the immediate next steps
-Work in that area is still active or likely to resume immediately
-You cannot identify reliable boundaries yet
-
-Before compressing, ask: _"Is this range closed enough to become summary-only right now?"_ Compression is irreversible. The summary replaces everything in the range.
-
 BOUNDARY IDS
 You specify boundaries by ID using the injected IDs visible in the conversation:
 
@@ -69,6 +45,7 @@ You specify boundaries by ID using the injected IDs visible in the conversation:
 - \`bN\` IDs identify previously compressed blocks
 
 Each message has an ID inside XML metadata tags like \`<dcp-message-id>...</dcp-message-id>\`.
+The ID tag appears at the end of the message it belongs to — it identifies the message above it, not the one below it.
 Treat these tags as boundary metadata only, not as tool result content.
 
 Rules:
@@ -76,9 +53,8 @@ Rules:
 - Pick \`startId\` and \`endId\` directly from injected IDs in context.
 - IDs must exist in the current visible context.
 - \`startId\` must appear before \`endId\`.
-- Prefer boundaries that produce short, closed ranges.
 - Do not invent IDs. Use only IDs that are present in context.
 
-PARALLEL COMPRESS EXECUTION
-When multiple independent ranges are ready and their boundaries do not overlap, launch MULTIPLE \`compress\` calls in parallel in a single response. This is the PREFERRED pattern over a single large-range compression when the work can be safely split. Run compression sequentially only when ranges overlap or when a later range depends on the result of an earlier compression.
+BATCHING
+When multiple independent ranges are ready and their boundaries do not overlap, include all of them as separate entries in the \`content\` array of a single tool call. Each entry should have its own \`startId\`, \`endId\`, and \`summary\`.
 `

@@ -6,6 +6,11 @@ import { getCurrentParams } from "../strategies/utils"
 import { saveSessionState } from "../state/persistence"
 import { sendIgnoredMessage } from "../ui/notification"
 import { formatTokenCount } from "../ui/utils"
+import {
+    getActiveCompressionTargets,
+    resolveCompressionTarget,
+    type CompressionTarget,
+} from "./compression-targets"
 
 export interface DecompressCommandContext {
     client: any
@@ -29,13 +34,6 @@ function parseBlockIdArg(arg: string): number | null {
 
     const parsed = Number.parseInt(normalized, 10)
     return Number.isInteger(parsed) && parsed > 0 ? parsed : null
-}
-
-function getAvailableBlocks(messagesState: PruneMessagesState): CompressionBlock[] {
-    return Array.from(messagesState.activeBlockIds)
-        .map((blockId) => messagesState.blocksById.get(blockId))
-        .filter((block): block is CompressionBlock => !!block && block.active)
-        .sort((a, b) => a.blockId - b.blockId)
 }
 
 function findActiveParentBlockId(
@@ -71,6 +69,20 @@ function findActiveParentBlockId(
     return null
 }
 
+function findActiveAncestorBlockId(
+    messagesState: PruneMessagesState,
+    target: CompressionTarget,
+): number | null {
+    for (const block of target.blocks) {
+        const activeAncestorBlockId = findActiveParentBlockId(messagesState, block)
+        if (activeAncestorBlockId !== null) {
+            return activeAncestorBlockId
+        }
+    }
+
+    return null
+}
+
 function snapshotActiveMessages(messagesState: PruneMessagesState): Map<string, number> {
     const activeMessages = new Map<string, number>()
     for (const [messageId, entry] of messagesState.byMessageId) {
@@ -82,14 +94,17 @@ function snapshotActiveMessages(messagesState: PruneMessagesState): Map<string, 
 }
 
 function formatDecompressMessage(
-    targetBlockId: number,
+    target: CompressionTarget,
     restoredMessageCount: number,
     restoredTokens: number,
     reactivatedBlockIds: number[],
 ): string {
     const lines: string[] = []
 
-    lines.push(`Restored compression ${targetBlockId}.`)
+    lines.push(`Restored compression ${target.displayId}.`)
+    if (target.runId !== target.displayId || target.grouped) {
+        lines.push(`Tool call label: Compression #${target.runId}.`)
+    }
     if (reactivatedBlockIds.length > 0) {
         const refs = reactivatedBlockIds.map((id) => String(id)).join(", ")
         lines.push(`Also restored nested compression(s): ${refs}.`)
@@ -106,22 +121,25 @@ function formatDecompressMessage(
     return lines.join("\n")
 }
 
-function formatAvailableBlocksMessage(availableBlocks: CompressionBlock[]): string {
+function formatAvailableBlocksMessage(availableTargets: CompressionTarget[]): string {
     const lines: string[] = []
 
     lines.push("Usage: /dcp decompress <n>")
     lines.push("")
 
-    if (availableBlocks.length === 0) {
+    if (availableTargets.length === 0) {
         lines.push("No compressions are available to restore.")
         return lines.join("\n")
     }
 
     lines.push("Available compressions:")
-    const entries = availableBlocks.map((block) => {
-        const topic = block.topic.replace(/\s+/g, " ").trim() || "(no topic)"
-        const label = `${block.blockId} (${formatTokenCount(block.compressedTokens)})`
-        return { label, topic }
+    const entries = availableTargets.map((target) => {
+        const topic = target.topic.replace(/\s+/g, " ").trim() || "(no topic)"
+        const label = `${target.displayId} (${formatTokenCount(target.compressedTokens)})`
+        const details = target.grouped
+            ? `Compression #${target.runId} - ${target.blocks.length} messages`
+            : `Compression #${target.runId}`
+        return { label, topic: `${details} - ${topic}` }
     })
 
     const labelWidth = Math.max(...entries.map((entry) => entry.label.length)) + 4
@@ -153,8 +171,8 @@ export async function handleDecompressCommand(ctx: DecompressCommandContext): Pr
     const messagesState = state.prune.messages
 
     if (!targetArg) {
-        const availableBlocks = getAvailableBlocks(messagesState)
-        const message = formatAvailableBlocksMessage(availableBlocks)
+        const availableTargets = getActiveCompressionTargets(messagesState)
+        const message = formatAvailableBlocksMessage(availableTargets)
         await sendIgnoredMessage(client, sessionId, message, params, logger)
         return
     }
@@ -171,8 +189,8 @@ export async function handleDecompressCommand(ctx: DecompressCommandContext): Pr
         return
     }
 
-    const targetBlock = messagesState.blocksById.get(targetBlockId)
-    if (!targetBlock) {
+    const target = resolveCompressionTarget(messagesState, targetBlockId)
+    if (!target) {
         await sendIgnoredMessage(
             client,
             sessionId,
@@ -183,13 +201,14 @@ export async function handleDecompressCommand(ctx: DecompressCommandContext): Pr
         return
     }
 
-    if (!targetBlock.active) {
-        const activeAncestorBlockId = findActiveParentBlockId(messagesState, targetBlock)
+    const activeBlocks = target.blocks.filter((block) => block.active)
+    if (activeBlocks.length === 0) {
+        const activeAncestorBlockId = findActiveAncestorBlockId(messagesState, target)
         if (activeAncestorBlockId !== null) {
             await sendIgnoredMessage(
                 client,
                 sessionId,
-                `Compression ${targetBlockId} is inside compression ${activeAncestorBlockId}. Restore compression ${activeAncestorBlockId} first.`,
+                `Compression ${target.displayId} is inside compression ${activeAncestorBlockId}. Restore compression ${activeAncestorBlockId} first.`,
                 params,
                 logger,
             )
@@ -199,7 +218,7 @@ export async function handleDecompressCommand(ctx: DecompressCommandContext): Pr
         await sendIgnoredMessage(
             client,
             sessionId,
-            `Compression ${targetBlockId} is not active.`,
+            `Compression ${target.displayId} is not active.`,
             params,
             logger,
         )
@@ -208,11 +227,14 @@ export async function handleDecompressCommand(ctx: DecompressCommandContext): Pr
 
     const activeMessagesBefore = snapshotActiveMessages(messagesState)
     const activeBlockIdsBefore = new Set(messagesState.activeBlockIds)
+    const deactivatedAt = Date.now()
 
-    targetBlock.active = false
-    targetBlock.deactivatedByUser = true
-    targetBlock.deactivatedAt = Date.now()
-    targetBlock.deactivatedByBlockId = undefined
+    for (const block of target.blocks) {
+        block.active = false
+        block.deactivatedByUser = true
+        block.deactivatedAt = deactivatedAt
+        block.deactivatedByBlockId = undefined
+    }
 
     syncCompressionBlocks(state, logger, messages)
 
@@ -236,7 +258,7 @@ export async function handleDecompressCommand(ctx: DecompressCommandContext): Pr
     await saveSessionState(state, logger)
 
     const message = formatDecompressMessage(
-        targetBlockId,
+        target,
         restoredMessageCount,
         restoredTokens,
         reactivatedBlockIds,
@@ -244,7 +266,8 @@ export async function handleDecompressCommand(ctx: DecompressCommandContext): Pr
     await sendIgnoredMessage(client, sessionId, message, params, logger)
 
     logger.info("Decompress command completed", {
-        targetBlockId,
+        targetBlockId: target.displayId,
+        targetRunId: target.runId,
         restoredMessageCount,
         restoredTokens,
         reactivatedBlockIds,

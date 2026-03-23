@@ -1,0 +1,106 @@
+import type { WithParts } from "../state"
+import { ensureSessionInitialized } from "../state"
+import { saveSessionState } from "../state/persistence"
+import { assignMessageRefs } from "../message-ids"
+import { isIgnoredUserMessage } from "../messages/utils"
+import { deduplicate, purgeErrors } from "../strategies"
+import { getCurrentParams, getCurrentTokenUsage } from "../strategies/utils"
+import { sendCompressNotification } from "../ui/notification"
+import type { ToolContext } from "./types"
+import { buildSearchContext, fetchSessionMessages } from "./search"
+import type { SearchContext } from "./types"
+
+interface RunContext {
+    ask(input: {
+        permission: string
+        patterns: string[]
+        always: string[]
+        metadata: Record<string, unknown>
+    }): Promise<void>
+    metadata(input: { title: string }): void
+    sessionID: string
+}
+
+export interface NotificationEntry {
+    blockId: number
+    runId: number
+    summary: string
+    summaryTokens: number
+}
+
+export interface PreparedSession {
+    rawMessages: WithParts[]
+    searchContext: SearchContext
+}
+
+export async function prepareSession(
+    ctx: ToolContext,
+    toolCtx: RunContext,
+    title: string,
+): Promise<PreparedSession> {
+    if (ctx.state.manualMode && ctx.state.manualMode !== "compress-pending") {
+        throw new Error(
+            "Manual mode: compress blocked. Do not retry until `<compress triggered manually>` appears in user context.",
+        )
+    }
+
+    await toolCtx.ask({
+        permission: "compress",
+        patterns: ["*"],
+        always: ["*"],
+        metadata: {},
+    })
+
+    toolCtx.metadata({ title })
+
+    const rawMessages = await fetchSessionMessages(ctx.client, toolCtx.sessionID)
+
+    await ensureSessionInitialized(
+        ctx.client,
+        ctx.state,
+        toolCtx.sessionID,
+        ctx.logger,
+        rawMessages,
+        ctx.config.manualMode.enabled,
+    )
+
+    assignMessageRefs(ctx.state, rawMessages)
+
+    deduplicate(ctx.state, ctx.logger, ctx.config, rawMessages)
+    purgeErrors(ctx.state, ctx.logger, ctx.config, rawMessages)
+
+    return {
+        rawMessages,
+        searchContext: buildSearchContext(ctx.state, rawMessages),
+    }
+}
+
+export async function finalizeSession(
+    ctx: ToolContext,
+    toolCtx: RunContext,
+    rawMessages: WithParts[],
+    entries: NotificationEntry[],
+    batchTopic: string | undefined,
+): Promise<void> {
+    ctx.state.manualMode = ctx.state.manualMode ? "active" : false
+    await saveSessionState(ctx.state, ctx.logger)
+
+    const params = getCurrentParams(ctx.state, rawMessages, ctx.logger)
+    const totalSessionTokens = getCurrentTokenUsage(rawMessages)
+    const sessionMessageIds = rawMessages
+        .filter((msg) => !(msg.info.role === "user" && isIgnoredUserMessage(msg)))
+        .map((msg) => msg.info.id)
+
+    await sendCompressNotification(
+        ctx.client,
+        ctx.logger,
+        ctx.config,
+        ctx.state,
+        toolCtx.sessionID,
+        entries,
+        batchTopic,
+        totalSessionTokens,
+        sessionMessageIds,
+        params,
+    )
+}

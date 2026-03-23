@@ -3,7 +3,8 @@ import { join, dirname } from "path"
 import { homedir } from "os"
 import type { Logger } from "../logger"
 import { SYSTEM as SYSTEM_PROMPT } from "./system"
-import { COMPRESS as COMPRESS_PROMPT } from "./compress"
+import { COMPRESS_RANGE as COMPRESS_RANGE_PROMPT } from "./compress-range"
+import { COMPRESS_MESSAGE as COMPRESS_MESSAGE_PROMPT } from "./compress-message"
 import { CONTEXT_LIMIT_NUDGE } from "./context-limit-nudge"
 import { TURN_NUDGE } from "./turn-nudge"
 import { ITERATION_NUDGE } from "./iteration-nudge"
@@ -11,14 +12,16 @@ import { MANUAL_MODE_SYSTEM_OVERLAY, SUBAGENT_SYSTEM_OVERLAY } from "./internal-
 
 export type PromptKey =
     | "system"
-    | "compress"
+    | "compress-range"
+    | "compress-message"
     | "context-limit-nudge"
     | "turn-nudge"
     | "iteration-nudge"
 
 type EditablePromptField =
     | "system"
-    | "compress"
+    | "compressRange"
+    | "compressMessage"
     | "contextLimitNudge"
     | "turnNudge"
     | "iterationNudge"
@@ -45,7 +48,8 @@ interface PromptPaths {
 
 export interface RuntimePrompts {
     system: string
-    compress: string
+    compressRange: string
+    compressMessage: string
     contextLimitNudge: string
     turnNudge: string
     iterationNudge: string
@@ -63,12 +67,20 @@ const PROMPT_DEFINITIONS: PromptDefinition[] = [
         runtimeField: "system",
     },
     {
-        key: "compress",
-        fileName: "compress.md",
-        label: "Compress",
-        description: "compress tool instructions and summary constraints",
-        usage: "Registered as the compress tool description",
-        runtimeField: "compress",
+        key: "compress-range",
+        fileName: "compress-range.md",
+        label: "Compress Range",
+        description: "range-mode compress tool instructions and summary constraints",
+        usage: "Registered as the range-mode compress tool description",
+        runtimeField: "compressRange",
+    },
+    {
+        key: "compress-message",
+        fileName: "compress-message.md",
+        label: "Compress Message",
+        description: "message-mode compress tool instructions and summary constraints",
+        usage: "Registered as the message-mode compress tool description",
+        runtimeField: "compressMessage",
     },
     {
         key: "context-limit-nudge",
@@ -98,7 +110,8 @@ const PROMPT_DEFINITIONS: PromptDefinition[] = [
 
 export const PROMPT_KEYS: PromptKey[] = [
     "system",
-    "compress",
+    "compress-range",
+    "compress-message",
     "context-limit-nudge",
     "turn-nudge",
     "iteration-nudge",
@@ -112,7 +125,8 @@ const DEFAULTS_README_FILE = "README.md"
 
 const BUNDLED_EDITABLE_PROMPTS: Record<EditablePromptField, string> = {
     system: SYSTEM_PROMPT,
-    compress: COMPRESS_PROMPT,
+    compressRange: COMPRESS_RANGE_PROMPT,
+    compressMessage: COMPRESS_MESSAGE_PROMPT,
     contextLimitNudge: CONTEXT_LIMIT_NUDGE,
     turnNudge: TURN_NUDGE,
     iterationNudge: ITERATION_NUDGE,
@@ -126,7 +140,8 @@ const INTERNAL_PROMPT_OVERLAYS = {
 function createBundledRuntimePrompts(): RuntimePrompts {
     return {
         system: BUNDLED_EDITABLE_PROMPTS.system,
-        compress: BUNDLED_EDITABLE_PROMPTS.compress,
+        compressRange: BUNDLED_EDITABLE_PROMPTS.compressRange,
+        compressMessage: BUNDLED_EDITABLE_PROMPTS.compressMessage,
         contextLimitNudge: BUNDLED_EDITABLE_PROMPTS.contextLimitNudge,
         turnNudge: BUNDLED_EDITABLE_PROMPTS.turnNudge,
         iterationNudge: BUNDLED_EDITABLE_PROMPTS.iterationNudge,
@@ -232,7 +247,7 @@ function toEditablePromptText(definition: PromptDefinition, rawContent: string):
         normalized = stripConditionalTag(normalized, "subagent")
     }
 
-    if (definition.key !== "compress") {
+    if (definition.key !== "compress-range" && definition.key !== "compress-message") {
         normalized = normalizeReminderPromptContent(normalized)
     }
 
@@ -245,7 +260,7 @@ function wrapRuntimePromptContent(definition: PromptDefinition, editableText: st
         return ""
     }
 
-    if (definition.key === "compress") {
+    if (definition.key === "compress-range" || definition.key === "compress-message") {
         return trimmed
     }
 

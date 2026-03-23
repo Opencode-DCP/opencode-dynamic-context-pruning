@@ -16,6 +16,13 @@ export const PRUNE_REASON_LABELS: Record<PruneReason, string> = {
     extraction: "Extraction",
 }
 
+interface CompressionNotificationEntry {
+    blockId: number
+    runId: number
+    summary: string
+    summaryTokens: number
+}
+
 function buildMinimalMessage(state: SessionState, reason: PruneReason | undefined): string {
     const reasonSuffix = reason ? ` — ${PRUNE_REASON_LABELS[reason]}` : ""
     return (
@@ -127,15 +134,40 @@ export async function sendUnifiedNotification(
     return true
 }
 
+function buildCompressionSummary(
+    entries: CompressionNotificationEntry[],
+    state: SessionState,
+): string {
+    if (entries.length === 1) {
+        return entries[0]?.summary ?? ""
+    }
+
+    return entries
+        .map((entry) => {
+            const topic =
+                state.prune.messages.blocksById.get(entry.blockId)?.topic ?? "(unknown topic)"
+            return `### ${topic}\n${entry.summary}`
+        })
+        .join("\n\n")
+}
+
+function getCompressionLabel(entries: CompressionNotificationEntry[]): string {
+    const runId = entries[0]?.runId
+    if (runId === undefined) {
+        return "Compression"
+    }
+
+    return `Compression #${runId}`
+}
+
 export async function sendCompressNotification(
     client: any,
     logger: Logger,
     config: PluginConfig,
     state: SessionState,
     sessionId: string,
-    compressionId: number,
-    summary: string,
-    summaryTokens: number,
+    entries: CompressionNotificationEntry[],
+    batchTopic: string | undefined,
     totalSessionTokens: number,
     sessionMessageIds: string[],
     params: any,
@@ -144,25 +176,66 @@ export async function sendCompressNotification(
         return false
     }
 
-    let message: string
-    const summaryTokensStr = formatTokenCount(summaryTokens)
-    const compressionBlock = state.prune.messages.blocksById.get(compressionId)
-
-    if (!compressionBlock) {
-        logger.error("Compression block missing for notification", {
-            compressionId,
-            sessionId,
-        })
+    if (entries.length === 0) {
+        return false
     }
 
-    const newlyCompressedToolIds = compressionBlock?.directToolIds ?? []
-    const newlyCompressedMessageIds = compressionBlock?.directMessageIds ?? []
-    const topic = compressionBlock?.topic ?? "(unknown topic)"
-    const compressedTokens = compressionBlock?.compressedTokens ?? 0
+    let message: string
+    const compressionLabel = getCompressionLabel(entries)
+    const summary = buildCompressionSummary(entries, state)
+    const summaryTokens = entries.reduce((total, entry) => total + entry.summaryTokens, 0)
+    const summaryTokensStr = formatTokenCount(summaryTokens)
+    const compressedTokens = entries.reduce((total, entry) => {
+        const compressionBlock = state.prune.messages.blocksById.get(entry.blockId)
+        if (!compressionBlock) {
+            logger.error("Compression block missing for notification", {
+                compressionId: entry.blockId,
+                sessionId,
+            })
+            return total
+        }
+
+        return total + compressionBlock.compressedTokens
+    }, 0)
+
+    const newlyCompressedMessageIds: string[] = []
+    const newlyCompressedToolIds: string[] = []
+    const seenMessageIds = new Set<string>()
+    const seenToolIds = new Set<string>()
+
+    for (const entry of entries) {
+        const compressionBlock = state.prune.messages.blocksById.get(entry.blockId)
+        if (!compressionBlock) {
+            continue
+        }
+
+        for (const messageId of compressionBlock.directMessageIds) {
+            if (seenMessageIds.has(messageId)) {
+                continue
+            }
+            seenMessageIds.add(messageId)
+            newlyCompressedMessageIds.push(messageId)
+        }
+
+        for (const toolId of compressionBlock.directToolIds) {
+            if (seenToolIds.has(toolId)) {
+                continue
+            }
+            seenToolIds.add(toolId)
+            newlyCompressedToolIds.push(toolId)
+        }
+    }
+
+    const topic =
+        batchTopic ??
+        (entries.length === 1
+            ? (state.prune.messages.blocksById.get(entries[0]?.blockId ?? -1)?.topic ??
+              "(unknown topic)")
+            : "(unknown topic)")
 
     if (config.pruneNotification === "minimal") {
         message = formatStatsHeader(state.stats.totalPruneTokens, state.stats.pruneTokenCounter)
-        message += ` — Compression #${compressionId}`
+        message += ` — ${compressionLabel}`
     } else {
         message = formatStatsHeader(state.stats.totalPruneTokens, state.stats.pruneTokenCounter)
 
@@ -183,7 +256,7 @@ export async function sendCompressNotification(
             totalSessionTokens > 0 ? Math.round((compressedTokens / totalSessionTokens) * 100) : 0
 
         message += `\n\n${progressBar}`
-        message += `\n▣ Compression #${compressionId} (${pruneTokenCounterStr} removed, ${reduction}% reduction)`
+        message += `\n▣ ${compressionLabel} (${pruneTokenCounterStr} removed, ${reduction}% reduction)`
         message += `\n→ Topic: ${topic}`
         message += `\n→ Items: ${newlyCompressedMessageIds.length} messages`
         if (newlyCompressedToolIds.length > 0) {

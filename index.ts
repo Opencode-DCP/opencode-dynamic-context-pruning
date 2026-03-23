@@ -1,5 +1,6 @@
 import type { Plugin } from "@opencode-ai/plugin"
 import { getConfig } from "./lib/config"
+import { createCompressMessageTool, createCompressRangeTool } from "./lib/compress"
 import {
     compressDisabledByOpencode,
     hasExplicitToolPermission,
@@ -7,7 +8,6 @@ import {
 } from "./lib/host-permissions"
 import { Logger } from "./lib/logger"
 import { createSessionState } from "./lib/state"
-import { createCompressTool } from "./lib/tools"
 import { PromptStore } from "./lib/prompts/store"
 import {
     createChatMessageTransformHandler,
@@ -40,6 +40,14 @@ const plugin: Plugin = (async (ctx) => {
     logger.info("DCP initialized", {
         strategies: config.strategies,
     })
+
+    const compressToolContext = {
+        client: ctx.client,
+        state,
+        logger,
+        config,
+        prompts,
+    }
 
     return {
         "experimental.chat.system.transform": createSystemPromptHandler(
@@ -81,14 +89,10 @@ const plugin: Plugin = (async (ctx) => {
         ),
         tool: {
             ...(config.compress.permission !== "deny" && {
-                compress: createCompressTool({
-                    client: ctx.client,
-                    state,
-                    logger,
-                    config,
-                    workingDirectory: ctx.directory,
-                    prompts,
-                }),
+                compress:
+                    config.compress.mode === "message"
+                        ? createCompressMessageTool(compressToolContext)
+                        : createCompressRangeTool(compressToolContext),
             }),
         },
         config: async (opencodeConfig) => {

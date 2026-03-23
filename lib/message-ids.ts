@@ -90,8 +90,30 @@ export function parseBoundaryId(id: string): ParsedBoundaryId | null {
     return null
 }
 
-export function formatMessageIdTag(ref: string): string {
-    return `\n<${MESSAGE_ID_TAG_NAME}>${ref}</${MESSAGE_ID_TAG_NAME}>`
+function escapeXmlAttribute(value: string): string {
+    return value
+        .replace(/&/g, "&amp;")
+        .replace(/"/g, "&quot;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+}
+
+export function formatMessageIdTag(
+    ref: string,
+    attributes?: Record<string, string | undefined>,
+): string {
+    const serializedAttributes = Object.entries(attributes || {})
+        .sort(([left], [right]) => left.localeCompare(right))
+        .map(([name, value]) => {
+            if (name.trim().length === 0 || typeof value !== "string" || value.length === 0) {
+                return ""
+            }
+
+            return ` ${name}="${escapeXmlAttribute(value)}"`
+        })
+        .join("")
+
+    return `\n<${MESSAGE_ID_TAG_NAME}${serializedAttributes}>${ref}</${MESSAGE_ID_TAG_NAME}>`
 }
 
 export function assignMessageRefs(state: SessionState, messages: WithParts[]): number {

@@ -21,14 +21,20 @@ const MANUAL_MODE_OFF = "Manual mode is now OFF."
 const COMPRESS_TRIGGER_PROMPT = [
     "<compress triggered manually>",
     "Manual mode trigger received. You must now use the compress tool.",
-    "Find the most significant completed section of the conversation that can be compressed into a high-fidelity technical summary.",
-    "Choose safe boundaries and preserve all critical implementation details.",
-    "Return after compress with a brief explanation of what range was compressed.",
+    "Find the most significant completed conversation content that can be compressed into a high-fidelity technical summary.",
+    "Follow the active compress mode, preserve all critical implementation details, and choose safe targets.",
+    "Return after compress with a brief explanation of what content was compressed.",
 ].join("\n\n")
 
-function getTriggerPrompt(tool: "compress", state: SessionState, userFocus?: string): string {
+function getTriggerPrompt(
+    tool: "compress",
+    state: SessionState,
+    config: PluginConfig,
+    userFocus?: string,
+): string {
     const base = COMPRESS_TRIGGER_PROMPT
-    const compressedBlockGuidance = buildCompressedBlockGuidance(state)
+    const compressedBlockGuidance =
+        config.compress.mode === "message" ? "" : buildCompressedBlockGuidance(state)
 
     const sections = [base, compressedBlockGuidance]
     if (userFocus && userFocus.trim().length > 0) {
@@ -78,5 +84,5 @@ export async function handleManualTriggerCommand(
     tool: "compress",
     userFocus?: string,
 ): Promise<string | null> {
-    return getTriggerPrompt(tool, ctx.state, userFocus)
+    return getTriggerPrompt(tool, ctx.state, ctx.config, userFocus)
 }

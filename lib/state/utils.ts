@@ -14,6 +14,7 @@ interface PersistedPruneMessagesState {
     activeBlockIds?: number[]
     activeByAnchorMessageId?: Record<string, number>
     nextBlockId?: number
+    nextRunId?: number
 }
 
 export async function isSubAgentSession(client: any, sessionID: string): Promise<boolean> {
@@ -70,6 +71,7 @@ export function createPruneMessagesState(): PruneMessagesState {
         activeBlockIds: new Set<number>(),
         activeByAnchorMessageId: new Map<string, number>(),
         nextBlockId: 1,
+        nextRunId: 1,
     }
 }
 
@@ -83,6 +85,9 @@ export function loadPruneMessagesState(
 
     if (typeof persisted.nextBlockId === "number" && Number.isInteger(persisted.nextBlockId)) {
         state.nextBlockId = Math.max(1, persisted.nextBlockId)
+    }
+    if (typeof persisted.nextRunId === "number" && Number.isInteger(persisted.nextRunId)) {
+        state.nextRunId = Math.max(1, persisted.nextRunId)
     }
 
     if (persisted.byMessageId && typeof persisted.byMessageId === "object") {
@@ -143,6 +148,12 @@ export function loadPruneMessagesState(
 
             state.blocksById.set(blockId, {
                 blockId,
+                runId:
+                    typeof block.runId === "number" &&
+                    Number.isInteger(block.runId) &&
+                    block.runId > 0
+                        ? block.runId
+                        : blockId,
                 active: block.active === true,
                 deactivatedByUser: block.deactivatedByUser === true,
                 compressedTokens:
@@ -150,7 +161,14 @@ export function loadPruneMessagesState(
                     Number.isFinite(block.compressedTokens)
                         ? Math.max(0, block.compressedTokens)
                         : 0,
+                mode: block.mode === "range" || block.mode === "message" ? block.mode : undefined,
                 topic: typeof block.topic === "string" ? block.topic : "",
+                batchTopic:
+                    typeof block.batchTopic === "string"
+                        ? block.batchTopic
+                        : typeof block.topic === "string"
+                          ? block.topic
+                          : "",
                 startId: typeof block.startId === "string" ? block.startId : "",
                 endId: typeof block.endId === "string" ? block.endId : "",
                 anchorMessageId:
@@ -209,6 +227,9 @@ export function loadPruneMessagesState(
         }
         if (blockId >= state.nextBlockId) {
             state.nextBlockId = blockId + 1
+        }
+        if (block.runId >= state.nextRunId) {
+            state.nextRunId = block.runId + 1
         }
     }
 

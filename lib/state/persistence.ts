@@ -18,6 +18,7 @@ export interface PersistedPruneMessagesState {
     activeBlockIds: number[]
     activeByAnchorMessageId: Record<string, number>
     nextBlockId: number
+    nextRunId: number
 }
 
 export interface PersistedPrune {
@@ -85,6 +86,7 @@ export async function saveSessionState(
                         sessionState.prune.messages.activeByAnchorMessageId,
                     ),
                     nextBlockId: sessionState.prune.messages.nextBlockId,
+                    nextRunId: sessionState.prune.messages.nextRunId,
                 },
             },
             nudges: {

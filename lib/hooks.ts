@@ -2,6 +2,7 @@ import type { SessionState, WithParts } from "./state"
 import type { Logger } from "./logger"
 import type { PluginConfig } from "./config"
 import { assignMessageRefs } from "./message-ids"
+import { buildPriorityMap } from "./messages/priority"
 import { syncToolCache } from "./state/tool-cache"
 import {
     prune,
@@ -11,7 +12,12 @@ import {
     injectExtendedSubAgentResults,
     stripStaleMetadata,
 } from "./messages"
-import { buildToolIdList, isIgnoredUserMessage, stripHallucinations } from "./messages/utils"
+import {
+    buildToolIdList,
+    isIgnoredUserMessage,
+    stripHallucinations,
+    stripHallucinationsFromString,
+} from "./messages/utils"
 import { checkSession } from "./state"
 import { renderSystemPrompt } from "./prompts"
 import { handleStatsCommand } from "./commands/stats"
@@ -32,9 +38,6 @@ const INTERNAL_AGENT_SIGNATURES = [
     "You are a helpful AI assistant tasked with summarizing conversations",
     "Summarize what was done in this conversation",
 ]
-
-const DCP_MESSAGE_ID_TAG_REGEX = /<dcp-message-id>(?:m\d+|b\d+)<\/dcp-message-id>/g
-const DCP_SYSTEM_REMINDER_REGEX = /<dcp-system-reminder\b[^>]*>[\s\S]*?<\/dcp-system-reminder>/g
 
 function applyManualPrompt(state: SessionState, messages: WithParts[], logger: Logger): void {
     const pending = state.pendingManualTrigger
@@ -148,9 +151,17 @@ export function createChatMessageTransformHandler(
             output.messages,
             config.experimental.allowSubAgents,
         )
+        const compressionPriorities = buildPriorityMap(config, state, output.messages)
         prompts.reload()
-        injectCompressNudges(state, config, logger, output.messages, prompts.getRuntimePrompts())
-        injectMessageIds(state, config, output.messages)
+        injectCompressNudges(
+            state,
+            config,
+            logger,
+            output.messages,
+            prompts.getRuntimePrompts(),
+            compressionPriorities,
+        )
+        injectMessageIds(state, config, output.messages, compressionPriorities)
         applyManualPrompt(state, output.messages, logger)
         stripStaleMetadata(output.messages)
 
@@ -280,8 +291,6 @@ export function createTextCompleteHandler() {
         _input: { sessionID: string; messageID: string; partID: string },
         output: { text: string },
     ) => {
-        output.text = output.text
-            .replace(DCP_SYSTEM_REMINDER_REGEX, "")
-            .replace(DCP_MESSAGE_ID_TAG_REGEX, "")
+        output.text = stripHallucinationsFromString(output.text)
     }
 }

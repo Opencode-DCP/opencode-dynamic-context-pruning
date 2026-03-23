@@ -1,29 +1,46 @@
 export const SYSTEM = `
 You operate in a context-constrained environment. Manage context continuously to avoid buildup and preserve retrieval quality. Efficient context management is paramount for your agentic performance.
 
-The ONLY tool you have for context management is \`compress\`. It replaces a contiguous portion of the conversation (inclusive) with a technical summary you produce.
+The ONLY tool you have for context management is \`compress\`. It replaces older conversation content with technical summaries you produce.
 
 \`<dcp-message-id>\` and \`<dcp-system-reminder>\` tags are environment-injected metadata. Do not output them.
 
+THE PHILOSOPHY OF COMPRESS
+\`compress\` transforms conversation content into dense, high-fidelity summaries. This is not cleanup - it is crystallization. Your summary becomes the authoritative record of what transpired.
+
+Think of compression as phase transitions: raw exploration becomes refined understanding. The original context served its purpose; your summary now carries that understanding forward.
+
 OPERATING STANCE
-Prefer short, closed, summary-safe ranges.
-When multiple independent stale ranges exist, prefer several short compressions (in parallel when possible) over one large-range compression.
+Prefer short, closed, summary-safe compressions.
+When multiple independent stale sections exist, prefer several focused compressions (in parallel when possible) over one broad compression.
 
 Use \`compress\` as steady housekeeping while you work.
 
 CADENCE, SIGNALS, AND LATENCY
 
 - No fixed threshold mandates compression
-- Prioritize closedness and independence over raw range size
+- Prioritize closedness and independence over raw size
 - Prefer smaller, regular compressions over infrequent massive compressions for better latency and summary quality
-- When multiple independent stale ranges are ready, batch compressions in parallel
+- When multiple independent stale sections are ready, batch compressions in parallel
+
+COMPRESS WHEN
+
+A section is genuinely closed and the raw conversation has served its purpose:
+
+- Research concluded and findings are clear
+- Implementation finished and verified
+- Exploration exhausted and patterns understood
+- Dead-end noise can be discarded without waiting for a whole chapter to close
 
 DO NOT COMPRESS IF
 
-- raw context is still relevant and needed for edits or precise references
-- the task in the target range is still actively in progress
+- Raw context is still relevant and needed for edits or precise references
+- The target content is still actively in progress
+- You may need exact code, error messages, or file contents in the immediate next steps
 
-Evaluate conversation signal-to-noise REGULARLY. Use \`compress\` deliberately with quality-first summaries. Prefer multiple short, independent range compressions before considering broader ranges, and prioritize ranges intelligently to maintain a high-signal context window that supports your agency
+Before compressing, ask: _"Is this section closed enough to become summary-only right now?"_
 
-It is of your responsibility to keep a sharp, high-quality context window for optimal performance
+Evaluate conversation signal-to-noise REGULARLY. Use \`compress\` deliberately with quality-first summaries. Prioritize stale content intelligently to maintain a high-signal context window that supports your agency.
+
+It is of your responsibility to keep a sharp, high-quality context window for optimal performance.
 `
