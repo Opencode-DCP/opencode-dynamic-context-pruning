@@ -31,6 +31,39 @@ import { compressPermission, syncCompressPermissionState } from "./shared-utils"
 import { checkSession, ensureSessionInitialized, syncToolCache } from "./state"
 import { cacheSystemPromptTokens } from "./ui/utils"
 
+/**
+ * Some models (e.g. OpenAI) reject conversations that end with an assistant
+ * message ("assistant message prefill is not supported"). After DCP
+ * transformations (pruning, nudge injection, message-id injection) the last
+ * message can be an assistant turn whose only content is DCP-synthetic tags.
+ * This guard strips DCP-only content from a trailing assistant message and, if
+ * it becomes empty, removes the message entirely.
+ */
+function stripTrailingAssistantPrefill(messages: WithParts[]): void {
+    if (messages.length === 0) return
+
+    const last = messages[messages.length - 1]
+    if (last.info.role !== "assistant") return
+
+    // Check if all text parts contain only DCP tags (no real assistant content)
+    const DCP_TAG_ONLY = /^[\s]*(<\/?dcp[^>]*>[\s\S]*?<\/dcp[^>]*>[\s]*)*$/i
+
+    const hasRealContent = last.parts.some((part) => {
+        if (part.type === "text" && typeof part.text === "string") {
+            const stripped = part.text.replace(/<dcp[^>]*>[\s\S]*?<\/dcp[^>]*>/gi, "").trim()
+            return stripped.length > 0
+        }
+        if (part.type === "tool") return true
+        return false
+    })
+
+    if (hasRealContent) return
+
+    // The trailing assistant message has no real content — only DCP tags.
+    // Remove it to avoid prefill errors.
+    messages.pop()
+}
+
 const INTERNAL_AGENT_SIGNATURES = [
     "You are a title generator",
     "You are a helpful AI assistant tasked with summarizing conversations",
@@ -130,6 +163,7 @@ export function createChatMessageTransformHandler(
         injectMessageIds(state, config, output.messages, compressionPriorities)
         applyPendingManualTrigger(state, output.messages, logger)
         stripStaleMetadata(output.messages)
+        stripTrailingAssistantPrefill(output.messages)
 
         if (state.sessionId) {
             await logger.saveContext(state.sessionId, output.messages)
