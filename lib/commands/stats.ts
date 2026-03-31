@@ -45,9 +45,15 @@ function formatStatsMessage(
     lines.push("")
     lines.push("All-time:")
     lines.push("─".repeat(60))
-    lines.push(`  Tokens saved:    ~${formatTokenCount(allTime.totalTokens)}`)
-    lines.push(`  Tools pruned:     ${allTime.totalTools}`)
-    lines.push(`  Messages pruned:  ${allTime.totalMessages}`)
+    lines.push(
+        `  Tokens in|out:    ~${formatTokenCount(allTime.totalTokens)} | ~${formatTokenCount(allTime.totalSummaryTokens)}`,
+    )
+    lines.push(
+        `  Ratio:            ${formatCompressionRatio(allTime.totalTokens, allTime.totalSummaryTokens)}`,
+    )
+    lines.push(`  Time:             ${formatCompressionTime(allTime.totalDurationMs)}`)
+    lines.push(`  Messages:         ${allTime.totalMessages}`)
+    lines.push(`  Tools:            ${allTime.totalTools}`)
     lines.push(`  Sessions:         ${allTime.sessionCount}`)
 
     return lines.join("\n")
@@ -142,6 +148,8 @@ export async function handleStatsCommand(ctx: StatsCommandContext): Promise<void
         sessionMessages,
         sessionDurationMs,
         allTimeTokens: allTime.totalTokens,
+        allTimeSummaryTokens: allTime.totalSummaryTokens,
+        allTimeDurationMs: allTime.totalDurationMs,
         allTimeTools: allTime.totalTools,
         allTimeMessages: allTime.totalMessages,
     })
