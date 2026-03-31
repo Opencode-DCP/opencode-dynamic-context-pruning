@@ -1,0 +1,125 @@
+{
+  "$schema": "https://raw.githubusercontent.com/Opencode-DCP/opencode-dynamic-context-pruning/v3.1.5/dcp.schema.json",
+  "version": "3.1.5-optimized",
+  "lastUpdated": "2026-03-31",
+  
+  // ========================================
+  // 核心开关
+  // ========================================
+  "enabled": true,
+  "debug": false,
+  "pruneNotification": "detailed",
+  "pruneNotificationType": "chat",
+  
+  // ========================================
+  // 手动命令配置
+  // ========================================
+  "commands": {
+    "enabled": true,
+    "protectedTools": [
+      "sisyphus_*",
+      "oracle",
+      "build",
+      "test"
+    ]
+  },
+  
+  // ========================================
+  // 手动模式（关闭自动触发）
+  // ========================================
+  "manualMode": {
+    "enabled": false,
+    "automaticStrategies": true
+  },
+  
+  // ========================================
+  // 转数保护（保护最近的工具输出）
+  // ========================================
+  "turnProtection": {
+    "enabled": true,
+    "turns": 4
+  },
+  
+  // ========================================
+  // 实验性功能（谨慎开启）
+  // ========================================
+  "experimental": {
+    "allowSubAgents": false,
+    "customPrompts": false
+  },
+  
+  // ========================================
+  // 受保护的文件模式（内容不会被剪枝）
+  // ========================================
+  "protectedFilePatterns": [
+    "package.json",
+    "tsconfig.json",
+    ".env",
+    ".env.*",
+    ".gitignore",
+    "**/*.config.ts",
+    "**/*.config.js",
+    "**/secrets.json"
+  ],
+  
+  // ========================================
+  // 智能压缩核心配置（v3.1.5 优化）
+  // ========================================
+  "compress": {
+    "enabled": true,
+    "mode": "range",
+    "permission": "allow",
+    "showCompression": false,
+    "summaryBuffer": true,
+    
+    // 上下文阈值 - 针对 step-3.5-flash 优化
+    // step-3.5-flash 上下文窗口约为 128K tokens
+    "minContextLimit": 50000,
+    "maxContextLimit": 100000,
+    
+    // 每模型特定配置（可选覆盖）
+    "modelMaxLimits": {
+      "nvidia/step-3.5-flash": 100000,
+      "stepfun-ai/step-3.5-flash": 100000
+    },
+    "modelMinLimits": {
+      "nvidia/step-3.5-flash": 40000
+    },
+    
+    // 提醒频率
+    "nudgeFrequency": 5,
+    "iterationNudgeThreshold": 15,
+    "nudgeForce": "soft",
+    
+    // 保护设置
+    "protectedTools": [
+      "file_write",
+      "file_edit",
+      "bash",
+      "git_*"
+    ],
+    "protectUserMessages": false
+  },
+  
+  // ========================================
+  // 去重复策略
+  // ========================================
+  "strategies": {
+    "deduplication": {
+      "enabled": true,
+      "protectedTools": [
+        "build",
+        "test",
+        "oracle",
+        "librarian"
+      ]
+    },
+    
+    // 错误清理策略
+    "purgeErrors": {
+      "enabled": true,
+      "turns": 4,
+      "protectedTools": []
+    }
+  }
+}
