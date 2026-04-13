@@ -28,7 +28,7 @@ export interface PrunedMessageEntry {
     activeBlockIds: number[]
 }
 
-export type CompressionMode = "range" | "message"
+export type CompressionMode = "range" | "message" | "prune"
 
 export interface CompressionBlock {
     blockId: number
