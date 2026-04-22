@@ -166,7 +166,9 @@ function allocateNextMessageRef(state: SessionState): string {
         candidate++
     }
 
-    throw new Error(
-        `Message ID alias capacity exceeded. Cannot allocate more than ${formatMessageRef(MESSAGE_REF_MAX_INDEX)} aliases in this session.`,
-    )
+    // Graceful degradation: stop allocating aliases instead of hard-throwing.
+    // This prevents DCP from crashing the session when message volume exceeds
+    // the referenceable range; downstream features that depend on message refs
+    // will simply see unassigned messages.
+    return ""
 }
