@@ -10,9 +10,22 @@ export function estimateSelectedTokens(
     consumedBlockIds: number[] = [],
 ): number {
     let total = 0
+    const consumedMessageIds = new Set<string>()
 
-    for (const tokenCount of selection.messageTokenById.values()) {
-        total += tokenCount
+    for (const blockId of consumedBlockIds) {
+        const block = state.prune.messages.blocksById.get(blockId)
+        if (!block) {
+            continue
+        }
+        for (const messageId of block.effectiveMessageIds) {
+            consumedMessageIds.add(messageId)
+        }
+    }
+
+    for (const [messageId, tokenCount] of selection.messageTokenById) {
+        if (!consumedMessageIds.has(messageId)) {
+            total += tokenCount
+        }
     }
 
     for (const blockId of consumedBlockIds) {
@@ -25,20 +38,14 @@ export function estimateSelectedTokens(
     return total
 }
 
-export function assertUsefulCompressedSummary(
-    summaryTokens: number,
-    selectedTokens: number,
-): void {
+export function assertUsefulCompressedSummary(summaryTokens: number, selectedTokens: number): void {
     if (summaryTokens > MAX_COMPRESSED_SUMMARY_TOKENS) {
         throw new Error(
             `Compression summary is too large (${summaryTokens} tokens; max ${MAX_COMPRESSED_SUMMARY_TOKENS}). Retry with a shorter, evidence-focused summary.`,
         )
     }
 
-    if (
-        selectedTokens >= MIN_SELECTED_TOKENS_FOR_RATIO_CHECK &&
-        summaryTokens >= selectedTokens
-    ) {
+    if (selectedTokens >= MIN_SELECTED_TOKENS_FOR_RATIO_CHECK && summaryTokens >= selectedTokens) {
         throw new Error(
             `Compression summary is not smaller than the selected content (${summaryTokens} >= ${selectedTokens} tokens). Retry with a concise summary.`,
         )
