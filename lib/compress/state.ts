@@ -4,15 +4,41 @@ import type { AppliedCompressionResult, CompressionStateInput, SelectionResoluti
 
 export const COMPRESSED_BLOCK_HEADER = "[Compressed conversation section]"
 
-export function allocateBlockId(state: SessionState): number {
+function nextBlockId(state: SessionState): number {
     const next = state.prune.messages.nextBlockId
     if (!Number.isInteger(next) || next < 1) {
-        state.prune.messages.nextBlockId = 2
         return 1
     }
 
-    state.prune.messages.nextBlockId = next + 1
     return next
+}
+
+export function previewBlockIds(state: SessionState, count: number): number[] {
+    if (!Number.isInteger(count) || count < 0) {
+        throw new Error(`Invalid block reservation count: ${count}`)
+    }
+    if (count === 0) {
+        return []
+    }
+
+    const first = nextBlockId(state)
+    return Array.from({ length: count }, (_, index) => first + index)
+}
+
+export function reserveBlockIds(state: SessionState, count: number): number[] {
+    const ids = previewBlockIds(state, count)
+    if (ids.length > 0) {
+        state.prune.messages.nextBlockId = ids[ids.length - 1] + 1
+    }
+    return ids
+}
+
+export function allocateBlockId(state: SessionState): number {
+    const [blockId] = reserveBlockIds(state, 1)
+    if (blockId === undefined) {
+        throw new Error("Failed to allocate compression block ID")
+    }
+    return blockId
 }
 
 export function allocateRunId(state: SessionState): number {

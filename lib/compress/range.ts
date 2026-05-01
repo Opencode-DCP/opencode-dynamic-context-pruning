@@ -16,9 +16,10 @@ import {
 import { assertUsefulCompressedSummary, estimateSelectedTokens } from "./summary-limits"
 import {
     COMPRESSED_BLOCK_HEADER,
-    allocateBlockId,
     allocateRunId,
     applyCompressionState,
+    previewBlockIds,
+    reserveBlockIds,
     wrapCompressedSummary,
 } from "./state"
 import type { CompressRangeToolArgs } from "./types"
@@ -136,10 +137,13 @@ export function createCompressRangeTool(ctx: ToolContext): ReturnType<typeof too
                 })
             }
 
-            const runId = allocateRunId(ctx.state)
+            const blockIds = previewBlockIds(ctx.state, preparedPlans.length)
+            const validatedPlans = preparedPlans.map((preparedPlan, index) => {
+                const blockId = blockIds[index]
+                if (blockId === undefined) {
+                    throw new Error("Failed to preview compression block ID")
+                }
 
-            for (const preparedPlan of preparedPlans) {
-                const blockId = allocateBlockId(ctx.state)
                 const storedSummary = wrapCompressedSummary(blockId, preparedPlan.finalSummary)
                 const summaryTokens = countTokens(storedSummary)
                 const selectedTokens = estimateSelectedTokens(
@@ -149,6 +153,18 @@ export function createCompressRangeTool(ctx: ToolContext): ReturnType<typeof too
                 )
                 assertUsefulCompressedSummary(summaryTokens, selectedTokens)
 
+                return {
+                    ...preparedPlan,
+                    blockId,
+                    storedSummary,
+                    summaryTokens,
+                }
+            })
+
+            reserveBlockIds(ctx.state, validatedPlans.length)
+            const runId = allocateRunId(ctx.state)
+
+            for (const preparedPlan of validatedPlans) {
                 const applied = applyCompressionState(
                     ctx.state,
                     {
@@ -160,22 +176,22 @@ export function createCompressRangeTool(ctx: ToolContext): ReturnType<typeof too
                         runId,
                         compressMessageId: toolCtx.messageID,
                         compressCallId: callId,
-                        summaryTokens,
+                        summaryTokens: preparedPlan.summaryTokens,
                     },
                     preparedPlan.selection,
                     preparedPlan.anchorMessageId,
-                    blockId,
-                    storedSummary,
+                    preparedPlan.blockId,
+                    preparedPlan.storedSummary,
                     preparedPlan.consumedBlockIds,
                 )
 
                 totalCompressedMessages += applied.messageIds.length
 
                 notifications.push({
-                    blockId,
+                    blockId: preparedPlan.blockId,
                     runId,
                     summary: preparedPlan.finalSummary,
-                    summaryTokens,
+                    summaryTokens: preparedPlan.summaryTokens,
                 })
             }
 

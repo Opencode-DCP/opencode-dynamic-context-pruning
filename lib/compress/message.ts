@@ -7,9 +7,10 @@ import { finalizeSession, prepareSession, type NotificationEntry } from "./pipel
 import { appendProtectedTools } from "./protected-content"
 import { assertUsefulCompressedSummary, estimateSelectedTokens } from "./summary-limits"
 import {
-    allocateBlockId,
     allocateRunId,
     applyCompressionState,
+    previewBlockIds,
+    reserveBlockIds,
     wrapCompressedSummary,
 } from "./state"
 import type { CompressMessageToolArgs } from "./types"
@@ -95,14 +96,33 @@ export function createCompressMessageTool(ctx: ToolContext): ReturnType<typeof t
                 })
             }
 
-            const runId = allocateRunId(ctx.state)
+            const blockIds = previewBlockIds(ctx.state, preparedPlans.length)
+            const validatedPlans = preparedPlans.map(({ plan, summaryWithTools }, index) => {
+                const blockId = blockIds[index]
+                if (blockId === undefined) {
+                    throw new Error("Failed to preview compression block ID")
+                }
 
-            for (const { plan, summaryWithTools } of preparedPlans) {
-                const blockId = allocateBlockId(ctx.state)
                 const storedSummary = wrapCompressedSummary(blockId, summaryWithTools)
                 const summaryTokens = countTokens(storedSummary)
                 const selectedTokens = estimateSelectedTokens(ctx.state, plan.selection)
                 assertUsefulCompressedSummary(summaryTokens, selectedTokens)
+
+                return {
+                    plan,
+                    summaryWithTools,
+                    blockId,
+                    storedSummary,
+                    summaryTokens,
+                }
+            })
+
+            reserveBlockIds(ctx.state, validatedPlans.length)
+            const runId = allocateRunId(ctx.state)
+
+            for (const validatedPlan of validatedPlans) {
+                const { plan, summaryWithTools, blockId, storedSummary, summaryTokens } =
+                    validatedPlan
 
                 applyCompressionState(
                     ctx.state,
