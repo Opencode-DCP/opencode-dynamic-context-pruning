@@ -10,6 +10,8 @@ const PRUNED_TOOL_OUTPUT_REPLACEMENT =
     "[Output removed to save context - information superseded or no longer needed]"
 const PRUNED_TOOL_ERROR_INPUT_REPLACEMENT = "[input removed due to failed tool call]"
 const PRUNED_QUESTION_INPUT_REPLACEMENT = "[questions removed - see output for user's answers]"
+const PRUNED_FILE_SNAPSHOT_REPLACEMENT =
+    "[full file snapshot removed to save context - diff metadata retained]"
 
 export const prune = (
     state: SessionState,
@@ -19,6 +21,7 @@ export const prune = (
 ): void => {
     filterCompressedRanges(state, logger, config, messages)
     // pruneFullTool(state, logger, messages)
+    pruneToolMetadata(state, logger, messages)
     pruneToolOutputs(state, logger, messages)
     pruneToolInputs(state, logger, messages)
     pruneToolErrors(state, logger, messages)
@@ -67,6 +70,37 @@ const pruneFullTool = (state: SessionState, logger: Logger, messages: WithParts[
         const result = messages.filter((msg) => !messagesToRemove.includes(msg.info.id))
         messages.length = 0
         messages.push(...result)
+    }
+}
+
+const pruneToolMetadata = (state: SessionState, logger: Logger, messages: WithParts[]): void => {
+    for (const msg of messages) {
+        if (isMessageCompacted(state, msg)) {
+            continue
+        }
+
+        const parts = Array.isArray(msg.parts) ? msg.parts : []
+        for (const part of parts) {
+            if (part.type !== "tool") {
+                continue
+            }
+            if (part.tool !== "edit" && part.tool !== "write") {
+                continue
+            }
+
+            const toolState = part.state as { metadata?: { filediff?: Record<string, unknown> } }
+            const filediff = toolState.metadata?.filediff
+            if (!filediff || typeof filediff !== "object") {
+                continue
+            }
+
+            if (typeof filediff.before === "string") {
+                filediff.before = PRUNED_FILE_SNAPSHOT_REPLACEMENT
+            }
+            if (typeof filediff.after === "string") {
+                filediff.after = PRUNED_FILE_SNAPSHOT_REPLACEMENT
+            }
+        }
     }
 }
 

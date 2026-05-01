@@ -5,6 +5,7 @@ import { MESSAGE_FORMAT_EXTENSION } from "../prompts/extensions/tool"
 import { formatIssues, formatResult, resolveMessages, validateArgs } from "./message-utils"
 import { finalizeSession, prepareSession, type NotificationEntry } from "./pipeline"
 import { appendProtectedTools } from "./protected-content"
+import { assertUsefulCompressedSummary, estimateSelectedTokens } from "./summary-limits"
 import {
     allocateBlockId,
     allocateRunId,
@@ -100,6 +101,8 @@ export function createCompressMessageTool(ctx: ToolContext): ReturnType<typeof t
                 const blockId = allocateBlockId(ctx.state)
                 const storedSummary = wrapCompressedSummary(blockId, summaryWithTools)
                 const summaryTokens = countTokens(storedSummary)
+                const selectedTokens = estimateSelectedTokens(ctx.state, plan.selection)
+                assertUsefulCompressedSummary(summaryTokens, selectedTokens)
 
                 applyCompressionState(
                     ctx.state,

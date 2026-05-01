@@ -13,6 +13,7 @@ import {
     validateNonOverlapping,
     validateSummaryPlaceholders,
 } from "./range-utils"
+import { assertUsefulCompressedSummary, estimateSelectedTokens } from "./summary-limits"
 import {
     COMPRESSED_BLOCK_HEADER,
     allocateBlockId,
@@ -141,6 +142,12 @@ export function createCompressRangeTool(ctx: ToolContext): ReturnType<typeof too
                 const blockId = allocateBlockId(ctx.state)
                 const storedSummary = wrapCompressedSummary(blockId, preparedPlan.finalSummary)
                 const summaryTokens = countTokens(storedSummary)
+                const selectedTokens = estimateSelectedTokens(
+                    ctx.state,
+                    preparedPlan.selection,
+                    preparedPlan.consumedBlockIds,
+                )
+                assertUsefulCompressedSummary(summaryTokens, selectedTokens)
 
                 const applied = applyCompressionState(
                     ctx.state,

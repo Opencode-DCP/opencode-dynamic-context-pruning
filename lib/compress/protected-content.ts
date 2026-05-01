@@ -13,6 +13,27 @@ import {
 import { fetchSessionMessages } from "./search"
 import type { SearchContext, SelectionResolution } from "./types"
 
+const MAX_PROTECTED_TOOL_OUTPUT_CHARS = 20_000
+const PROTECTED_TOOL_OUTPUT_HEAD_CHARS = 2_000
+
+export function truncateProtectedToolOutput(tool: string, output: string): string {
+    if (output.length <= MAX_PROTECTED_TOOL_OUTPUT_CHARS) {
+        return output
+    }
+
+    const head = output.slice(0, PROTECTED_TOOL_OUTPUT_HEAD_CHARS)
+    const tail = output.slice(
+        output.length - (MAX_PROTECTED_TOOL_OUTPUT_CHARS - PROTECTED_TOOL_OUTPUT_HEAD_CHARS),
+    )
+    const omitted = output.length - head.length - tail.length
+
+    return [
+        head,
+        `[Protected ${tool} output truncated by DCP: ${omitted} characters omitted. Use the original tool/session artifact if exact details are needed.]`,
+        tail,
+    ].join("\n\n")
+}
+
 export function appendProtectedUserMessages(
     summary: string,
     selection: SelectionResolution,
@@ -138,6 +159,7 @@ export async function appendProtectedTools(
                     }
 
                     if (output) {
+                        output = truncateProtectedToolOutput(part.tool, output)
                         protectedOutputs.push(`\n### ${title}\n${output}`)
                     }
                 }
