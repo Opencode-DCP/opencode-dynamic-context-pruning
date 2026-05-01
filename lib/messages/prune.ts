@@ -87,6 +87,9 @@ const pruneToolMetadata = (state: SessionState, logger: Logger, messages: WithPa
             if (part.tool !== "edit" && part.tool !== "write") {
                 continue
             }
+            if (!state.prune.tools.has(part.callID)) {
+                continue
+            }
 
             const toolState = part.state as { metadata?: { filediff?: Record<string, unknown> } }
             const filediff = toolState.metadata?.filediff
