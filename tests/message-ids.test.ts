@@ -87,3 +87,42 @@ test("checkSession resets message id aliases after native compaction", async () 
     assert.equal(state.messageIds.byRef.get("m0002"), "msg-user-follow-up")
     assert.equal(state.messageIds.nextRef, 3)
 })
+
+test("assignMessageRefs stops cleanly when alias capacity is exhausted", () => {
+    const sessionID = `ses_message_ids_exhausted_${Date.now()}`
+    const state = createSessionState()
+    state.messageIds.nextRef = 10000
+
+    const messages: WithParts[] = [
+        {
+            info: {
+                id: "msg-a",
+                role: "assistant",
+                sessionID,
+                agent: "assistant",
+                time: { created: 1 },
+            } as WithParts["info"],
+            parts: [textPart("msg-a", sessionID, "msg-a-part", "A")],
+        },
+        {
+            info: {
+                id: "msg-b",
+                role: "assistant",
+                sessionID,
+                agent: "assistant",
+                time: { created: 2 },
+            } as WithParts["info"],
+            parts: [textPart("msg-b", sessionID, "msg-b-part", "B")],
+        },
+    ]
+
+    const firstAssigned = assignMessageRefs(state, messages)
+    const secondAssigned = assignMessageRefs(state, messages)
+
+    assert.equal(firstAssigned, 0)
+    assert.equal(secondAssigned, 0)
+    assert.equal(state.messageIds.byRawId.size, 0)
+    assert.equal(state.messageIds.byRef.size, 0)
+    assert.equal(state.messageIds.byRawId.get("msg-a"), undefined)
+    assert.equal(state.messageIds.byRawId.get("msg-b"), undefined)
+})
