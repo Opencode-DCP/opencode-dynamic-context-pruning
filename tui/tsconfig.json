@@ -1,0 +1,14 @@
+{
+    "$schema": "https://json.schemastore.org/tsconfig",
+    "compilerOptions": {
+        "target": "ES2022",
+        "module": "ESNext",
+        "moduleResolution": "bundler",
+        "jsx": "preserve",
+        "jsxImportSource": "@opentui/solid",
+        "strict": true,
+        "skipLibCheck": true,
+        "types": ["node"]
+    },
+    "include": ["./**/*.ts", "./**/*.tsx"]
+}

@@ -1,0 +1,13 @@
+{
+    "$schema": "https://json.schemastore.org/package.json",
+    "name": "dcp-tui-local",
+    "private": true,
+    "type": "module",
+    "dependencies": {
+        "@opencode-ai/plugin": "1.4.3",
+        "@opentui/core": "0.1.97",
+        "@opentui/solid": "0.1.97",
+        "solid-js": "1.9.10"
+    },
+    "version": "3.2.4-beta0"
+}

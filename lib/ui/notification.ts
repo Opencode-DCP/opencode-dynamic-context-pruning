@@ -249,7 +249,6 @@ export async function sendCompressNotification(
         message = `${notificationHeader} — ${compressionLabel}`
     } else {
         message = notificationHeader
-
         const activePrunedMessages = new Map<string, number>()
         for (const [messageId, entry] of state.prune.messages.byMessageId) {
             if (entry.activeBlockIds.length > 0) {

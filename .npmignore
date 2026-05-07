@@ -1,25 +1,45 @@
-# Development files
+# Dependencies
 node_modules/
+
+# Build artifacts
+*.tgz
+
+# Logs
 logs/
 dist/logs/
 *.log
+npm-debug.log*
+
+# Local/dev files
 .DS_Store
 tsconfig.json
 watch-logs.sh
 bun.lock
 
-# Documentation
-ANALYSIS.md
-docs/
-notes/
-
-# Source files (since we're shipping dist/)
-index.ts
-lib/
-
 # Git
 .git/
 .gitignore
+.github/
 
-# OpenCode
+# OpenCode local config
 .opencode/
+
+# Docs and local notes
+ANALYSIS.md
+docs/
+notes/
+SCHEMA_NOTES.md
+assets/
+CONTRIBUTING.md
+.prettierrc
+.repomixignore
+
+# Tests and local helpers
+tests/
+tests/results/
+test-update.ts
+repomix-output.xml
+scripts/
+tui/node_modules/
+tui/package-lock.json
+tui/types/

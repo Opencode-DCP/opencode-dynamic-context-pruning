@@ -1,7 +1,7 @@
 {
     "$schema": "https://json.schemastore.org/package.json",
     "name": "@tarquinen/opencode-dcp",
-    "version": "3.1.11",
+    "version": "3.2.8-beta0",
     "type": "module",
     "description": "OpenCode plugin that optimizes token usage by pruning obsolete tool outputs from conversation context",
     "main": "./dist/index.js",
@@ -14,8 +14,25 @@
         "./server": {
             "types": "./dist/index.d.ts",
             "import": "./dist/index.js"
+        },
+        "./tui": {
+            "types": "./dist/tui/index.d.ts",
+            "import": "./tui/index.tsx"
         }
     },
+    "files": [
+        "dist/",
+        "index.ts",
+        "lib/**/*.ts",
+        "tui/index.tsx",
+        "tui/data/*.ts",
+        "tui/routes/*.tsx",
+        "tui/shared/*.ts",
+        "tui/slots/*.tsx",
+        "README.md",
+        "LICENSE",
+        "dcp.schema.json"
+    ],
     "scripts": {
         "clean": "rm -rf dist",
         "build": "npm run clean && tsup && tsc --emitDeclarationOnly",
@@ -24,6 +41,7 @@
         "prepublishOnly": "npm run check:package",
         "dev": "opencode plugin dev",
         "typecheck": "tsc --noEmit",
+        "tui:link-host-runtime": "node scripts/link-tui-host-runtime.mjs",
         "test": "node --import tsx --test tests/*.test.ts",
         "format": "prettier --write .",
         "format:check": "prettier --check .",
@@ -49,7 +67,10 @@
     "author": "tarquinen",
     "license": "AGPL-3.0-or-later",
     "peerDependencies": {
-        "@opencode-ai/plugin": ">=1.4.3"
+        "@opencode-ai/plugin": ">=1.4.3",
+        "@opentui/core": ">=0.1.97",
+        "@opentui/solid": ">=0.1.97",
+        "solid-js": ">=1.9.10"
     },
     "dependencies": {
         "@anthropic-ai/tokenizer": "^0.0.4",
@@ -65,9 +86,9 @@
         "tsx": "^4.21.0",
         "typescript": "^6.0.2"
     },
-    "files": [
-        "dist/",
-        "README.md",
-        "LICENSE"
-    ]
+    "directories": {
+        "doc": "docs",
+        "lib": "lib",
+        "test": "tests"
+    }
 }
