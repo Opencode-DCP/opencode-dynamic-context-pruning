@@ -48,6 +48,7 @@ function buildConfig(permission: "allow" | "ask" | "deny" = "allow"): PluginConf
             iterationNudgeThreshold: 15,
             nudgeForce: "soft",
             protectedTools: ["task"],
+            protectTags: false,
             protectUserMessages: false,
         },
         strategies: {

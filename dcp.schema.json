@@ -15,6 +15,11 @@
             "default": true,
             "description": "Enable or disable the DCP plugin"
         },
+        "autoUpdate": {
+            "type": "boolean",
+            "default": true,
+            "description": "Automatically update npm-installed DCP when a newer npm latest version is available. Version-locked plugin specs are not updated."
+        },
         "debug": {
             "type": "boolean",
             "default": false,
@@ -232,6 +237,11 @@
                     "default": [],
                     "description": "Tool names or wildcard patterns whose completed outputs should be appended to the compression summary. Supports glob wildcards: * matches any characters, ? matches a single character (e.g., \"mcp_*\", \"my_tool_?\")"
                 },
+                "protectTags": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Preserve text wrapped in <protect>...</protect> when compressed"
+                },
                 "protectUserMessages": {
                     "type": "boolean",
                     "default": false,
@@ -249,6 +259,7 @@
                 "iterationNudgeThreshold": 15,
                 "nudgeForce": "soft",
                 "protectedTools": [],
+                "protectTags": false,
                 "protectUserMessages": false
             }
         },

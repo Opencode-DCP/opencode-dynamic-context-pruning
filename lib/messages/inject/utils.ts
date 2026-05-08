@@ -34,6 +34,20 @@ export interface LastNonIgnoredMessage {
     index: number
 }
 
+interface ModelLimit {
+    context: number
+    input?: number
+    output?: number
+}
+
+export function computeInputBudget(limit: ModelLimit): number | undefined {
+    if (!limit.context) {
+        return undefined
+    }
+
+    return limit.input ?? Math.max(0, limit.context - (limit.output ?? 0))
+}
+
 export function getNudgeFrequency(config: PluginConfig): number {
     return Math.max(1, Math.floor(config.compress.nudgeFrequency || 1))
 }

@@ -50,6 +50,7 @@ function buildConfig(): PluginConfig {
             iterationNudgeThreshold: 15,
             nudgeForce: "soft",
             protectedTools: [],
+            protectTags: false,
             protectUserMessages: false,
         },
         strategies: {
@@ -176,6 +177,91 @@ test("compress range rebuilds subagent message refs after session state was rese
     assert.equal(state.messageIds.byRef.get("m0001"), "msg-assistant-1")
     assert.equal(state.messageIds.byRef.get("m0002"), "msg-user-2")
     assert.equal(state.prune.messages.blocksById.size, 1)
+})
+
+test("compress range mode appends protected prompt info", async () => {
+    const sessionID = `ses_range_protect_tag_${Date.now()}`
+    const rawMessages: WithParts[] = [
+        {
+            info: {
+                id: "msg-user-1",
+                role: "user",
+                sessionID,
+                agent: "assistant",
+                model: {
+                    providerID: "anthropic",
+                    modelID: "claude-test",
+                },
+                time: { created: 1 },
+            } as WithParts["info"],
+            parts: [
+                textPart(
+                    "msg-user-1",
+                    sessionID,
+                    "part-user-1",
+                    "Investigate the release. <protect>Keep the npm publish token note.</protect>",
+                ),
+            ],
+        },
+        {
+            info: {
+                id: "msg-assistant-1",
+                role: "assistant",
+                sessionID,
+                agent: "assistant",
+                time: { created: 2 },
+            } as WithParts["info"],
+            parts: [textPart("msg-assistant-1", sessionID, "part-assistant-1", "I checked it")],
+        },
+    ]
+
+    const state = createSessionState()
+    const logger = new Logger(false)
+    const config = buildConfig()
+    config.compress.protectTags = true
+    const tool = createCompressRangeTool({
+        client: {
+            session: {
+                messages: async () => ({ data: rawMessages }),
+                get: async () => ({ data: { parentID: null } }),
+            },
+        },
+        state,
+        logger,
+        config,
+        prompts: {
+            reload() {},
+            getRuntimePrompts() {
+                return { compressRange: "", compressMessage: "" }
+            },
+        },
+    } as any)
+
+    await tool.execute(
+        {
+            topic: "Protected range",
+            content: [
+                {
+                    startId: "m0001",
+                    endId: "m0002",
+                    summary: "Captured release investigation.",
+                },
+            ],
+        },
+        {
+            ask: async () => {},
+            metadata: () => {},
+            sessionID,
+            messageID: "msg-compress-range-protect-tag",
+        },
+    )
+
+    const block = Array.from(state.prune.messages.blocksById.values())[0]
+    assert.match(
+        block?.summary || "",
+        /The following protected prompt information was included in this conversation verbatim:/,
+    )
+    assert.match(block?.summary || "", /Keep the npm publish token note\./)
 })
 
 test("compress range mode batches multiple ranges into one notification", async () => {

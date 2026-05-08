@@ -13,6 +13,7 @@ import {
     stripHallucinationsFromString,
     stripStaleMetadata,
     syncCompressionBlocks,
+    computeInputBudget,
 } from "./messages"
 import { renderSystemPrompt, type PromptStore } from "./prompts"
 import { buildProtectedToolsExtension } from "./prompts/extensions/system"
@@ -42,6 +43,7 @@ import { cacheSystemPromptTokens } from "./ui/utils"
 const INTERNAL_AGENT_SIGNATURES = [
     "You are a title generator",
     "You are a helpful AI assistant tasked with summarizing conversations",
+    "You are an anchored context summarization assistant for coding sessions",
     "Summarize what was done in this conversation",
 ]
 
@@ -52,11 +54,17 @@ export function createSystemPromptHandler(
     prompts: PromptStore,
 ) {
     return async (
-        input: { sessionID?: string; model: { limit: { context: number } } },
+        input: {
+            sessionID?: string
+            model: { limit: { context: number; input?: number; output?: number } }
+        },
         output: { system: string[] },
     ) => {
         if (input.model?.limit?.context) {
-            state.modelContextLimit = input.model.limit.context
+            const inputBudget = computeInputBudget(input.model.limit)
+            if (inputBudget !== undefined) {
+                state.modelContextLimit = inputBudget
+            }
             logger.debug("Cached model context limit", { limit: state.modelContextLimit })
         }
 
