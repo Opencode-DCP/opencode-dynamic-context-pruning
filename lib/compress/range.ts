@@ -2,7 +2,7 @@ import { tool } from "@opencode-ai/plugin"
 import type { ToolContext } from "./types"
 import { countTokens } from "../token-utils"
 import { getRangeFormatExtension } from "../prompts/extensions/tool"
-import { finalizeSession, prepareSession, generateDelegatedSummary, resolveCompressionDelegate, type NotificationEntry } from "./pipeline"
+import { finalizeSession, prepareSession, generateDelegatedSummary, resolveCompressionDelegate, formatPartForDelegatedCompression, type NotificationEntry } from "./pipeline"
 import { INTERNAL_COMPRESSION_SYSTEM_PROMPT } from "../prompts/system"
 import {
     appendProtectedPromptInfo,
@@ -97,7 +97,7 @@ export function createCompressRangeTool(ctx: ToolContext): ReturnType<typeof too
                     const rawText = plan.selection.messageIds
                         .map((id) => {
                             const msg = searchContext.rawMessagesById.get(id)
-                            return msg ? `[${msg.info.role}] ${msg.parts?.map((p: any) => p.text || p.prompt || p.tool).join("\n")}` : ""
+                            return msg ? `[${msg.info.role}] ${msg.parts?.map(formatPartForDelegatedCompression).join("\n")}` : ""
                         })
                         .filter(Boolean)
                         .join("\n\n")

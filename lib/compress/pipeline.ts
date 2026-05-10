@@ -76,6 +76,78 @@ export async function prepareSession(
     }
 }
 
+const TOOL_PAYLOAD_LIMIT = 3000
+const TRUNCATION_MARKER = "\n...[truncated]...\n"
+
+function stringifyForCompression(value: unknown): string {
+    if (typeof value === "string") return value
+    if (value === undefined) return ""
+
+    try {
+        const seen = new WeakSet<object>()
+
+        return JSON.stringify(
+            value,
+            (_key, val) => {
+                if (typeof val === "bigint") return val.toString()
+                if (typeof val === "object" && val !== null) {
+                    if (seen.has(val)) return "[Circular]"
+                    seen.add(val)
+                }
+                return val
+            },
+            2,
+        )
+    } catch {
+        return String(value)
+    }
+}
+
+function truncateMiddle(value: string, limit = TOOL_PAYLOAD_LIMIT): string {
+    if (value.length <= limit) return value
+
+    const available = Math.max(0, limit - TRUNCATION_MARKER.length)
+    const headLength = Math.ceil(available / 2)
+    const tailLength = Math.floor(available / 2)
+
+    return `${value.slice(0, headLength)}${TRUNCATION_MARKER}${value.slice(value.length - tailLength)}`
+}
+
+export function formatPartForDelegatedCompression(part: any): string {
+    if (!part || typeof part !== "object") return ""
+
+    if (part.type === "text") {
+        return typeof part.text === "string" ? part.text : stringifyForCompression(part.text)
+    }
+
+    if (part.type === "tool") {
+        const state = part.state && typeof part.state === "object" ? part.state : {}
+        const status = typeof state.status === "string" ? state.status : "unknown"
+        const toolName = typeof part.tool === "string" ? part.tool : "unknown"
+        const args = stringifyForCompression(state.input ?? {})
+
+        if (status === "completed") {
+            return `[Tool: ${toolName} status=completed]\nargs: ${args}\noutput:\n${truncateMiddle(
+                stringifyForCompression(state.output),
+            )}`
+        }
+
+        if (status === "error") {
+            return `[Tool: ${toolName} status=error]\nargs: ${args}\nerror:\n${truncateMiddle(
+                stringifyForCompression(state.error),
+            )}`
+        }
+
+        return `[Tool: ${toolName} status=${status}]\nargs: ${args}`
+    }
+
+    if (typeof part.prompt === "string") {
+        return part.prompt
+    }
+
+    return ""
+}
+
 export type CompressionDelegate =
     | {
           enabled: false

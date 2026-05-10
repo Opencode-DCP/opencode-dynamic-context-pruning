@@ -3,7 +3,7 @@ import type { ToolContext } from "./types"
 import { countTokens } from "../token-utils"
 import { getMessageFormatExtension } from "../prompts/extensions/tool"
 import { formatIssues, formatResult, resolveMessages, validateArgs } from "./message-utils"
-import { finalizeSession, prepareSession, generateDelegatedSummary, resolveCompressionDelegate, type NotificationEntry } from "./pipeline"
+import { finalizeSession, prepareSession, generateDelegatedSummary, resolveCompressionDelegate, formatPartForDelegatedCompression, type NotificationEntry } from "./pipeline"
 import { INTERNAL_COMPRESSION_SYSTEM_PROMPT } from "../prompts/system"
 import { appendProtectedPromptInfo, appendProtectedTools } from "./protected-content"
 import {
@@ -87,7 +87,7 @@ export function createCompressMessageTool(ctx: ToolContext): ReturnType<typeof t
                     const rawText = plan.selection.messageIds
                         .map((id) => {
                             const msg = searchContext.rawMessagesById.get(id)
-                            return msg ? `[${msg.info.role}] ${msg.parts?.map((p: any) => p.text || p.prompt || p.tool).join("\n")}` : ""
+                            return msg ? `[${msg.info.role}] ${msg.parts?.map(formatPartForDelegatedCompression).join("\n")}` : ""
                         })
                         .filter(Boolean)
                         .join("\n\n")
