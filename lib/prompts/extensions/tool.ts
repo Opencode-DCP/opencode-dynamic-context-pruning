@@ -2,7 +2,8 @@
 // so they cannot be modified via custom prompt overrides. The schemas must
 // match the tool's input validation and are not safe to change independently.
 
-export const RANGE_FORMAT_EXTENSION = `
+export function getRangeFormatExtension(delegated: boolean) {
+    return `
 THE FORMAT OF COMPRESS
 
 \`\`\`
@@ -12,13 +13,15 @@ THE FORMAT OF COMPRESS
     {
       startId: string,     // Boundary ID at range start: mNNNN or bN
       endId: string,       // Boundary ID at range end: mNNNN or bN
-      summary: string      // Complete technical summary replacing all content in range
+      summary: string      // ${delegated ? "Omit this field. DCP will generate the summary." : "Complete technical summary replacing all content in range"}
     }
   ]
 }
 \`\`\``
+}
 
-export const MESSAGE_FORMAT_EXTENSION = `
+export function getMessageFormatExtension(delegated: boolean) {
+    return `
 THE FORMAT OF COMPRESS
 
 \`\`\`
@@ -28,8 +31,9 @@ THE FORMAT OF COMPRESS
     {
       messageId: string,   // Raw message ID only: mNNNN (ignore metadata attributes like priority)
       topic: string,       // Short label (3-5 words) for this one message summary
-      summary: string      // Complete technical summary replacing that one message
+      summary: string      // ${delegated ? "Omit this field. DCP will generate the summary." : "Complete technical summary replacing that one message"}
     }
   ]
 }
 \`\`\``
+}

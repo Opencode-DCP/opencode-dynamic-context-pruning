@@ -14,7 +14,7 @@ export interface ToolContext {
 export interface CompressRangeEntry {
     startId: string
     endId: string
-    summary: string
+    summary?: string
 }
 
 export interface CompressRangeToolArgs {
@@ -25,7 +25,7 @@ export interface CompressRangeToolArgs {
 export interface CompressMessageEntry {
     messageId: string
     topic: string
-    summary: string
+    summary?: string
 }
 
 export interface CompressMessageToolArgs {

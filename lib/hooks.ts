@@ -37,8 +37,9 @@ import {
 } from "./commands"
 import { type HostPermissionSnapshot } from "./host-permissions"
 import { compressPermission, syncCompressPermissionState } from "./compress-permission"
-import { checkSession, ensureSessionInitialized, saveSessionState, syncToolCache } from "./state"
+import { INTERNAL_SESSION_IDS, checkSession, ensureSessionInitialized, saveSessionState, syncToolCache } from "./state"
 import { cacheSystemPromptTokens } from "./ui/utils"
+import { INTERNAL_COMPRESSION_SYSTEM_PROMPT } from "./prompts/system"
 
 const INTERNAL_AGENT_SIGNATURES = [
     "You are a title generator",
@@ -60,6 +61,12 @@ export function createSystemPromptHandler(
         },
         output: { system: string[] },
     ) => {
+        if (input.sessionID && INTERNAL_SESSION_IDS.has(input.sessionID)) {
+            output.system.length = 0
+            output.system.push(INTERNAL_COMPRESSION_SYSTEM_PROMPT)
+            return
+        }
+
         if (input.model?.limit?.context) {
             const inputBudget = computeInputBudget(input.model.limit)
             if (inputBudget !== undefined) {
@@ -113,6 +120,13 @@ export function createChatMessageTransformHandler(
 ) {
     return async (input: {}, output: { messages: WithParts[] }) => {
         const receivedMessages = Array.isArray(output.messages) ? output.messages.length : 0
+        
+        if (receivedMessages > 0 && output.messages[0]?.info?.sessionID) {
+            if (INTERNAL_SESSION_IDS.has(output.messages[0].info.sessionID)) {
+                return
+            }
+        }
+        
         const messages = filterMessagesInPlace(output.messages)
         if (messages.length !== receivedMessages) {
             logger.warn("Skipping messages with unexpected shape during chat transform", {
