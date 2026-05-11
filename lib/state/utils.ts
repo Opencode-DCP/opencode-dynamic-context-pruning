@@ -328,18 +328,8 @@ export function getActiveSummaryTokenUsage(state: SessionState): number {
     return total
 }
 
-export function resetOnCompaction(state: SessionState): void {
-    state.toolParameters.clear()
-    state.prune.tools = new Map<string, number>()
-    state.prune.messages = createPruneMessagesState()
-    state.messageIds = {
-        byRawId: new Map<string, string>(),
-        byRef: new Map<string, string>(),
-        nextRef: 1,
-    }
-    state.nudges = {
-        contextLimitAnchors: new Set<string>(),
-        turnNudgeAnchors: new Set<string>(),
-        iterationNudgeAnchors: new Set<string>(),
-    }
+export function resetOnCompaction(_state: SessionState): void {
+    // Native opencode /compact inserts a summary message but keeps the original msg_* rows
+    // addressable in the session DB, so DCP compression blocks and mNNNN aliases remain valid.
+    // Keep this exported symbol for backward compatibility, but make it intentionally inert.
 }

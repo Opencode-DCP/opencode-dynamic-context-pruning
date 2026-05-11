@@ -1,6 +1,10 @@
 import type { SessionState, WithParts } from "../state"
 import type { Logger } from "../logger"
 
+export interface SyncCompressionBlocksOptions {
+    authoritative?: boolean
+}
+
 function sortBlocksByCreation(
     a: { createdAt: number; blockId: number },
     b: { createdAt: number; blockId: number },
@@ -16,8 +20,10 @@ export const syncCompressionBlocks = (
     state: SessionState,
     logger: Logger,
     messages: WithParts[],
+    options: SyncCompressionBlocksOptions = {},
 ): void => {
     const messagesState = state.prune.messages
+    const authoritative = options.authoritative === true
     if (!messagesState?.blocksById?.size) {
         return
     }
@@ -42,7 +48,7 @@ export const syncCompressionBlocks = (
             block.compressMessageId.length > 0 &&
             messageIds.has(block.compressMessageId)
 
-        if (!hasOriginMessage) {
+        if (!hasOriginMessage && authoritative) {
             block.active = false
             block.deactivatedAt = now
             block.deactivatedByBlockId = undefined
@@ -56,6 +62,10 @@ export const syncCompressionBlocks = (
                 block.deactivatedAt = now
             }
             block.deactivatedByBlockId = undefined
+            continue
+        }
+
+        if (!hasOriginMessage && !block.active) {
             continue
         }
 
@@ -85,7 +95,11 @@ export const syncCompressionBlocks = (
         block.deactivatedAt = undefined
         block.deactivatedByBlockId = undefined
         messagesState.activeBlockIds.add(block.blockId)
-        if (messageIds.has(block.anchorMessageId)) {
+        const hasAnchorMessage =
+            typeof block.anchorMessageId === "string" &&
+            block.anchorMessageId.length > 0 &&
+            (authoritative ? messageIds.has(block.anchorMessageId) : true)
+        if (hasAnchorMessage) {
             messagesState.activeByAnchorMessageId.set(block.anchorMessageId, block.blockId)
         }
     }

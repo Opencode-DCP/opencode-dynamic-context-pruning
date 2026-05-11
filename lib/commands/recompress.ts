@@ -120,7 +120,7 @@ export async function handleRecompressCommand(ctx: RecompressCommandContext): Pr
         return
     }
 
-    syncCompressionBlocks(state, logger, messages)
+    syncCompressionBlocks(state, logger, messages, { authoritative: true })
     const messagesState = state.prune.messages
     const availableMessageIds = new Set(messages.map((msg) => msg.info.id))
 
@@ -186,7 +186,7 @@ export async function handleRecompressCommand(ctx: RecompressCommandContext): Pr
         block.deactivatedByBlockId = undefined
     }
 
-    syncCompressionBlocks(state, logger, messages)
+    syncCompressionBlocks(state, logger, messages, { authoritative: true })
 
     let recompressedMessageCount = 0
     let recompressedTokens = 0

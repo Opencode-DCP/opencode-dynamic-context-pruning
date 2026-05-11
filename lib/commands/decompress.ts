@@ -167,7 +167,7 @@ export async function handleDecompressCommand(ctx: DecompressCommandContext): Pr
         return
     }
 
-    syncCompressionBlocks(state, logger, messages)
+    syncCompressionBlocks(state, logger, messages, { authoritative: true })
     const messagesState = state.prune.messages
 
     if (!targetArg) {
@@ -236,7 +236,7 @@ export async function handleDecompressCommand(ctx: DecompressCommandContext): Pr
         block.deactivatedByBlockId = undefined
     }
 
-    syncCompressionBlocks(state, logger, messages)
+    syncCompressionBlocks(state, logger, messages, { authoritative: true })
 
     let restoredMessageCount = 0
     let restoredTokens = 0
