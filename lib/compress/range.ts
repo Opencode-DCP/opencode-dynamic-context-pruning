@@ -66,7 +66,7 @@ export function createCompressRangeTool(ctx: ToolContext): ReturnType<typeof too
         args: buildSchema(),
         async execute(args, toolCtx) {
             const input = args as CompressRangeToolArgs
-            validateArgs(input)
+            validateArgs(input, delegated)
             const callId =
                 typeof (toolCtx as unknown as { callID?: unknown }).callID === "string"
                     ? (toolCtx as unknown as { callID: string }).callID

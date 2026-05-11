@@ -51,7 +51,7 @@ export function createCompressMessageTool(ctx: ToolContext): ReturnType<typeof t
         args: buildSchema(),
         async execute(args, toolCtx) {
             const input = args as CompressMessageToolArgs
-            validateArgs(input)
+            validateArgs(input, delegated)
             const callId =
                 typeof (toolCtx as unknown as { callID?: unknown }).callID === "string"
                     ? (toolCtx as unknown as { callID: string }).callID
