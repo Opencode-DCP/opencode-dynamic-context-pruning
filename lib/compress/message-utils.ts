@@ -27,7 +27,7 @@ class SoftIssue extends Error {
     }
 }
 
-export function validateArgs(args: CompressMessageToolArgs): void {
+export function validateArgs(args: CompressMessageToolArgs, delegated = false): void {
     if (typeof args.topic !== "string" || args.topic.trim().length === 0) {
         throw new Error("topic is required and must be a non-empty string")
     }
@@ -48,7 +48,7 @@ export function validateArgs(args: CompressMessageToolArgs): void {
             throw new Error(`${prefix}.topic is required and must be a non-empty string`)
         }
 
-        if (typeof entry?.summary !== "string" || entry.summary.trim().length === 0) {
+        if (!delegated && (typeof entry?.summary !== "string" || entry.summary.trim().length === 0)) {
             throw new Error(`${prefix}.summary is required and must be a non-empty string`)
         }
     }

@@ -1,8 +1,9 @@
 import { tool } from "@opencode-ai/plugin"
 import type { ToolContext } from "./types"
 import { countTokens } from "../token-utils"
-import { RANGE_FORMAT_EXTENSION } from "../prompts/extensions/tool"
-import { finalizeSession, prepareSession, type NotificationEntry } from "./pipeline"
+import { getRangeFormatExtension } from "../prompts/extensions/tool"
+import { finalizeSession, prepareSession, generateDelegatedSummary, resolveCompressionDelegate, formatPartForDelegatedCompression, type NotificationEntry } from "./pipeline"
+import { INTERNAL_COMPRESSION_SYSTEM_PROMPT } from "../prompts/system"
 import {
     appendProtectedPromptInfo,
     appendProtectedTools,
@@ -44,6 +45,7 @@ function buildSchema() {
                         .describe("Message or block ID marking the end of range (e.g. m0012, b5)"),
                     summary: tool.schema
                         .string()
+                        .optional()
                         .describe("Complete technical summary replacing all content in range"),
                 }),
             )
@@ -57,12 +59,14 @@ export function createCompressRangeTool(ctx: ToolContext): ReturnType<typeof too
     ctx.prompts.reload()
     const runtimePrompts = ctx.prompts.getRuntimePrompts()
 
+    const delegate = resolveCompressionDelegate(ctx.config)
+    const delegated = delegate.enabled
     return tool({
-        description: runtimePrompts.compressRange + RANGE_FORMAT_EXTENSION,
+        description: runtimePrompts.compressRange + getRangeFormatExtension(delegated),
         args: buildSchema(),
         async execute(args, toolCtx) {
             const input = args as CompressRangeToolArgs
-            validateArgs(input)
+            validateArgs(input, delegated)
             const callId =
                 typeof (toolCtx as unknown as { callID?: unknown }).callID === "string"
                     ? (toolCtx as unknown as { callID: string }).callID
@@ -87,7 +91,29 @@ export function createCompressRangeTool(ctx: ToolContext): ReturnType<typeof too
             let totalCompressedMessages = 0
 
             for (const plan of resolvedPlans) {
-                const parsedPlaceholders = parseBlockPlaceholders(plan.entry.summary)
+                let initialSummary = plan.entry.summary || ""
+
+                if (delegated && delegate) {
+                    const rawText = plan.selection.messageIds
+                        .map((id) => {
+                            const msg = searchContext.rawMessagesById.get(id)
+                            return msg ? `[${msg.info.role}] ${msg.parts?.map(formatPartForDelegatedCompression).join("\n")}` : ""
+                        })
+                        .filter(Boolean)
+                        .join("\n\n")
+
+                    initialSummary = await generateDelegatedSummary(
+                        ctx.client,
+                        ctx.logger,
+                        delegate,
+                        INTERNAL_COMPRESSION_SYSTEM_PROMPT,
+                        `Please summarize the following conversation range:\n\n${rawText}`
+                    )
+                } else if (!initialSummary) {
+                    throw new Error("Summary is required when delegated compression is disabled.")
+                }
+
+                const parsedPlaceholders = parseBlockPlaceholders(initialSummary)
                 const missingBlockIds = validateSummaryPlaceholders(
                     parsedPlaceholders,
                     plan.selection.requiredBlockIds,
@@ -97,7 +123,7 @@ export function createCompressRangeTool(ctx: ToolContext): ReturnType<typeof too
                 )
 
                 const injected = injectBlockPlaceholders(
-                    plan.entry.summary,
+                    initialSummary,
                     parsedPlaceholders,
                     searchContext.summaryByBlockId,
                     plan.selection.startReference,

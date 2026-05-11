@@ -19,6 +19,8 @@ export interface CompressConfig {
     summaryBuffer: boolean
     maxContextLimit: number | `${number}%`
     minContextLimit: number | `${number}%`
+    model?: string
+    agent?: string
     modelMaxLimits?: Record<string, number | `${number}%`>
     modelMinLimits?: Record<string, number | `${number}%`>
     nudgeFrequency: number
@@ -118,6 +120,8 @@ export const VALID_CONFIG_KEYS = new Set([
     "compress.summaryBuffer",
     "compress.maxContextLimit",
     "compress.minContextLimit",
+    "compress.model",
+    "compress.agent",
     "compress.modelMaxLimits",
     "compress.modelMinLimits",
     "compress.nudgeFrequency",
@@ -847,6 +851,8 @@ function mergeCompress(
         summaryBuffer: override.summaryBuffer ?? base.summaryBuffer,
         maxContextLimit: override.maxContextLimit ?? base.maxContextLimit,
         minContextLimit: override.minContextLimit ?? base.minContextLimit,
+        model: override.model ?? base.model,
+        agent: override.agent ?? base.agent,
         modelMaxLimits: override.modelMaxLimits ?? base.modelMaxLimits,
         modelMinLimits: override.modelMinLimits ?? base.modelMinLimits,
         nudgeFrequency: override.nudgeFrequency ?? base.nudgeFrequency,

@@ -14,6 +14,8 @@ import {
 } from "./utils"
 import { getLastUserMessage } from "../messages/query"
 
+export const INTERNAL_SESSION_IDS = new Set<string>()
+
 export const checkSession = async (
     client: any,
     state: SessionState,
@@ -27,6 +29,10 @@ export const checkSession = async (
     }
 
     const lastSessionId = lastUserMessage.info.sessionID
+
+    if (INTERNAL_SESSION_IDS.has(lastSessionId)) {
+        return
+    }
 
     if (state.sessionId === null || state.sessionId !== lastSessionId) {
         logger.info(`Session changed: ${state.sessionId} -> ${lastSessionId}`)

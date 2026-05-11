@@ -11,7 +11,7 @@ import type {
 
 const BLOCK_PLACEHOLDER_REGEX = /\(b(\d+)\)|\{block_(\d+)\}/gi
 
-export function validateArgs(args: CompressRangeToolArgs): void {
+export function validateArgs(args: CompressRangeToolArgs, delegated = false): void {
     if (typeof args.topic !== "string" || args.topic.trim().length === 0) {
         throw new Error("topic is required and must be a non-empty string")
     }
@@ -32,7 +32,7 @@ export function validateArgs(args: CompressRangeToolArgs): void {
             throw new Error(`${prefix}.endId is required and must be a non-empty string`)
         }
 
-        if (typeof entry?.summary !== "string" || entry.summary.trim().length === 0) {
+        if (!delegated && (typeof entry?.summary !== "string" || entry.summary.trim().length === 0)) {
             throw new Error(`${prefix}.summary is required and must be a non-empty string`)
         }
     }

@@ -169,17 +169,18 @@
                     ]
                 },
                 "minContextLimit": {
-                    "description": "Soft lower threshold for reminder nudges. Below this, turn/iteration reminders are off (compression is less likely). At or above this, reminders are on. Accepts number or \"X%\" of the model context window.",
-                    "default": 50000,
-                    "oneOf": [
-                        {
-                            "type": "number"
-                        },
-                        {
-                            "type": "string",
-                            "pattern": "^\\d+(?:\\.\\d+)?%$"
-                        }
-                    ]
+                    "type": ["number", "string"],
+                    "pattern": "^[0-9]+%$",
+                    "default": "45%",
+                    "description": "Lower threshold: contextual turn nudge stops appearing below this limit"
+                },
+                "model": {
+                    "type": "string",
+                    "description": "Provider/Model ID to use for generating compression summaries instead of the active model (e.g. 'anthropic/claude-3-haiku-20240307')"
+                },
+                "agent": {
+                    "type": "string",
+                    "description": "Agent to use when prompting the custom compression model (e.g. 'dcp-compressor')"
                 },
                 "modelMaxLimits": {
                     "description": "Per-model override for maxContextLimit by exact provider/model key. If set, this takes priority over the global maxContextLimit.",
