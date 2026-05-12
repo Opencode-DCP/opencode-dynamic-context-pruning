@@ -87,6 +87,10 @@ function buildMessage(id: string, role: "user" | "assistant", text: string): Wit
     }
 }
 
+function dcpMessageIdTag(ref = "m0001"): string {
+    return `<${"dcp-message-id"}>${ref}</${"dcp-message-id"}>`
+}
+
 test("system prompt handler caches full model context for percentage thresholds", async () => {
     const state = createSessionState()
     const handler = createSystemPromptHandler(state, new Logger(false), buildConfig("deny"), {
@@ -175,6 +179,123 @@ test("chat message transform drops messages without info instead of crashing", a
 
     assert.equal(state.sessionId, null)
     assert.equal(output.messages.length, 0)
+})
+
+test("chat message transform leaves original messages untouched when a late transform fails", async () => {
+    const state = createSessionState()
+    const logger = new Logger(false)
+    let loggedError = ""
+    logger.error = ((message: string) => {
+        loggedError = message
+        return Promise.resolve()
+    }) as Logger["error"]
+    const config = buildConfig("allow")
+    const originalText = `alpha ${dcpMessageIdTag()} omega`
+    const output = {
+        messages: [buildMessage("assistant-1", "assistant", originalText)],
+    }
+    const originalMessages = output.messages
+    const handler = createChatMessageTransformHandler(
+        { session: { get: async () => ({}) } } as any,
+        state,
+        logger,
+        config,
+        {
+            reload() {
+                throw new Error("reload failed")
+            },
+            getRuntimePrompts() {
+                return {} as any
+            },
+        } as any,
+        { global: undefined, agents: {} },
+    )
+
+    await handler({}, output)
+
+    assert.equal(output.messages, originalMessages)
+    assert.equal((output.messages[0]?.parts[0] as any).text, originalText)
+    assert.equal(loggedError, "DCP chat transform failed; continuing without mutations")
+})
+
+test("chat message transform leaves original messages untouched when cloning fails", async () => {
+    const originalStructuredClone = globalThis.structuredClone
+    const state = createSessionState()
+    const logger = new Logger(false)
+    let loggedError = ""
+    logger.error = ((message: string) => {
+        loggedError = message
+        return Promise.resolve()
+    }) as Logger["error"]
+    const output = {
+        messages: [buildMessage("assistant-1", "assistant", "alpha")],
+    }
+    const originalMessages = output.messages
+
+    globalThis.structuredClone = (() => {
+        throw new Error("clone failed")
+    }) as typeof structuredClone
+
+    try {
+        const handler = createChatMessageTransformHandler(
+            { session: { get: async () => ({}) } } as any,
+            state,
+            logger,
+            buildConfig("allow"),
+            {
+                reload() {},
+                getRuntimePrompts() {
+                    return {} as any
+                },
+            } as any,
+            { global: undefined, agents: {} },
+        )
+
+        await handler({}, output)
+    } finally {
+        globalThis.structuredClone = originalStructuredClone
+    }
+
+    assert.equal(output.messages, originalMessages)
+    assert.equal((output.messages[0]?.parts[0] as any).text, "alpha")
+    assert.equal(loggedError, "DCP chat transform failed; continuing without mutations")
+})
+
+test("chat message transform commits pre-skip filtering for disabled subagents", async () => {
+    const state = createSessionState()
+    state.sessionId = "session-1"
+    state.isSubAgent = true
+    const config = buildConfig("allow")
+    const originalText = `alpha ${dcpMessageIdTag()} omega`
+    const output = {
+        messages: [
+            { role: "assistant", parts: [] } as any,
+            buildMessage("assistant-1", "assistant", originalText),
+        ],
+    }
+    const originalMessages = output.messages
+    const handler = createChatMessageTransformHandler(
+        { session: { get: async () => ({}) } } as any,
+        state,
+        new Logger(false),
+        config,
+        {
+            reload() {
+                throw new Error("later transforms should not run")
+            },
+            getRuntimePrompts() {
+                return {} as any
+            },
+        } as any,
+        { global: undefined, agents: {} },
+    )
+
+    await handler({}, output as any)
+
+    assert.equal(output.messages, originalMessages)
+    assert.equal(output.messages.length, 1)
+    assert.equal((output.messages[0]?.parts[0] as any).text, originalText)
+    assert.equal(state.messageIds.byRawId.size, 0)
 })
 
 test("command execute exits after effective permission resolves to deny", async () => {

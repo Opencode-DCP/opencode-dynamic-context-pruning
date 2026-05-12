@@ -1,7 +1,7 @@
 import assert from "node:assert/strict"
 import test from "node:test"
 import { Logger } from "../lib/logger"
-import { assignMessageRefs } from "../lib/message-ids"
+import { assignMessageRefs, MESSAGE_REF_MAX_INDEX, formatMessageRef } from "../lib/message-ids"
 import { checkSession, createSessionState, type WithParts } from "../lib/state"
 
 function textPart(messageID: string, sessionID: string, id: string, text: string) {
@@ -88,10 +88,10 @@ test("checkSession resets message id aliases after native compaction", async () 
     assert.equal(state.messageIds.nextRef, 3)
 })
 
-test("assignMessageRefs stops cleanly when alias capacity is exhausted", () => {
+test("assignMessageRefs throws when alias capacity is exhausted", () => {
     const sessionID = `ses_message_ids_exhausted_${Date.now()}`
     const state = createSessionState()
-    state.messageIds.nextRef = 10000
+    state.messageIds.nextRef = MESSAGE_REF_MAX_INDEX + 1
 
     const messages: WithParts[] = [
         {
@@ -116,11 +116,12 @@ test("assignMessageRefs stops cleanly when alias capacity is exhausted", () => {
         },
     ]
 
-    const firstAssigned = assignMessageRefs(state, messages)
-    const secondAssigned = assignMessageRefs(state, messages)
-
-    assert.equal(firstAssigned, 0)
-    assert.equal(secondAssigned, 0)
+    assert.throws(
+        () => assignMessageRefs(state, messages),
+        new RegExp(
+            `Message ID alias capacity exceeded. Cannot allocate more than ${formatMessageRef(MESSAGE_REF_MAX_INDEX)} aliases in this session.`,
+        ),
+    )
     assert.equal(state.messageIds.byRawId.size, 0)
     assert.equal(state.messageIds.byRef.size, 0)
     assert.equal(state.messageIds.byRawId.get("msg-a"), undefined)

@@ -144,9 +144,6 @@ export function assignMessageRefs(state: SessionState, messages: WithParts[]): n
         }
 
         const ref = allocateNextMessageRef(state)
-        if (!ref) {
-            break
-        }
         state.messageIds.byRawId.set(rawMessageId, ref)
         state.messageIds.byRef.set(ref, rawMessageId)
         assigned++
@@ -169,9 +166,7 @@ function allocateNextMessageRef(state: SessionState): string {
         candidate++
     }
 
-    // Graceful degradation: stop allocating aliases instead of hard-throwing.
-    // This prevents DCP from crashing the session when message volume exceeds
-    // the referenceable range; downstream features that depend on message refs
-    // will simply see unassigned messages.
-    return ""
+    throw new Error(
+        `Message ID alias capacity exceeded. Cannot allocate more than ${formatMessageRef(MESSAGE_REF_MAX_INDEX)} aliases in this session.`,
+    )
 }
