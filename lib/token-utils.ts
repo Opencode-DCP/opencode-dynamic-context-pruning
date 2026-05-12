@@ -80,7 +80,8 @@ export function estimateTokensBatch(texts: string[]): number {
     return countTokens(texts.join(" "))
 }
 
-export const COMPACTED_TOOL_OUTPUT_PLACEHOLDER = "[Tool output compacted locally; original in session storage.]"
+export const COMPACTED_TOOL_OUTPUT_PLACEHOLDER =
+    "[Tool output compacted locally; original in session storage.]"
 
 function stringifyToolContent(value: unknown): string {
     return typeof value === "string" ? value : JSON.stringify(value)
