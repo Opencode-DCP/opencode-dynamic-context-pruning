@@ -25,6 +25,7 @@ export interface CompressConfig {
     iterationNudgeThreshold: number
     nudgeForce: "strong" | "soft"
     protectedTools: string[]
+    protectTags: boolean
     protectUserMessages: boolean
 }
 
@@ -56,6 +57,7 @@ export interface ExperimentalConfig {
 
 export interface PluginConfig {
     enabled: boolean
+    autoUpdate: boolean
     debug: boolean
     pruneNotification: "off" | "minimal" | "detailed"
     pruneNotificationType: "chat" | "toast"
@@ -91,6 +93,7 @@ const COMPRESS_DEFAULT_PROTECTED_TOOLS = ["task", "skill", "todowrite", "todorea
 export const VALID_CONFIG_KEYS = new Set([
     "$schema",
     "enabled",
+    "autoUpdate",
     "debug",
     "showUpdateToasts",
     "pruneNotification",
@@ -121,6 +124,7 @@ export const VALID_CONFIG_KEYS = new Set([
     "compress.iterationNudgeThreshold",
     "compress.nudgeForce",
     "compress.protectedTools",
+    "compress.protectTags",
     "compress.protectUserMessages",
     "strategies",
     "strategies.deduplication",
@@ -166,6 +170,10 @@ export function validateConfigTypes(config: Record<string, any>): ValidationErro
 
     if (config.enabled !== undefined && typeof config.enabled !== "boolean") {
         errors.push({ key: "enabled", expected: "boolean", actual: typeof config.enabled })
+    }
+
+    if (config.autoUpdate !== undefined && typeof config.autoUpdate !== "boolean") {
+        errors.push({ key: "autoUpdate", expected: "boolean", actual: typeof config.autoUpdate })
     }
 
     if (config.debug !== undefined && typeof config.debug !== "boolean") {
@@ -416,6 +424,14 @@ export function validateConfigTypes(config: Record<string, any>): ValidationErro
                 })
             }
 
+            if (compress.protectTags !== undefined && typeof compress.protectTags !== "boolean") {
+                errors.push({
+                    key: "compress.protectTags",
+                    expected: "boolean",
+                    actual: typeof compress.protectTags,
+                })
+            }
+
             if (
                 compress.protectUserMessages !== undefined &&
                 typeof compress.protectUserMessages !== "boolean"
@@ -639,6 +655,7 @@ function showConfigWarnings(
 
 const defaultConfig: PluginConfig = {
     enabled: true,
+    autoUpdate: true,
     debug: false,
     pruneNotification: "detailed",
     pruneNotificationType: "chat",
@@ -670,6 +687,7 @@ const defaultConfig: PluginConfig = {
         iterationNudgeThreshold: 15,
         nudgeForce: "soft",
         protectedTools: [...COMPRESS_DEFAULT_PROTECTED_TOOLS],
+        protectTags: false,
         protectUserMessages: false,
     },
     strategies: {
@@ -835,6 +853,7 @@ function mergeCompress(
         iterationNudgeThreshold: override.iterationNudgeThreshold ?? base.iterationNudgeThreshold,
         nudgeForce: override.nudgeForce ?? base.nudgeForce,
         protectedTools: [...new Set([...base.protectedTools, ...(override.protectedTools ?? [])])],
+        protectTags: override.protectTags ?? base.protectTags,
         protectUserMessages: override.protectUserMessages ?? base.protectUserMessages,
     }
 }
@@ -913,6 +932,7 @@ function deepCloneConfig(config: PluginConfig): PluginConfig {
 function mergeLayer(config: PluginConfig, data: Record<string, any>): PluginConfig {
     return {
         enabled: data.enabled ?? config.enabled,
+        autoUpdate: data.autoUpdate ?? config.autoUpdate,
         debug: data.debug ?? config.debug,
         pruneNotification: data.pruneNotification ?? config.pruneNotification,
         pruneNotificationType: data.pruneNotificationType ?? config.pruneNotificationType,

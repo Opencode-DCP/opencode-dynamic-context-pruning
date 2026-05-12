@@ -5,6 +5,7 @@ import {
     createChatMessageTransformHandler,
     createCommandExecuteHandler,
     createEventHandler,
+    createSystemPromptHandler,
     createTextCompleteHandler,
 } from "../lib/hooks"
 import { Logger } from "../lib/logger"
@@ -48,6 +49,7 @@ function buildConfig(permission: "allow" | "ask" | "deny" = "allow"): PluginConf
             iterationNudgeThreshold: 15,
             nudgeForce: "soft",
             protectedTools: ["task"],
+            protectTags: false,
             protectUserMessages: false,
         },
         strategies: {
@@ -84,6 +86,31 @@ function buildMessage(id: string, role: "user" | "assistant", text: string): Wit
         ],
     }
 }
+
+test("system prompt handler caches full model context for percentage thresholds", async () => {
+    const state = createSessionState()
+    const handler = createSystemPromptHandler(state, new Logger(false), buildConfig("deny"), {
+        reload() {},
+        getRuntimePrompts() {
+            return {} as any
+        },
+    } as any)
+
+    await handler(
+        {
+            sessionID: "session-1",
+            model: {
+                limit: {
+                    context: 200000,
+                    output: 131072,
+                },
+            },
+        } as any,
+        { system: ["base system"] },
+    )
+
+    assert.equal(state.modelContextLimit, 200000)
+})
 
 test("chat message transform strips hallucinated tags even when compress is denied", async () => {
     const state = createSessionState()

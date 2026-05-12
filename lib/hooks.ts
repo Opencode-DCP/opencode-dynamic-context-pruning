@@ -42,6 +42,7 @@ import { cacheSystemPromptTokens } from "./ui/utils"
 const INTERNAL_AGENT_SIGNATURES = [
     "You are a title generator",
     "You are a helpful AI assistant tasked with summarizing conversations",
+    "You are an anchored context summarization assistant for coding sessions",
     "Summarize what was done in this conversation",
 ]
 

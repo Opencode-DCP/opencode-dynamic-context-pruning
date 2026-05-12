@@ -4,7 +4,7 @@ import { countTokens } from "../token-utils"
 import { MESSAGE_FORMAT_EXTENSION } from "../prompts/extensions/tool"
 import { formatIssues, formatResult, resolveMessages, validateArgs } from "./message-utils"
 import { finalizeSession, prepareSession, type NotificationEntry } from "./pipeline"
-import { appendProtectedTools } from "./protected-content"
+import { appendProtectedPromptInfo, appendProtectedTools } from "./protected-content"
 import {
     allocateBlockId,
     allocateRunId,
@@ -77,11 +77,19 @@ export function createCompressMessageTool(ctx: ToolContext): ReturnType<typeof t
             }> = []
 
             for (const plan of plans) {
+                const summaryWithPromptInfo = appendProtectedPromptInfo(
+                    plan.entry.summary,
+                    plan.selection,
+                    searchContext,
+                    ctx.state,
+                    ctx.config.compress.protectTags,
+                )
+
                 const summaryWithTools = await appendProtectedTools(
                     ctx.client,
                     ctx.state,
                     ctx.config.experimental.allowSubAgents,
-                    plan.entry.summary,
+                    summaryWithPromptInfo,
                     plan.selection,
                     searchContext,
                     ctx.config.compress.protectedTools,

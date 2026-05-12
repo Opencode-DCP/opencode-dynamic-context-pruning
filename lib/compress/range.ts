@@ -3,7 +3,11 @@ import type { ToolContext } from "./types"
 import { countTokens } from "../token-utils"
 import { RANGE_FORMAT_EXTENSION } from "../prompts/extensions/tool"
 import { finalizeSession, prepareSession, type NotificationEntry } from "./pipeline"
-import { appendProtectedTools, appendProtectedUserMessages } from "./protected-content"
+import {
+    appendProtectedPromptInfo,
+    appendProtectedTools,
+    appendProtectedUserMessages,
+} from "./protected-content"
 import {
     appendMissingBlockSummaries,
     injectBlockPlaceholders,
@@ -108,11 +112,19 @@ export function createCompressRangeTool(ctx: ToolContext): ReturnType<typeof too
                     ctx.config.compress.protectUserMessages,
                 )
 
+                const summaryWithPromptInfo = appendProtectedPromptInfo(
+                    summaryWithUsers,
+                    plan.selection,
+                    searchContext,
+                    ctx.state,
+                    ctx.config.compress.protectTags,
+                )
+
                 const summaryWithTools = await appendProtectedTools(
                     ctx.client,
                     ctx.state,
                     ctx.config.experimental.allowSubAgents,
-                    summaryWithUsers,
+                    summaryWithPromptInfo,
                     plan.selection,
                     searchContext,
                     ctx.config.compress.protectedTools,

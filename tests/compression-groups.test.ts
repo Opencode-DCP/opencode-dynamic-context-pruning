@@ -53,6 +53,7 @@ function buildConfig(mode: "message" | "range"): PluginConfig {
             iterationNudgeThreshold: 15,
             nudgeForce: "soft",
             protectedTools: ["task"],
+            protectTags: false,
             protectUserMessages: false,
         },
         strategies: {

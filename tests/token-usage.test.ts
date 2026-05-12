@@ -41,6 +41,7 @@ function buildConfig(maxContextLimit: number, minContextLimit = 1): PluginConfig
             iterationNudgeThreshold: 15,
             nudgeForce: "soft",
             protectedTools: ["task"],
+            protectTags: false,
             protectUserMessages: false,
         },
         strategies: {
