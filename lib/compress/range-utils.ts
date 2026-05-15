@@ -11,6 +11,13 @@ import type {
 
 const BLOCK_PLACEHOLDER_REGEX = /\(b(\d+)\)|\{block_(\d+)\}/gi
 
+export class ValidationError extends Error {
+    constructor(message: string) {
+        super(message)
+        this.name = "ValidationError"
+    }
+}
+
 export function validateArgs(args: CompressRangeToolArgs): void {
     if (typeof args.topic !== "string" || args.topic.trim().length === 0) {
         throw new Error("topic is required and must be a non-empty string")
@@ -104,8 +111,8 @@ export function parseBlockPlaceholders(summary: string): ParsedBlockPlaceholder[
     const placeholders: ParsedBlockPlaceholder[] = []
     const regex = new RegExp(BLOCK_PLACEHOLDER_REGEX)
 
-    let match: RegExpExecArray | null
-    while ((match = regex.exec(summary)) !== null) {
+    let match: RegExpExecArray | null = regex.exec(summary)
+    while (match !== null) {
         const full = match[0]
         const blockIdPart = match[1] || match[2]
         const parsed = Number.parseInt(blockIdPart, 10)
@@ -119,6 +126,7 @@ export function parseBlockPlaceholders(summary: string): ParsedBlockPlaceholder[
             startIndex: match.index,
             endIndex: match.index + full.length,
         })
+        match = regex.exec(summary)
     }
 
     return placeholders
@@ -127,6 +135,7 @@ export function parseBlockPlaceholders(summary: string): ParsedBlockPlaceholder[
 export function validateSummaryPlaceholders(
     placeholders: ParsedBlockPlaceholder[],
     requiredBlockIds: number[],
+    newBlockId: number,
     startReference: BoundaryReference,
     endReference: BoundaryReference,
     summaryByBlockId: Map<number, CompressionBlock>,
@@ -151,14 +160,31 @@ export function validateSummaryPlaceholders(
     const validPlaceholders: ParsedBlockPlaceholder[] = []
 
     for (const placeholder of placeholders) {
-        const isKnown = summaryByBlockId.has(placeholder.blockId)
-        const isRequired = requiredSet.has(placeholder.blockId)
-        const isDuplicate = keptPlaceholderIds.has(placeholder.blockId)
+        const placeholderId = placeholder.blockId
 
-        if (isKnown && isRequired && !isDuplicate) {
-            validPlaceholders.push(placeholder)
-            keptPlaceholderIds.add(placeholder.blockId)
+        if (placeholderId === undefined) {
+            continue
         }
+
+        if (placeholderId === newBlockId) {
+            throw new ValidationError("self-ref")
+        }
+
+        if (placeholderId >= newBlockId) {
+            throw new ValidationError("forward-ref")
+        }
+
+        if (!summaryByBlockId.has(placeholderId)) {
+            console.warn(`Compressed block placeholder missing from summary map: (b${placeholderId})`)
+            continue
+        }
+
+        if (!requiredSet.has(placeholderId) || keptPlaceholderIds.has(placeholderId)) {
+            continue
+        }
+
+        validPlaceholders.push(placeholder)
+        keptPlaceholderIds.add(placeholderId)
     }
 
     placeholders.length = 0
@@ -173,6 +199,7 @@ export function injectBlockPlaceholders(
     summaryByBlockId: Map<number, CompressionBlock>,
     startReference: BoundaryReference,
     endReference: BoundaryReference,
+    consumedBlockIds: Set<number>,
 ): InjectedSummaryResult {
     let cursor = 0
     let expanded = summary
@@ -188,7 +215,9 @@ export function injectBlockPlaceholders(
             }
 
             expanded += summary.slice(cursor, placeholder.startIndex)
-            expanded += restoreSummary(target.summary)
+            expanded += consumedBlockIds.has(placeholder.blockId)
+                ? `(b${placeholder.blockId}) — existing compressed block [topic: "${target.topic || "untitled"}"] — preserve this token exactly, do not expand or paraphrase`
+                : `(b${placeholder.blockId}) — preserved compressed block — do not paraphrase or replace`
             cursor = placeholder.endIndex
 
             if (!consumedSeen.has(placeholder.blockId)) {
@@ -205,6 +234,7 @@ export function injectBlockPlaceholders(
         startReference,
         "start",
         summaryByBlockId,
+        consumedBlockIds,
         consumed,
         consumedSeen,
     )
@@ -213,6 +243,7 @@ export function injectBlockPlaceholders(
         endReference,
         "end",
         summaryByBlockId,
+        consumedBlockIds,
         consumed,
         consumedSeen,
     )
@@ -243,7 +274,9 @@ export function appendMissingBlockSummaries(
             throw new Error(`Compressed block not found: (b${blockId})`)
         }
 
-        missingSummaries.push(`\n### (b${blockId})\n${restoreSummary(target.summary)}`)
+        missingSummaries.push(
+            `\n### (b${blockId})\n(b${blockId}) — existing compressed block [topic: "${target.topic || "untitled"}"] — preserve this token exactly, do not expand or paraphrase`,
+        )
         consumedSeen.add(blockId)
         consumed.push(blockId)
     }
@@ -264,24 +297,12 @@ export function appendMissingBlockSummaries(
     }
 }
 
-function restoreSummary(summary: string): string {
-    const headerMatch = summary.match(/^\s*\[Compressed conversation(?: section)?(?: b\d+)?\]/i)
-    if (!headerMatch) {
-        return summary
-    }
-
-    const afterHeader = summary.slice(headerMatch[0].length)
-    const withoutLeadingBreaks = afterHeader.replace(/^(?:\r?\n)+/, "")
-    return withoutLeadingBreaks
-        .replace(/(?:\r?\n)*<dcp-message-id>b\d+<\/dcp-message-id>\s*$/i, "")
-        .replace(/(?:\r?\n)+$/, "")
-}
-
 function injectBoundarySummary(
     summary: string,
     reference: BoundaryReference,
     position: "start" | "end",
     summaryByBlockId: Map<number, CompressionBlock>,
+    consumedBlockIds: Set<number>,
     consumed: number[],
     consumedSeen: Set<number>,
 ): string {
@@ -297,7 +318,9 @@ function injectBoundarySummary(
         throw new Error(`Compressed block not found: (b${reference.blockId})`)
     }
 
-    const injectedBody = restoreSummary(target.summary)
+    const injectedBody = consumedBlockIds.has(reference.blockId)
+        ? `(b${reference.blockId}) — existing compressed block [topic: "${target.topic || "untitled"}"] — preserve this token exactly, do not expand or paraphrase`
+        : `(b${reference.blockId}) — preserved compressed block — do not paraphrase or replace`
     const left = position === "start" ? injectedBody.trim() : summary.trim()
     const right = position === "start" ? summary.trim() : injectedBody.trim()
     const next = !left ? right : !right ? left : `${left}\n\n${right}`

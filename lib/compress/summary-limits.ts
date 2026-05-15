@@ -1,7 +1,6 @@
 import type { SelectionResolution } from "./types"
 import type { SessionState } from "../state"
 
-const MAX_COMPRESSED_SUMMARY_TOKENS = 60_000
 const MIN_SELECTED_TOKENS_FOR_RATIO_CHECK = 10_000
 
 export function estimateSelectedTokens(
@@ -39,12 +38,8 @@ export function estimateSelectedTokens(
 }
 
 export function assertUsefulCompressedSummary(summaryTokens: number, selectedTokens: number): void {
-    if (summaryTokens > MAX_COMPRESSED_SUMMARY_TOKENS) {
-        throw new Error(
-            `Compression summary is too large (${summaryTokens} tokens; max ${MAX_COMPRESSED_SUMMARY_TOKENS}). Retry with a shorter, evidence-focused summary.`,
-        )
-    }
-
+    // Both sides of this comparison use rendered token semantics for v2 blocks.
+    // summaryTokens is set to renderBlockForContext().renderedTokens at creation time (T12).
     if (selectedTokens >= MIN_SELECTED_TOKENS_FOR_RATIO_CHECK && summaryTokens >= selectedTokens) {
         throw new Error(
             `Compression summary is not smaller than the selected content (${summaryTokens} >= ${selectedTokens} tokens). Retry with a concise summary.`,

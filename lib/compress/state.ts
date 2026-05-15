@@ -1,6 +1,7 @@
-import type { CompressionBlock, PruneMessagesState, SessionState } from "../state"
-import { formatBlockRef, formatMessageIdTag } from "../message-ids"
+import { validateBlockRefs } from "./dag"
+import { formatBlockPlaceholder, formatBlockRef, formatMessageIdTag } from "../message-ids"
 import type { AppliedCompressionResult, CompressionStateInput, SelectionResolution } from "./types"
+import type { CompressionBlock, PruneMessagesState, SessionState } from "../state"
 
 export const COMPRESSED_BLOCK_HEADER = "[Compressed conversation section]"
 
@@ -75,7 +76,13 @@ export function attachCompressionDuration(
     return updates
 }
 
-export function wrapCompressedSummary(blockId: number, summary: string): string {
+/**
+ * Wrap a body string in the standard [Compressed conversation section] header
+ * and dcp-message-id boundary footer used for stored block summaries.
+ * Primitive used by wrapCompressedSummary and by tests that need to construct a
+ * stored-form summary directly without dedup.
+ */
+export function wrapBlockSummary(blockId: number, summary: string): string {
     const header = COMPRESSED_BLOCK_HEADER
     const footer = formatMessageIdTag(formatBlockRef(blockId))
     const body = summary.trim()
@@ -83,6 +90,116 @@ export function wrapCompressedSummary(blockId: number, summary: string): string 
         return `${header}\n${footer}`
     }
     return `${header}\n${body}\n\n${footer}`
+}
+
+/**
+ * Reverse of wrapBlockSummary: pull the inner body out of a stored block
+ * summary by stripping the standard header prefix and boundary-id footer.
+ * Returns the trimmed body, or "" when the summary contains no body content.
+ */
+function extractBlockBody(blockSummary: string, blockId: number): string {
+    const header = COMPRESSED_BLOCK_HEADER
+    const footer = formatMessageIdTag(formatBlockRef(blockId))
+    let body = blockSummary
+    if (body.startsWith(`${header}\n`)) {
+        body = body.slice(header.length + 1)
+    } else if (body.startsWith(header)) {
+        body = body.slice(header.length)
+    }
+    if (body.endsWith(footer)) {
+        body = body.slice(0, -footer.length)
+    }
+    return body.trim()
+}
+
+export interface WrapCompressedSummaryArgs {
+    blockId: number
+    modelSummary: string
+    consumedBlocks: ReadonlyArray<{
+        id: number
+        summary: string
+        schemaVersion?: number
+    }>
+    blocksById: ReadonlyMap<
+        number,
+        { summary: string; refBlockIds?: number[]; schemaVersion?: number }
+    >
+    mode: "range" | "message"
+}
+
+export interface WrapCompressedSummaryDraftBlock {
+    summary: string
+    refBlockIds: number[]
+    schemaVersion: number
+    summaryTokens: number
+}
+
+export interface WrapCompressedSummaryResult {
+    storedSummary: string
+    refBlockIds: number[]
+    draftBlock: WrapCompressedSummaryDraftBlock
+}
+
+/**
+ * Build the stored summary for a newly created compression block.
+ *
+ * Performs exact-substring dedup of consumed-block bodies inside the
+ * model-produced summary: any verbatim occurrence of a consumed block's
+ * inner body (header/footer stripped) is replaced with its (bN) placeholder
+ * so the stored summary stays compact. The renderer can later inline the
+ * referenced block on demand via renderBlockForContext.
+ *
+ * Dedup is greedy longest-body-first so a short body that happens to be a
+ * substring of a longer body does not pre-empt the longer match. Each
+ * consumed block is replaced at most once (String.replace with a string
+ * searchValue substitutes the first occurrence only) and only enters
+ * refBlockIds when its body actually matched.
+ *
+ * Phase 0 Contract E: returns { storedSummary, refBlockIds, draftBlock }.
+ * draftBlock.summaryTokens is left at 0 here; T12 will build a draft Map,
+ * call renderBlockForContext, and set the real token count.
+ *
+ * blocksById and mode are accepted as part of the contract for future
+ * expansion (DAG-wide validation, mode-specific framing); the dedup
+ * itself only needs consumedBlocks.
+ */
+export function wrapCompressedSummary(
+    args: WrapCompressedSummaryArgs,
+): WrapCompressedSummaryResult {
+    const { blockId, modelSummary, consumedBlocks } = args
+
+    const consumedBodies: Array<{ id: number; body: string }> = []
+    for (const consumed of consumedBlocks) {
+        const body = extractBlockBody(consumed.summary, consumed.id)
+        if (body.length === 0) {
+            continue
+        }
+        consumedBodies.push({ id: consumed.id, body })
+    }
+    consumedBodies.sort((left, right) => right.body.length - left.body.length)
+
+    let working = modelSummary
+    const refBlockIds: number[] = []
+    for (const { id, body } of consumedBodies) {
+        if (working.indexOf(body) === -1) {
+            continue
+        }
+        working = working.replace(body, formatBlockPlaceholder(id))
+        refBlockIds.push(id)
+    }
+
+    const storedSummary = wrapBlockSummary(blockId, working)
+
+    return {
+        storedSummary,
+        refBlockIds,
+        draftBlock: {
+            summary: storedSummary,
+            refBlockIds,
+            schemaVersion: 2,
+            summaryTokens: 0,
+        },
+    }
 }
 
 export function applyCompressionState(
@@ -135,6 +252,9 @@ export function applyCompressionState(
     }
 
     const createdAt = Date.now()
+    if (input.refBlockIds !== undefined) {
+        validateBlockRefs(blockId, input.refBlockIds, messagesState.blocksById)
+    }
     const block: CompressionBlock = {
         blockId,
         runId: input.runId,
@@ -160,6 +280,10 @@ export function applyCompressionState(
         effectiveToolIds: [...effectiveToolIds],
         createdAt,
         summary,
+    }
+    if (input.refBlockIds !== undefined) {
+        block.refBlockIds = input.refBlockIds
+        block.schemaVersion = 2
     }
 
     messagesState.blocksById.set(blockId, block)
