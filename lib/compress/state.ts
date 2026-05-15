@@ -1,9 +1,10 @@
 import { validateBlockRefs } from "./dag"
-import { formatBlockPlaceholder, formatBlockRef, formatMessageIdTag } from "../message-ids"
+import { COMPRESSED_BLOCK_HEADER, deduplicateBlockContent, stripCompactMarkers } from "./dedup"
+import { formatBlockRef, formatMessageIdTag } from "../message-ids"
 import type { AppliedCompressionResult, CompressionStateInput, SelectionResolution } from "./types"
 import type { CompressionBlock, PruneMessagesState, SessionState } from "../state"
 
-export const COMPRESSED_BLOCK_HEADER = "[Compressed conversation section]"
+export { COMPRESSED_BLOCK_HEADER }
 
 function nextBlockId(state: SessionState): number {
     const next = state.prune.messages.nextBlockId
@@ -92,26 +93,6 @@ export function wrapBlockSummary(blockId: number, summary: string): string {
     return `${header}\n${body}\n\n${footer}`
 }
 
-/**
- * Reverse of wrapBlockSummary: pull the inner body out of a stored block
- * summary by stripping the standard header prefix and boundary-id footer.
- * Returns the trimmed body, or "" when the summary contains no body content.
- */
-function extractBlockBody(blockSummary: string, blockId: number): string {
-    const header = COMPRESSED_BLOCK_HEADER
-    const footer = formatMessageIdTag(formatBlockRef(blockId))
-    let body = blockSummary
-    if (body.startsWith(`${header}\n`)) {
-        body = body.slice(header.length + 1)
-    } else if (body.startsWith(header)) {
-        body = body.slice(header.length)
-    }
-    if (body.endsWith(footer)) {
-        body = body.slice(0, -footer.length)
-    }
-    return body.trim()
-}
-
 export interface WrapCompressedSummaryArgs {
     blockId: number
     modelSummary: string
@@ -143,52 +124,49 @@ export interface WrapCompressedSummaryResult {
 /**
  * Build the stored summary for a newly created compression block.
  *
- * Performs exact-substring dedup of consumed-block bodies inside the
- * model-produced summary: any verbatim occurrence of a consumed block's
- * inner body (header/footer stripped) is replaced with its (bN) placeholder
- * so the stored summary stays compact. The renderer can later inline the
- * referenced block on demand via renderBlockForContext.
- *
- * Dedup is greedy longest-body-first so a short body that happens to be a
- * substring of a longer body does not pre-empt the longer match. Each
- * consumed block is replaced at most once (String.replace with a string
- * searchValue substitutes the first occurrence only) and only enters
- * refBlockIds when its body actually matched.
+ * Pipeline:
+ *   1. stripCompactMarkers (lib/compress/dedup.ts) removes any prompt-only
+ *      marker text the model may have parroted, leaving only bare `(bN)`
+ *      refs.
+ *   2. deduplicateBlockContent (lib/compress/dedup.ts) performs exact-
+ *      substring dedup of consumed block bodies inside the cleaned summary,
+ *      plus a defensive rendered-content leak check (T8 step 5).
+ *   3. wrapBlockSummary frames the result with the standard
+ *      [Compressed conversation section] header and dcp-message-id footer.
  *
  * Phase 0 Contract E: returns { storedSummary, refBlockIds, draftBlock }.
- * draftBlock.summaryTokens is left at 0 here; T12 will build a draft Map,
- * call renderBlockForContext, and set the real token count.
+ * draftBlock.summaryTokens is left at 0 here; T12 builds a draft Map, calls
+ * renderBlockForContext, and sets the real token count.
  *
  * blocksById and mode are accepted as part of the contract for future
- * expansion (DAG-wide validation, mode-specific framing); the dedup
- * itself only needs consumedBlocks.
+ * expansion (DAG-wide validation, mode-specific framing); the dedup itself
+ * uses blocksById to render consumed blocks for the leak check.
  */
 export function wrapCompressedSummary(
     args: WrapCompressedSummaryArgs,
 ): WrapCompressedSummaryResult {
-    const { blockId, modelSummary, consumedBlocks } = args
+    const { blockId, modelSummary, consumedBlocks, blocksById } = args
 
-    const consumedBodies: Array<{ id: number; body: string }> = []
-    for (const consumed of consumedBlocks) {
-        const body = extractBlockBody(consumed.summary, consumed.id)
-        if (body.length === 0) {
-            continue
-        }
-        consumedBodies.push({ id: consumed.id, body })
-    }
-    consumedBodies.sort((left, right) => right.body.length - left.body.length)
+    // Strip any compact marker text the model may have parroted from the
+    // compression prompt (e.g. `(bN) — existing compressed block [topic: 
+    // "..."] — preserve this token exactly, ...`). Stored block summaries
+    // must contain only bare `(bN)` refs (Oracle Round 3 gap 1: storage vs
+    // prompt separation). stripCompactMarkers is anchored on the literal
+    // marker template generated in range-utils.ts so unrelated text that
+    // happens to mention (bN) is untouched.
+    const cleaned = stripCompactMarkers(modelSummary)
 
-    let working = modelSummary
-    const refBlockIds: number[] = []
-    for (const { id, body } of consumedBodies) {
-        if (working.indexOf(body) === -1) {
-            continue
-        }
-        working = working.replace(body, formatBlockPlaceholder(id))
-        refBlockIds.push(id)
-    }
+    // Exact-substring + rendered-content dedup of consumed block content,
+    // greedy longest-body-first so a short body that happens to be a
+    // substring of a longer body does not pre-empt the longer match.
+    // Each consumed block is replaced at most once.
+    const { deduped, refBlockIds } = deduplicateBlockContent(
+        cleaned,
+        consumedBlocks,
+        blocksById,
+    )
 
-    const storedSummary = wrapBlockSummary(blockId, working)
+    const storedSummary = wrapBlockSummary(blockId, deduped)
 
     return {
         storedSummary,
