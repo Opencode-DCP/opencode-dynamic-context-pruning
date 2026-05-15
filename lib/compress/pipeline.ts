@@ -1,10 +1,12 @@
-import type { WithParts } from "../state"
+import type { Logger } from "../logger"
+import type { SessionState, WithParts } from "../state"
 import { ensureSessionInitialized } from "../state"
-import { saveSessionState } from "../state/persistence"
+import { loadSessionState, saveSessionState } from "../state/persistence"
+import { loadPruneMessagesState } from "../state/utils"
 import { assignMessageRefs } from "../message-ids"
 import { isIgnoredUserMessage } from "../messages/query"
 import { deduplicate, purgeErrors } from "../strategies"
-import { getCurrentParams, getCurrentTokenUsage } from "../token-utils"
+import { getCurrentParams } from "../token-utils"
 import { sendCompressNotification } from "../ui/notification"
 import type { ToolContext } from "./types"
 import { buildSearchContext, fetchSessionMessages } from "./search"
@@ -32,6 +34,19 @@ export interface NotificationEntry {
 export interface PreparedSession {
     rawMessages: WithParts[]
     searchContext: SearchContext
+}
+
+interface PlannedCompression {
+    selection: {
+        requiredBlockIds: number[]
+    }
+}
+
+export class RebaseConflict extends Error {
+    constructor(message: string) {
+        super(message)
+        this.name = "RebaseConflict"
+    }
 }
 
 export async function prepareSession(
@@ -76,17 +91,80 @@ export async function prepareSession(
     }
 }
 
-export async function finalizeSession(
+export async function reloadLatestState(
+    state: SessionState,
+    sessionId: string,
+    logger: Logger,
+): Promise<void> {
+    if (!state.sessionId) {
+        state.sessionId = sessionId
+    }
+
+    const latest = await loadSessionState(state.sessionId, logger)
+    if (!latest?.prune?.messages) {
+        return
+    }
+
+    const latestMessages = loadPruneMessagesState(latest.prune.messages)
+
+    // Merge only the persisted compression block graph and its derived indexes. The
+    // in-memory messageIds map was built by prepareSession for the current raw
+    // message set and must not be replaced by the on-disk snapshot.
+    state.prune.messages.blocksById = latestMessages.blocksById
+    state.prune.messages.activeBlockIds = latestMessages.activeBlockIds
+    state.prune.messages.activeByAnchorMessageId = latestMessages.activeByAnchorMessageId
+    state.prune.messages.nextBlockId = latestMessages.nextBlockId
+    state.prune.messages.nextRunId = latestMessages.nextRunId
+}
+
+export function rebasePlannedCompression(
+    plans: PlannedCompression[],
+    latestState: SessionState,
+): void {
+    const inactiveBlockIds = new Set<number>()
+    for (const plan of plans) {
+        for (const blockId of plan.selection.requiredBlockIds) {
+            const block = latestState.prune.messages.blocksById.get(blockId)
+            if (!block?.active) {
+                inactiveBlockIds.add(blockId)
+            }
+        }
+    }
+
+    if (inactiveBlockIds.size > 0) {
+        throw new RebaseConflict(
+            `Planned compression consumed inactive block IDs: ${Array.from(inactiveBlockIds)
+                .sort((left, right) => left - right)
+                .map((blockId) => `b${blockId}`)
+                .join(", ")}`,
+        )
+    }
+}
+
+export async function persistCompressionState(
+    state: SessionState,
+    sessionId: string,
+    logger: Logger,
+): Promise<void> {
+    if (state.sessionId !== sessionId) {
+        logger.warn("Persisting compression state for unexpected session", {
+            expectedSessionId: sessionId,
+            stateSessionId: state.sessionId,
+        })
+    }
+
+    state.manualMode = state.manualMode ? "active" : false
+    applyPendingCompressionDurations(state)
+    await saveSessionState(state, logger)
+}
+
+export async function sendCompressionNotification(
     ctx: ToolContext,
     toolCtx: RunContext,
     rawMessages: WithParts[],
     entries: NotificationEntry[],
     batchTopic: string | undefined,
 ): Promise<void> {
-    ctx.state.manualMode = ctx.state.manualMode ? "active" : false
-    applyPendingCompressionDurations(ctx.state)
-    await saveSessionState(ctx.state, ctx.logger)
-
     const params = getCurrentParams(ctx.state, rawMessages, ctx.logger)
     const sessionMessageIds = rawMessages
         .filter((msg) => !isIgnoredUserMessage(msg))

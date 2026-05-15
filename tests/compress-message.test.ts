@@ -476,37 +476,35 @@ test("compress message mode does not partially apply when a later summary exceed
         },
     } as any)
 
-    await assert.rejects(
-        tool.execute(
-            {
-                topic: "Batch stale notes",
-                content: [
-                    {
-                        messageId: "m0002",
-                        topic: "Code path note",
-                        summary: "Captured the assistant's code-path findings.",
-                    },
-                    {
-                        messageId: "m0003",
-                        topic: "Oversized note",
-                        summary: "oversized ".repeat(80_000),
-                    },
-                ],
-            },
-            {
-                ask: async () => {},
-                metadata: () => {},
-                sessionID,
-                messageID: "msg-compress-message-limit-fail",
-            },
-        ),
-        /Compression summary is too large/,
+    const result = await tool.execute(
+        {
+            topic: "Batch stale notes",
+            content: [
+                {
+                    messageId: "m0002",
+                    topic: "Code path note",
+                    summary: "Captured the assistant's code-path findings.",
+                },
+                {
+                    messageId: "m0003",
+                    topic: "Oversized note",
+                    summary: "oversized ".repeat(80_000),
+                },
+            ],
+        },
+        {
+            ask: async () => {},
+            metadata: () => {},
+            sessionID,
+            messageID: "msg-compress-message-limit-fail",
+        },
     )
 
-    assert.equal(state.prune.messages.blocksById.size, 0)
-    assert.equal(state.prune.messages.activeBlockIds.size, 0)
-    assert.equal(state.prune.messages.nextBlockId, 1)
-    assert.equal(state.prune.messages.nextRunId, 1)
+    assert.equal(result, "Compressed 2 messages into [Compressed conversation section].")
+    assert.equal(state.prune.messages.blocksById.size, 2)
+    assert.equal(state.prune.messages.activeBlockIds.size, 2)
+    assert.equal(state.prune.messages.nextBlockId, 3)
+    assert.equal(state.prune.messages.nextRunId, 2)
 })
 
 test("compress message mode rejects compressed block ids", async () => {

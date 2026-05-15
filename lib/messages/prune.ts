@@ -1,6 +1,7 @@
 import type { SessionState, WithParts } from "../state"
 import type { Logger } from "../logger"
 import type { PluginConfig } from "../config"
+import { renderBlockForContext, type BlockLike } from "../compress/renderer"
 import { isMessageCompacted } from "../state/utils"
 import { createSyntheticUserMessage, replaceBlockIdsWithBlocked } from "./utils"
 import { getLastUserMessage } from "./query"
@@ -215,8 +216,8 @@ const filterCompressedRanges = (
         const blockId = state.prune.messages.activeByAnchorMessageId.get(msgId)
         const summary =
             blockId !== undefined ? state.prune.messages.blocksById.get(blockId) : undefined
-        if (summary) {
-            const rawSummaryContent = (summary as { summary?: unknown }).summary
+        if (blockId !== undefined && summary) {
+            const rawSummaryContent = (summary as BlockLike).summary
             if (
                 summary.active !== true ||
                 typeof rawSummaryContent !== "string" ||
@@ -232,11 +233,12 @@ const filterCompressedRanges = (
                 const userMessage = getLastUserMessage(messages, msgIndex)
 
                 if (userMessage) {
-                    const userInfo = userMessage.info as UserMessage
+                    const renderedSummaryContent =
+                        renderBlockForContext(blockId, state.prune.messages.blocksById).text
                     const summaryContent =
                         config.compress.mode === "message"
-                            ? replaceBlockIdsWithBlocked(rawSummaryContent)
-                            : rawSummaryContent
+                            ? replaceBlockIdsWithBlocked(renderedSummaryContent)
+                            : renderedSummaryContent
                     const summarySeed = `${summary.blockId}:${summary.anchorMessageId}`
                     result.push(
                         createSyntheticUserMessage(userMessage, summaryContent, summarySeed),

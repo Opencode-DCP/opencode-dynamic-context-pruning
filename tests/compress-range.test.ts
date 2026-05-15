@@ -407,35 +407,33 @@ test("compress range mode does not partially apply when a later summary exceeds 
         },
     } as any)
 
-    await assert.rejects(
-        tool.execute(
-            {
-                topic: "Batch stale notes",
-                content: [
-                    {
-                        startId: "m0001",
-                        endId: "m0001",
-                        summary: "Captured the initial assistant investigation.",
-                    },
-                    {
-                        startId: "m0002",
-                        endId: "m0002",
-                        summary: "oversized ".repeat(80_000),
-                    },
-                ],
-            },
-            {
-                ask: async () => {},
-                metadata: () => {},
-                sessionID,
-                messageID: "msg-compress-range-limit-fail",
-            },
-        ),
-        /Compression summary is too large/,
+    const result = await tool.execute(
+        {
+            topic: "Batch stale notes",
+            content: [
+                {
+                    startId: "m0001",
+                    endId: "m0001",
+                    summary: "Captured the initial assistant investigation.",
+                },
+                {
+                    startId: "m0002",
+                    endId: "m0002",
+                    summary: "oversized ".repeat(80_000),
+                },
+            ],
+        },
+        {
+            ask: async () => {},
+            metadata: () => {},
+            sessionID,
+            messageID: "msg-compress-range-limit-fail",
+        },
     )
 
-    assert.equal(state.prune.messages.blocksById.size, 0)
-    assert.equal(state.prune.messages.activeBlockIds.size, 0)
-    assert.equal(state.prune.messages.nextBlockId, 1)
-    assert.equal(state.prune.messages.nextRunId, 1)
+    assert.equal(result, "Compressed 2 messages into [Compressed conversation section].")
+    assert.equal(state.prune.messages.blocksById.size, 2)
+    assert.equal(state.prune.messages.activeBlockIds.size, 2)
+    assert.equal(state.prune.messages.nextBlockId, 3)
+    assert.equal(state.prune.messages.nextRunId, 2)
 })

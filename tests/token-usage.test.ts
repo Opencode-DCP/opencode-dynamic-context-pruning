@@ -2,7 +2,7 @@ import assert from "node:assert/strict"
 import test from "node:test"
 import type { PluginConfig } from "../lib/config"
 import { isContextOverLimits } from "../lib/messages/inject/utils"
-import { wrapCompressedSummary } from "../lib/compress/state"
+import { wrapBlockSummary } from "../lib/compress/state"
 import { createSessionState, type WithParts } from "../lib/state"
 import type { CompressionBlock } from "../lib/state"
 import { getCurrentTokenUsage } from "../lib/token-utils"
@@ -252,7 +252,7 @@ test("isContextOverLimits extends the max threshold by active summary tokens", (
     const state = createSessionState()
     state.lastCompaction = 2
 
-    const storedSummary = wrapCompressedSummary(7, repeatedWord("summary", 120))
+    const storedSummary = wrapBlockSummary(7, repeatedWord("summary", 120))
     state.prune.messages.blocksById.set(7, createActiveBlock(7, storedSummary, 1000))
     state.prune.messages.activeBlockIds.add(7)
 
@@ -286,7 +286,7 @@ test("isContextOverLimits does not extend the max threshold when summaryBuffer i
     const state = createSessionState()
     state.lastCompaction = 2
 
-    const storedSummary = wrapCompressedSummary(7, repeatedWord("summary", 120))
+    const storedSummary = wrapBlockSummary(7, repeatedWord("summary", 120))
     state.prune.messages.blocksById.set(7, createActiveBlock(7, storedSummary, 1000))
     state.prune.messages.activeBlockIds.add(7)
 
