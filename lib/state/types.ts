@@ -38,6 +38,8 @@ export interface CompressionBlock {
     compressedTokens: number
     summaryTokens: number
     durationMs: number
+    refBlockIds?: number[]
+    schemaVersion?: number
     mode?: CompressionMode
     topic: string
     batchTopic?: string

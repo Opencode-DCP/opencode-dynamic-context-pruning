@@ -90,6 +90,39 @@ export function parseBoundaryId(id: string): ParsedBoundaryId | null {
     return null
 }
 
+export function formatBlockPlaceholder(blockId: number): string {
+    if (!Number.isInteger(blockId) || blockId < 0) {
+        throw new Error(`Invalid block placeholder ID: ${blockId}`)
+    }
+
+    return `(b${blockId})`
+}
+
+export function parseBlockPlaceholder(token: string): number | null {
+    const normalized = token.trim().toLowerCase()
+    const match = normalized.match(/^\(b(\d+)\)$/)
+    if (!match) {
+        return null
+    }
+
+    const blockId = Number.parseInt(match[1], 10)
+    return Number.isInteger(blockId) ? blockId : null
+}
+
+export function extractBlockPlaceholders(text: string): number[] {
+    const matches = text.matchAll(/\(b(\d+)\)/g)
+    const blockIds: number[] = []
+
+    for (const match of matches) {
+        const blockId = Number.parseInt(match[1], 10)
+        if (Number.isInteger(blockId)) {
+            blockIds.push(blockId)
+        }
+    }
+
+    return blockIds
+}
+
 function escapeXmlAttribute(value: string): string {
     return value
         .replace(/&/g, "&amp;")
