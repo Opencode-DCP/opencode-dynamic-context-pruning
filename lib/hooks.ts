@@ -124,7 +124,10 @@ export function createChatMessageTransformHandler(
 
         stripHallucinations(output.messages)
         cacheSystemPromptTokens(state, output.messages)
-        assignMessageRefs(state, output.messages)
+        const assigned = assignMessageRefs(state, output.messages)
+        if (assigned > 0) {
+            await saveSessionState(state, logger)
+        }
         syncCompressionBlocks(state, logger, output.messages)
         syncToolCache(state, config, logger, output.messages)
         buildToolIdList(state, output.messages)

@@ -8,7 +8,7 @@ import * as fs from "fs/promises"
 import { existsSync } from "fs"
 import { homedir } from "os"
 import { join } from "path"
-import type { CompressionBlock, PrunedMessageEntry, SessionState, SessionStats } from "./types"
+import type { CompressionBlock, MessageIdState, PrunedMessageEntry, SessionState, SessionStats } from "./types"
 import type { Logger } from "../logger"
 import { serializePruneMessagesState } from "./utils"
 
@@ -33,11 +33,79 @@ export interface PersistedNudges {
     iterationNudgeAnchors?: string[]
 }
 
+export interface PersistedMessageIds {
+    byRawId: Record<string, string>
+    nextRef: number
+}
+
+const MESSAGE_REF_REGEX = /^m\d{4}$/
+const MESSAGE_REF_MIN_INDEX = 1
+const MESSAGE_REF_MAX_INDEX = 9999
+const MESSAGE_REF_LIMIT = MESSAGE_REF_MAX_INDEX + 1
+
+function parsePersistedMessageRef(ref: string): number | null {
+    if (!MESSAGE_REF_REGEX.test(ref)) {
+        return null
+    }
+    const index = Number.parseInt(ref.slice(1), 10)
+    if (index < MESSAGE_REF_MIN_INDEX || index > MESSAGE_REF_MAX_INDEX) {
+        return null
+    }
+    return index
+}
+
+export function loadMessageIdState(persisted?: PersistedMessageIds): MessageIdState {
+    const state: MessageIdState = {
+        byRawId: new Map<string, string>(),
+        byRef: new Map<string, string>(),
+        nextRef: 1,
+    }
+
+    if (!persisted || typeof persisted !== "object") {
+        return state
+    }
+
+    let maxValidRefIndex = 0
+    const byRawId = persisted.byRawId
+    if (byRawId && typeof byRawId === "object") {
+        for (const [rawId, ref] of Object.entries(byRawId)) {
+            if (typeof rawId !== "string" || rawId.length === 0 || typeof ref !== "string") {
+                continue
+            }
+
+            const refIndex = parsePersistedMessageRef(ref)
+            if (refIndex === null || state.byRef.has(ref)) {
+                continue
+            }
+
+            state.byRawId.set(rawId, ref)
+            state.byRef.set(ref, rawId)
+            maxValidRefIndex = Math.max(maxValidRefIndex, refIndex)
+        }
+    }
+
+    const persistedNextRef = persisted.nextRef
+    const hasValidPersistedNextRef =
+        typeof persistedNextRef === "number" &&
+        Number.isInteger(persistedNextRef) &&
+        persistedNextRef >= MESSAGE_REF_MIN_INDEX &&
+        persistedNextRef <= MESSAGE_REF_LIMIT
+    state.nextRef = Math.max(
+        hasValidPersistedNextRef ? persistedNextRef : MESSAGE_REF_MIN_INDEX,
+        maxValidRefIndex + 1,
+    )
+
+    return state
+}
+
 export interface PersistedSessionState {
+    schemaVersion?: number
     sessionName?: string
     prune: PersistedPrune
     nudges: PersistedNudges
     stats: SessionStats
+    lastCompaction?: number
+    messageIds?: PersistedMessageIds
     lastUpdated: string
 }
 
@@ -57,6 +125,28 @@ async function ensureStorageDir(): Promise<void> {
 
 function getSessionFilePath(sessionId: string): string {
     return join(STORAGE_DIR, `${sessionId}.json`)
+}
+
+async function readExistingLastCompaction(sessionId: string): Promise<number> {
+    const filePath = getSessionFilePath(sessionId)
+    if (!existsSync(filePath)) {
+        return 0
+    }
+
+    try {
+        const content = await fs.readFile(filePath, "utf-8")
+        const parsed: unknown = JSON.parse(content)
+        if (!parsed || typeof parsed !== "object" || !("lastCompaction" in parsed)) {
+            return 0
+        }
+
+        const lastCompaction = (parsed as { lastCompaction?: unknown }).lastCompaction
+        return typeof lastCompaction === "number" && Number.isFinite(lastCompaction)
+            ? lastCompaction
+            : 0
+    } catch {
+        return 0
+    }
 }
 
 async function writePersistedSessionState(
@@ -86,7 +176,10 @@ export async function saveSessionState(
             return
         }
 
+        const existingLastCompaction = await readExistingLastCompaction(sessionState.sessionId)
+
         const state: PersistedSessionState = {
+            schemaVersion: 1,
             sessionName: sessionName,
             prune: {
                 tools: Object.fromEntries(sessionState.prune.tools),
@@ -98,6 +191,11 @@ export async function saveSessionState(
                 iterationNudgeAnchors: Array.from(sessionState.nudges.iterationNudgeAnchors),
             },
             stats: sessionState.stats,
+            lastCompaction: Math.max(sessionState.lastCompaction, existingLastCompaction),
+            messageIds: {
+                byRawId: Object.fromEntries(sessionState.messageIds.byRawId),
+                nextRef: sessionState.messageIds.nextRef,
+            },
             lastUpdated: new Date().toISOString(),
         }
 

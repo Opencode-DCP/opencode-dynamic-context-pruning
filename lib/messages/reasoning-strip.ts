@@ -1,10 +1,14 @@
 import type { WithParts } from "../state"
 import { getLastUserMessage } from "./query"
 
+const RELEVANT_TYPES = new Set(["text", "tool"])
+
 /**
- * Mirrors opencode's differentModel handling by preserving part content while
- * dropping provider metadata on assistant parts that came from a different
- * model/provider than the current turn's user message.
+ * Drops stale provider metadata from assistant text/tool parts that came from a
+ * different model/provider than the current turn's user message. Reasoning
+ * parts pass through unchanged because opencode native handles reasoning-to-text
+ * conversion for different-model requests and Anthropic requires thinking block
+ * metadata to remain byte-for-byte intact.
  */
 export function stripStaleMetadata(messages: WithParts[]): void {
     const lastUserMessage = getLastUserMessage(messages)
@@ -25,7 +29,7 @@ export function stripStaleMetadata(messages: WithParts[]): void {
         }
 
         message.parts = message.parts.map((part) => {
-            if (part.type !== "text" && part.type !== "tool" && part.type !== "reasoning") {
+            if (!RELEVANT_TYPES.has(part.type)) {
                 return part
             }
 

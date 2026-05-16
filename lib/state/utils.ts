@@ -8,6 +8,8 @@ import type {
 import { isIgnoredUserMessage, messageHasCompress } from "../messages/query"
 import { isMessageWithInfo } from "../messages/shape"
 import { countTokens } from "../token-utils"
+import { Logger } from "../logger"
+import { renderBlockForContext } from "../compress/renderer"
 
 export const isMessageCompacted = (state: SessionState, msg: WithParts): boolean => {
     if (!isMessageWithInfo(msg)) {
@@ -33,17 +35,36 @@ interface PersistedPruneMessagesState {
     nextRunId: number
 }
 
+function toIntegerArray(value: unknown): number[] {
+    return Array.isArray(value)
+        ? [...new Set(value.filter((item): item is number => Number.isInteger(item) && item > 0))]
+        : []
+}
+
+const logger = new Logger(false)
+
+const toNumberArray = toIntegerArray
+
 export function serializePruneMessagesState(
     messagesState: PruneMessagesState,
 ): PersistedPruneMessagesState {
+    const blocksById: Record<string, CompressionBlock> = {}
+    for (const [blockId, block] of messagesState.blocksById.entries()) {
+        const persistedBlock: CompressionBlock = {
+            ...block,
+        }
+        if (block.refBlockIds === undefined) {
+            delete persistedBlock.refBlockIds
+        }
+        if (block.schemaVersion === undefined) {
+            delete persistedBlock.schemaVersion
+        }
+        blocksById[String(blockId)] = persistedBlock
+    }
+
     return {
         byMessageId: Object.fromEntries(messagesState.byMessageId),
-        blocksById: Object.fromEntries(
-            Array.from(messagesState.blocksById.entries()).map(([blockId, block]) => [
-                String(blockId),
-                block,
-            ]),
-        ),
+        blocksById,
         activeBlockIds: Array.from(messagesState.activeBlockIds),
         activeByAnchorMessageId: Object.fromEntries(messagesState.activeByAnchorMessageId),
         nextBlockId: messagesState.nextBlockId,
@@ -171,22 +192,24 @@ export function loadPruneMessagesState(
                 continue
             }
 
-            const toNumberArray = (value: unknown): number[] =>
-                Array.isArray(value)
-                    ? [
-                          ...new Set(
-                              value.filter(
-                                  (item): item is number => Number.isInteger(item) && item > 0,
-                              ),
-                          ),
-                      ]
-                    : []
+            const blockSchemaVersion =
+                typeof block.schemaVersion === "number" && Number.isInteger(block.schemaVersion)
+                    ? block.schemaVersion
+                    : undefined
+            const effectiveSchemaVersion = blockSchemaVersion === 2 ? 2 : 1
+            if (blockSchemaVersion !== undefined && blockSchemaVersion !== 1 && blockSchemaVersion !== 2) {
+                logger.warn(
+                    `[dcp] Unknown compression block schemaVersion ${blockSchemaVersion} for block ${blockId}; treating as v1`,
+                )
+            }
+            const refBlockIds =
+                effectiveSchemaVersion === 2 ? toIntegerArray(block.refBlockIds) : undefined
             const toStringArray = (value: unknown): string[] =>
                 Array.isArray(value)
                     ? [...new Set(value.filter((item): item is string => typeof item === "string"))]
                     : []
 
-            state.blocksById.set(blockId, {
+            const newBlock: CompressionBlock = {
                 blockId,
                 runId:
                     typeof block.runId === "number" &&
@@ -211,6 +234,9 @@ export function loadPruneMessagesState(
                     typeof block.durationMs === "number" && Number.isFinite(block.durationMs)
                         ? Math.max(0, block.durationMs)
                         : 0,
+                refBlockIds,
+                schemaVersion:
+                    blockSchemaVersion === undefined ? undefined : effectiveSchemaVersion,
                 mode: block.mode === "range" || block.mode === "message" ? block.mode : undefined,
                 topic: typeof block.topic === "string" ? block.topic : "",
                 batchTopic:
@@ -243,7 +269,21 @@ export function loadPruneMessagesState(
                         ? block.deactivatedByBlockId
                         : undefined,
                 summary: typeof block.summary === "string" ? block.summary : "",
-            })
+            }
+            state.blocksById.set(blockId, newBlock)
+
+            // T12 load-path token recomputation: v2 blocks store a COMPACT summary with
+            // `(bN)` refs that the renderer expands at read time. The persisted
+            // `summaryTokens` may therefore reflect the compact stored size and
+            // undercount the rendered expansion the model actually sees. Recompute now
+            // so active-token bookkeeping is accurate from load forward.
+            // Forward-ref invariant (T4) + numeric blockId iteration order means every
+            // referenced block is already in `state.blocksById` by the time we reach it.
+            // v1 blocks (schemaVersion === undefined) keep their stored value verbatim.
+            if (effectiveSchemaVersion === 2) {
+                const { renderedTokens } = renderBlockForContext(blockId, state.blocksById)
+                newBlock.summaryTokens = renderedTokens
+            }
         }
     }
 
@@ -323,23 +363,15 @@ export function getActiveSummaryTokenUsage(state: SessionState): number {
         if (!block || !block.active) {
             continue
         }
+        // For v2 blocks, summaryTokens reflects rendered expansion (set by renderBlockForContext during create/load).
+        // For v1 blocks, summaryTokens reflects the stored compact size.
         total += block.summaryTokens
     }
     return total
 }
 
-export function resetOnCompaction(state: SessionState): void {
-    state.toolParameters.clear()
-    state.prune.tools = new Map<string, number>()
-    state.prune.messages = createPruneMessagesState()
-    state.messageIds = {
-        byRawId: new Map<string, string>(),
-        byRef: new Map<string, string>(),
-        nextRef: 1,
-    }
-    state.nudges = {
-        contextLimitAnchors: new Set<string>(),
-        turnNudgeAnchors: new Set<string>(),
-        iterationNudgeAnchors: new Set<string>(),
-    }
+export function resetOnCompaction(_state: SessionState): void {
+    // Native opencode /compact inserts a summary message but keeps the original msg_* rows
+    // addressable in the session DB, so DCP compression blocks and mNNNN aliases remain valid.
+    // Keep this exported symbol for backward compatibility, but make it intentionally inert.
 }

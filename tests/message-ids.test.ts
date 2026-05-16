@@ -58,32 +58,34 @@ function buildCompactedMessages(sessionID: string): WithParts[] {
     ]
 }
 
-test("checkSession resets message id aliases after native compaction", async () => {
+test("checkSession preserves message id aliases after native compaction", async () => {
     const sessionID = `ses_message_ids_after_compaction_${Date.now()}`
     const messages = buildCompactedMessages(sessionID)
     const state = createSessionState()
     const logger = new Logger(false)
 
     state.sessionId = sessionID
-    state.messageIds.byRawId.set("old-message-9998", "m9998")
-    state.messageIds.byRawId.set("old-message-9999", "m9999")
-    state.messageIds.byRef.set("m9998", "old-message-9998")
-    state.messageIds.byRef.set("m9999", "old-message-9999")
-    state.messageIds.nextRef = 9999
+    state.messageIds.byRawId.set("old-message-1", "m0001")
+    state.messageIds.byRawId.set("old-message-2", "m0002")
+    state.messageIds.byRef.set("m0001", "old-message-1")
+    state.messageIds.byRef.set("m0002", "old-message-2")
+    state.messageIds.nextRef = 3
 
     await checkSession({} as any, state, logger, messages, false)
 
     assert.equal(state.lastCompaction, 2)
-    assert.equal(state.messageIds.byRawId.size, 0)
-    assert.equal(state.messageIds.byRef.size, 0)
-    assert.equal(state.messageIds.nextRef, 1)
+    assert.equal(state.messageIds.byRawId.get("old-message-1"), "m0001")
+    assert.equal(state.messageIds.byRawId.get("old-message-2"), "m0002")
+    assert.equal(state.messageIds.byRef.get("m0001"), "old-message-1")
+    assert.equal(state.messageIds.byRef.get("m0002"), "old-message-2")
+    assert.equal(state.messageIds.nextRef, 3)
 
     const assigned = assignMessageRefs(state, messages)
 
     assert.equal(assigned, 2)
-    assert.equal(state.messageIds.byRawId.get("msg-assistant-summary"), "m0001")
-    assert.equal(state.messageIds.byRawId.get("msg-user-follow-up"), "m0002")
-    assert.equal(state.messageIds.byRef.get("m0001"), "msg-assistant-summary")
-    assert.equal(state.messageIds.byRef.get("m0002"), "msg-user-follow-up")
-    assert.equal(state.messageIds.nextRef, 3)
+    assert.equal(state.messageIds.byRawId.get("msg-assistant-summary"), "m0003")
+    assert.equal(state.messageIds.byRawId.get("msg-user-follow-up"), "m0004")
+    assert.equal(state.messageIds.byRef.get("m0003"), "msg-assistant-summary")
+    assert.equal(state.messageIds.byRef.get("m0004"), "msg-user-follow-up")
+    assert.equal(state.messageIds.nextRef, 5)
 })

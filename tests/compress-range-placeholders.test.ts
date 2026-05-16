@@ -7,7 +7,7 @@ import {
     parseBlockPlaceholders,
     validateSummaryPlaceholders,
 } from "../lib/compress/range-utils"
-import { wrapCompressedSummary } from "../lib/compress/state"
+import { wrapBlockSummary } from "../lib/compress/state"
 import type { BoundaryReference } from "../lib/compress/types"
 
 function createBlock(blockId: number, body: string): CompressionBlock {
@@ -31,7 +31,7 @@ function createBlock(blockId: number, body: string): CompressionBlock {
         effectiveMessageIds: [`msg-${blockId}`],
         effectiveToolIds: [],
         createdAt: blockId,
-        summary: wrapCompressedSummary(blockId, body),
+        summary: wrapBlockSummary(blockId, body),
     }
 }
 
@@ -54,6 +54,7 @@ test("compress range placeholder validation keeps valid placeholders and ignores
     const missingBlockIds = validateSummaryPlaceholders(
         parsed,
         [1],
+        10,
         createMessageBoundary("msg-a", 0),
         createMessageBoundary("msg-b", 1),
         summaryByBlockId,
@@ -71,9 +72,10 @@ test("compress range placeholder validation keeps valid placeholders and ignores
         summaryByBlockId,
         createMessageBoundary("msg-a", 0),
         createMessageBoundary("msg-b", 1),
+        new Set([1]),
     )
 
-    assert.match(injected.expandedSummary, /First compressed summary/)
+    assert.match(injected.expandedSummary, /existing compressed block \[topic: "Block 1"\]/)
     assert.doesNotMatch(injected.expandedSummary, /Second compressed summary/)
     assert.match(injected.expandedSummary, /\(b9\)/)
     assert.match(injected.expandedSummary, /\(b2\)/)
@@ -88,6 +90,7 @@ test("compress range continues by appending required block summaries the model o
     const missingBlockIds = validateSummaryPlaceholders(
         parsed,
         [1],
+        10,
         createMessageBoundary("msg-a", 0),
         createMessageBoundary("msg-b", 1),
         summaryByBlockId,
@@ -101,6 +104,7 @@ test("compress range continues by appending required block summaries the model o
         summaryByBlockId,
         createMessageBoundary("msg-a", 0),
         createMessageBoundary("msg-b", 1),
+        new Set([1]),
     )
     const finalSummary = appendMissingBlockSummaries(
         injected.expandedSummary,
@@ -114,6 +118,6 @@ test("compress range continues by appending required block summaries the model o
         /The following previously compressed summaries were also part of this conversation section:/,
     )
     assert.match(finalSummary.expandedSummary, /### \(b1\)/)
-    assert.match(finalSummary.expandedSummary, /Recovered compressed summary/)
+    assert.match(finalSummary.expandedSummary, /existing compressed block \[topic: "Block 1"\]/)
     assert.deepEqual(finalSummary.consumedBlockIds, [1])
 })

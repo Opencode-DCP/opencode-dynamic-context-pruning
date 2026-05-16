@@ -383,3 +383,57 @@ test("compress range mode rejects overlapping batched ranges", async () => {
 
     assert.equal(state.prune.messages.blocksById.size, 0)
 })
+
+test("compress range mode does not partially apply when a later summary exceeds limits", async () => {
+    const sessionID = `ses_range_compress_limit_fail_${Date.now()}`
+    const rawMessages = buildMessages(sessionID)
+    const state = createSessionState()
+    const logger = new Logger(false)
+    const tool = createCompressRangeTool({
+        client: {
+            session: {
+                messages: async () => ({ data: rawMessages }),
+                get: async () => ({ data: { parentID: "ses_parent" } }),
+            },
+        },
+        state,
+        logger,
+        config: buildConfig(),
+        prompts: {
+            reload() {},
+            getRuntimePrompts() {
+                return { compressRange: "", compressMessage: "" }
+            },
+        },
+    } as any)
+
+    const result = await tool.execute(
+        {
+            topic: "Batch stale notes",
+            content: [
+                {
+                    startId: "m0001",
+                    endId: "m0001",
+                    summary: "Captured the initial assistant investigation.",
+                },
+                {
+                    startId: "m0002",
+                    endId: "m0002",
+                    summary: "oversized ".repeat(80_000),
+                },
+            ],
+        },
+        {
+            ask: async () => {},
+            metadata: () => {},
+            sessionID,
+            messageID: "msg-compress-range-limit-fail",
+        },
+    )
+
+    assert.equal(result, "Compressed 2 messages into [Compressed conversation section].")
+    assert.equal(state.prune.messages.blocksById.size, 2)
+    assert.equal(state.prune.messages.activeBlockIds.size, 2)
+    assert.equal(state.prune.messages.nextBlockId, 3)
+    assert.equal(state.prune.messages.nextRunId, 2)
+})

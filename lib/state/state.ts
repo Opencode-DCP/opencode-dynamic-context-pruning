@@ -1,12 +1,11 @@
 import type { SessionState, ToolParameterEntry, WithParts } from "./types"
 import type { Logger } from "../logger"
 import { applyPendingCompressionDurations } from "../compress/timing"
-import { loadSessionState, saveSessionState } from "./persistence"
+import { loadMessageIdState, loadSessionState, saveSessionState } from "./persistence"
 import {
     isSubAgentSession,
     findLastCompactionTimestamp,
     countTurns,
-    resetOnCompaction,
     createPruneMessagesState,
     loadPruneMessagesState,
     loadPruneMap,
@@ -44,16 +43,21 @@ export const checkSession = async (
         }
     }
 
+    // opencode's /compact is a transparent operation that preserves all messages in DB
+    // (it inserts a summary message and tags pre-compact messages with type:"compaction" parts).
+    // The msg_X IDs DCP tracks (in messageIds and prune.messages blocks) remain VALID after
+    // compaction — they still exist in DB and Session.messages returns them all.
+    // Therefore we do NOT reset DCP state on compaction. We only track the timestamp for
+    // observability and to suppress re-triggering on the in-memory marker.
     const lastCompactionTimestamp = findLastCompactionTimestamp(messages)
     if (lastCompactionTimestamp > state.lastCompaction) {
         state.lastCompaction = lastCompactionTimestamp
-        resetOnCompaction(state)
-        logger.info("Detected compaction - reset stale state", {
+        logger.info("Detected compaction timestamp advance — DCP state preserved", {
             timestamp: lastCompactionTimestamp,
         })
 
         saveSessionState(state, logger).catch((error) => {
-            logger.warn("Failed to persist state reset after compaction", {
+            logger.warn("Failed to persist compaction timestamp", {
                 error: error instanceof Error ? error.message : String(error),
             })
         })
@@ -180,6 +184,14 @@ export async function ensureSessionInitialized(
         pruneTokenCounter: persisted.stats?.pruneTokenCounter || 0,
         totalPruneTokens: persisted.stats?.totalPruneTokens || 0,
     }
+
+    state.lastCompaction = Math.max(
+        state.lastCompaction,
+        typeof persisted.lastCompaction === "number" && Number.isFinite(persisted.lastCompaction)
+            ? persisted.lastCompaction
+            : 0,
+    )
+    state.messageIds = loadMessageIdState(persisted.messageIds)
 
     const applied = applyPendingCompressionDurations(state)
     if (applied > 0) {

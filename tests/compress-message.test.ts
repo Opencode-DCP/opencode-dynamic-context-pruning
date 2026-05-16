@@ -453,6 +453,60 @@ test("compress message mode does not partially apply when preparation fails", as
     assert.equal(state.prune.messages.blocksById.size, 0)
 })
 
+test("compress message mode does not partially apply when a later summary exceeds limits", async () => {
+    const sessionID = `ses_message_compress_limit_fail_${Date.now()}`
+    const rawMessages = buildMessages(sessionID)
+    const state = createSessionState()
+    const logger = new Logger(false)
+    const tool = createCompressMessageTool({
+        client: {
+            session: {
+                messages: async () => ({ data: rawMessages }),
+                get: async () => ({ data: { parentID: null } }),
+            },
+        },
+        state,
+        logger,
+        config: buildConfig(),
+        prompts: {
+            reload() {},
+            getRuntimePrompts() {
+                return { compressMessage: "", compressRange: "" }
+            },
+        },
+    } as any)
+
+    const result = await tool.execute(
+        {
+            topic: "Batch stale notes",
+            content: [
+                {
+                    messageId: "m0002",
+                    topic: "Code path note",
+                    summary: "Captured the assistant's code-path findings.",
+                },
+                {
+                    messageId: "m0003",
+                    topic: "Oversized note",
+                    summary: "oversized ".repeat(80_000),
+                },
+            ],
+        },
+        {
+            ask: async () => {},
+            metadata: () => {},
+            sessionID,
+            messageID: "msg-compress-message-limit-fail",
+        },
+    )
+
+    assert.equal(result, "Compressed 2 messages into [Compressed conversation section].")
+    assert.equal(state.prune.messages.blocksById.size, 2)
+    assert.equal(state.prune.messages.activeBlockIds.size, 2)
+    assert.equal(state.prune.messages.nextBlockId, 3)
+    assert.equal(state.prune.messages.nextRunId, 2)
+})
+
 test("compress message mode rejects compressed block ids", async () => {
     const sessionID = `ses_message_compress_reject_${Date.now()}`
     const rawMessages = buildMessages(sessionID)

@@ -221,9 +221,6 @@ function buildBoundaryLookup(
         if (!rawMessage) {
             continue
         }
-        if (isIgnoredUserMessage(rawMessage)) {
-            continue
-        }
 
         const rawIndex = context.rawIndexById.get(messageId)
         if (rawIndex === undefined) {
@@ -242,9 +239,6 @@ function buildBoundaryLookup(
     for (const summary of summaries) {
         const anchorMessage = context.rawMessagesById.get(summary.anchorMessageId)
         if (!anchorMessage) {
-            continue
-        }
-        if (isIgnoredUserMessage(anchorMessage)) {
             continue
         }
 
