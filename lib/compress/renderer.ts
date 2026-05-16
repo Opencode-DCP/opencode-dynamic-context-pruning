@@ -71,8 +71,16 @@ function renderInner(
 
     ctx.expanding.add(blockId)
     try {
+        // v2 contract: refBlockIds is the authoritative allowlist of structural DAG
+        // children. Prose mentions of (bN) in summary text are NOT placeholders.
+        // Filter actual textual occurrences against the allowlist BEFORE recursion to
+        // avoid renderedOnce side-effects polluting siblings that legitimately ref a
+        // child whose placeholder happens to be absent from this block's summary.
         let result = block.summary
-        const placeholderIds = extractBlockPlaceholders(block.summary)
+        const refIds = new Set(block.refBlockIds)
+        const placeholderIds = extractBlockPlaceholders(block.summary).filter((id) =>
+            refIds.has(id),
+        )
         const seen = new Set<number>()
         for (const refId of placeholderIds) {
             if (seen.has(refId)) {
