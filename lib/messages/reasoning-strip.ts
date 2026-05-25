@@ -34,6 +34,12 @@ export function stripStaleMetadata(messages: WithParts[]): void {
             }
 
             const { metadata: _metadata, ...rest } = part
+            // Reasoning parts without metadata cannot produce valid `thinking`
+            // API blocks because the required `signature` lives in metadata.
+            // Downgrade to text to prevent `thinking.signature: Field required`.
+            if (part.type === "reasoning") {
+                return { ...rest, type: "text" }
+            }
             return rest
         })
     })
