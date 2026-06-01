@@ -36,7 +36,13 @@ import {
 } from "./commands"
 import { type HostPermissionSnapshot } from "./host-permissions"
 import { compressPermission, syncCompressPermissionState } from "./compress-permission"
-import { checkSession, ensureSessionInitialized, saveSessionState, syncToolCache } from "./state"
+import {
+    checkSession,
+    deleteSessionState,
+    ensureSessionInitialized,
+    saveSessionState,
+    syncToolCache,
+} from "./state"
 import { cacheSystemPromptTokens } from "./ui/utils"
 
 const INTERNAL_AGENT_SIGNATURES = [
@@ -292,6 +298,14 @@ export function createEventHandler(state: SessionState, logger: Logger) {
                     Number.isFinite(input.event.properties.time)
                   ? input.event.properties.time
                   : undefined
+
+        if (input.event.type === "session.deleted") {
+            const sessionId = input.event.properties.info?.id
+            if (sessionId) {
+                await deleteSessionState(sessionId).catch(() => {})
+            }
+            return
+        }
 
         if (input.event.type !== "message.part.updated") {
             return

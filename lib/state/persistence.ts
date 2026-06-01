@@ -203,6 +203,11 @@ export async function loadSessionState(
     }
 }
 
+export async function deleteSessionState(sessionId: string): Promise<void> {
+    const filePath = getSessionFilePath(sessionId)
+    await fs.unlink(filePath)
+}
+
 export interface AggregatedStats {
     totalTokens: number
     totalTools: number
