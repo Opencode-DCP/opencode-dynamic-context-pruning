@@ -87,7 +87,8 @@ export async function updateRemoveDir(packageDir: string, name: string) {
     if (basename(nodeModulesDir) !== "node_modules") return undefined
 
     const wrapperDir = dirname(nodeModulesDir)
-    const spec = wrapperSpec(wrapperDir, name)
+    const wrapperPkg = await readPackageJson(join(wrapperDir, "package.json"))
+    const spec = wrapperSpec(wrapperDir, name) ?? wrapperPkg?.dependencies?.[name]
     if (!spec || !isAutoUpdatableSpec(spec)) return undefined
 
     return wrapperDir

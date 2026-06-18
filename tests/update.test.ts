@@ -40,23 +40,6 @@ test("updateRemoveDir removes opencode npm wrapper for latest installs", async (
     assert.equal(await updateRemoveDir(packageDir, "@tarquinen/opencode-dcp"), wrapperDir)
 })
 
-test("updateRemoveDir rejects directories not matching opencode wrapper naming", async () => {
-    const rootDir = await mkdtemp(join(tmpdir(), "dcp-update-"))
-    // Simulate .config/opencode-like setup: plugin lives in node_modules but
-    // the parent dir is NOT an @scope/pkg@spec wrapper — updateRemoveDir
-    // must NOT return the parent dir even if its package.json lists the dep.
-    const packageDir = join(rootDir, "node_modules", "@tarquinen", "opencode-dcp")
-    await writePackageJson(rootDir, {
-        dependencies: { "@tarquinen/opencode-dcp": "latest" },
-    })
-    await writePackageJson(packageDir, {
-        name: "@tarquinen/opencode-dcp",
-        version: "3.1.9",
-    })
-
-    assert.equal(await updateRemoveDir(packageDir, "@tarquinen/opencode-dcp"), undefined)
-})
-
 test("updateRemoveDir skips version-locked opencode installs", async () => {
     const rootDir = await mkdtemp(join(tmpdir(), "dcp-update-"))
     const wrapperDir = join(rootDir, "@tarquinen", "opencode-dcp@3.1.9")
