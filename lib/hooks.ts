@@ -46,6 +46,14 @@ const INTERNAL_AGENT_SIGNATURES = [
     "Summarize what was done in this conversation",
 ]
 
+function cloneMessages(messages: WithParts[]): WithParts[] {
+    return structuredClone(messages)
+}
+
+function commitMessages(target: WithParts[], source: WithParts[]): void {
+    target.splice(0, target.length, ...source)
+}
+
 export function createSystemPromptHandler(
     state: SessionState,
     logger: Logger,
@@ -105,53 +113,68 @@ export function createChatMessageTransformHandler(
     hostPermissions: HostPermissionSnapshot,
 ) {
     return async (input: {}, output: { messages: WithParts[] }) => {
-        const receivedMessages = Array.isArray(output.messages) ? output.messages.length : 0
-        const messages = filterMessagesInPlace(output.messages)
-        if (messages.length !== receivedMessages) {
-            logger.warn("Skipping messages with unexpected shape during chat transform", {
-                received: receivedMessages,
-                usable: messages.length,
+        // Fail-open: catch transform failures so DCP bugs do not abort the session.
+        try {
+            if (!Array.isArray(output.messages)) {
+                throw new Error("Chat transform output.messages is not an array")
+            }
+
+            const workingMessages = cloneMessages(output.messages)
+            const receivedMessages = workingMessages.length
+            const messages = filterMessagesInPlace(workingMessages)
+            if (messages.length !== receivedMessages) {
+                logger.warn("Skipping messages with unexpected shape during chat transform", {
+                    received: receivedMessages,
+                    usable: messages.length,
+                })
+            }
+
+            await checkSession(client, state, logger, workingMessages, config.manualMode.enabled)
+
+            syncCompressPermissionState(state, config, hostPermissions, workingMessages)
+
+            if (state.isSubAgent && !config.experimental.allowSubAgents) {
+                commitMessages(output.messages, workingMessages)
+                return
+            }
+
+            stripHallucinations(workingMessages)
+            cacheSystemPromptTokens(state, workingMessages)
+            assignMessageRefs(state, workingMessages)
+            syncCompressionBlocks(state, logger, workingMessages)
+            syncToolCache(state, config, logger, workingMessages)
+            buildToolIdList(state, workingMessages)
+            prune(state, logger, config, workingMessages)
+            await injectExtendedSubAgentResults(
+                client,
+                state,
+                logger,
+                workingMessages,
+                config.experimental.allowSubAgents,
+            )
+            const compressionPriorities = buildPriorityMap(config, state, workingMessages)
+            prompts.reload()
+            injectCompressNudges(
+                state,
+                config,
+                logger,
+                workingMessages,
+                prompts.getRuntimePrompts(),
+                compressionPriorities,
+            )
+            injectMessageIds(state, config, workingMessages, compressionPriorities)
+            applyPendingManualTrigger(state, workingMessages, logger)
+            stripStaleMetadata(workingMessages)
+
+            if (state.sessionId) {
+                await logger.saveContext(state.sessionId, workingMessages)
+            }
+
+            commitMessages(output.messages, workingMessages)
+        } catch (err) {
+            logger.error("DCP chat transform failed; continuing without mutations", {
+                error: err instanceof Error ? err.message : String(err),
             })
-        }
-
-        await checkSession(client, state, logger, output.messages, config.manualMode.enabled)
-
-        syncCompressPermissionState(state, config, hostPermissions, output.messages)
-
-        if (state.isSubAgent && !config.experimental.allowSubAgents) {
-            return
-        }
-
-        stripHallucinations(output.messages)
-        cacheSystemPromptTokens(state, output.messages)
-        assignMessageRefs(state, output.messages)
-        syncCompressionBlocks(state, logger, output.messages)
-        syncToolCache(state, config, logger, output.messages)
-        buildToolIdList(state, output.messages)
-        prune(state, logger, config, output.messages)
-        await injectExtendedSubAgentResults(
-            client,
-            state,
-            logger,
-            output.messages,
-            config.experimental.allowSubAgents,
-        )
-        const compressionPriorities = buildPriorityMap(config, state, output.messages)
-        prompts.reload()
-        injectCompressNudges(
-            state,
-            config,
-            logger,
-            output.messages,
-            prompts.getRuntimePrompts(),
-            compressionPriorities,
-        )
-        injectMessageIds(state, config, output.messages, compressionPriorities)
-        applyPendingManualTrigger(state, output.messages, logger)
-        stripStaleMetadata(output.messages)
-
-        if (state.sessionId) {
-            await logger.saveContext(state.sessionId, output.messages)
         }
     }
 }

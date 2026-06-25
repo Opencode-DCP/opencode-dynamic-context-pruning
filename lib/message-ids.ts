@@ -136,7 +136,7 @@ export function assignMessageRefs(state: SessionState, messages: WithParts[]): n
         }
 
         const existingRef = state.messageIds.byRawId.get(rawMessageId)
-        if (existingRef) {
+        if (existingRef !== undefined) {
             if (state.messageIds.byRef.get(existingRef) !== rawMessageId) {
                 state.messageIds.byRef.set(existingRef, rawMessageId)
             }

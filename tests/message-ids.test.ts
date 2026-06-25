@@ -1,7 +1,7 @@
 import assert from "node:assert/strict"
 import test from "node:test"
 import { Logger } from "../lib/logger"
-import { assignMessageRefs } from "../lib/message-ids"
+import { assignMessageRefs, MESSAGE_REF_MAX_INDEX, formatMessageRef } from "../lib/message-ids"
 import { checkSession, createSessionState, type WithParts } from "../lib/state"
 
 function textPart(messageID: string, sessionID: string, id: string, text: string) {
@@ -86,4 +86,44 @@ test("checkSession resets message id aliases after native compaction", async () 
     assert.equal(state.messageIds.byRef.get("m0001"), "msg-assistant-summary")
     assert.equal(state.messageIds.byRef.get("m0002"), "msg-user-follow-up")
     assert.equal(state.messageIds.nextRef, 3)
+})
+
+test("assignMessageRefs throws when alias capacity is exhausted", () => {
+    const sessionID = `ses_message_ids_exhausted_${Date.now()}`
+    const state = createSessionState()
+    state.messageIds.nextRef = MESSAGE_REF_MAX_INDEX + 1
+
+    const messages: WithParts[] = [
+        {
+            info: {
+                id: "msg-a",
+                role: "assistant",
+                sessionID,
+                agent: "assistant",
+                time: { created: 1 },
+            } as WithParts["info"],
+            parts: [textPart("msg-a", sessionID, "msg-a-part", "A")],
+        },
+        {
+            info: {
+                id: "msg-b",
+                role: "assistant",
+                sessionID,
+                agent: "assistant",
+                time: { created: 2 },
+            } as WithParts["info"],
+            parts: [textPart("msg-b", sessionID, "msg-b-part", "B")],
+        },
+    ]
+
+    assert.throws(
+        () => assignMessageRefs(state, messages),
+        new RegExp(
+            `Message ID alias capacity exceeded. Cannot allocate more than ${formatMessageRef(MESSAGE_REF_MAX_INDEX)} aliases in this session.`,
+        ),
+    )
+    assert.equal(state.messageIds.byRawId.size, 0)
+    assert.equal(state.messageIds.byRef.size, 0)
+    assert.equal(state.messageIds.byRawId.get("msg-a"), undefined)
+    assert.equal(state.messageIds.byRawId.get("msg-b"), undefined)
 })
