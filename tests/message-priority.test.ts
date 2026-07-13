@@ -814,6 +814,19 @@ test("hallucination stripping does not affect non-dcp tags", async () => {
     )
 })
 
+test("hallucination stripping handles injected message ID suffix without truncating content", async () => {
+    // Simulates a message that had injectMessageIds append <dcp-message-id>m0222</dcp-message-id>,
+    // AND contains a natural-language mention of <dcp-message-id> in the content body.
+    // Without the fix, DCP_PAIRED_TAG_REGEX matches from the in-content opening tag to the
+    // injected closing tag, truncating everything between them.
+    assert.equal(
+        stripHallucinationsFromString(
+            "The tag called <dcp-message-id> is used for tracking.\n<dcp-message-id>m0222</dcp-message-id>\n",
+        ),
+        "The tag called  is used for tracking.",
+    )
+})
+
 test("injectMessageIds skips empty assistant messages to avoid prefill (issue #463)", () => {
     const sessionID = "ses_empty_assistant"
     const messages: WithParts[] = [
