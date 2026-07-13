@@ -814,6 +814,18 @@ test("hallucination stripping does not affect non-dcp tags", async () => {
     )
 })
 
+test("hallucination stripping removes trailing mXXXX</parameter> fragments", async () => {
+    assert.equal(
+        stripHallucinationsFromString("Report complete.\n\nm0340</parameter>\n\n"),
+        "Report complete.\n",
+    )
+    // Should not match mid-text references
+    assert.equal(
+        stripHallucinationsFromString("Look at m0340</parameter> in the middle of text"),
+        "Look at m0340</parameter> in the middle of text",
+    )
+})
+
 test("injectMessageIds skips empty assistant messages to avoid prefill (issue #463)", () => {
     const sessionID = "ses_empty_assistant"
     const messages: WithParts[] = [
