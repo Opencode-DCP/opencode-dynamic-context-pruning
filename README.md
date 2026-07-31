@@ -162,6 +162,13 @@ Each level overrides the previous, so project settings take priority over global
         // Preserve your messages during compression.
         // Warning: large copy-pasted prompts will never be compressed away
         "protectUserMessages": false,
+        // Optional durable-learning pass before compression
+        "learning": {
+            // Disabled by default because learning may edit project guidance
+            "enabled": false,
+            // Show progress messages before and after learning
+            "notifications": true,
+        },
     },
     // Automatic pruning strategies
     "strategies": {

@@ -246,6 +246,28 @@
                     "type": "boolean",
                     "default": false,
                     "description": "When enabled, your messages are never lost during compression"
+                },
+                "learning": {
+                    "type": "object",
+                    "description": "Optional learning pass before compression that extracts durable codebase knowledge",
+                    "additionalProperties": false,
+                    "required": ["enabled", "notifications"],
+                    "properties": {
+                        "enabled": {
+                            "type": "boolean",
+                            "default": false,
+                            "description": "Run a durable-learning pass before invoking the compress tool"
+                        },
+                        "notifications": {
+                            "type": "boolean",
+                            "default": true,
+                            "description": "Show progress messages before and after the learning pass"
+                        }
+                    },
+                    "default": {
+                        "enabled": false,
+                        "notifications": true
+                    }
                 }
             },
             "default": {
@@ -260,7 +282,11 @@
                 "nudgeForce": "soft",
                 "protectedTools": [],
                 "protectTags": false,
-                "protectUserMessages": false
+                "protectUserMessages": false,
+                "learning": {
+                    "enabled": false,
+                    "notifications": true
+                }
             }
         },
         "strategies": {
