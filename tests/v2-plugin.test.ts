@@ -167,6 +167,15 @@ test("setup registers context hook, compress tool, and dcp-compress command", as
     assert.equal(dcpCommand.name, "dcp-compress")
     assert.ok(dcpCommand.description.includes("dcp-compress"))
 
+    // v2 has no command-execution hook: a command's `template` IS the whole
+    // prompt sent to the model. An empty template (what a prior v2 port left
+    // in place) means running /dcp-compress submits nothing useful. Lock
+    // that it now carries real compress-trigger instructions plus the
+    // $ARGUMENTS placeholder so optional focus text still gets threaded in.
+    assert.ok(typeof dcpCommand.template === "string" && dcpCommand.template.length > 0)
+    assert.ok(dcpCommand.template.includes("You must now use the compress tool"))
+    assert.ok(dcpCommand.template.includes("$ARGUMENTS"))
+
     await cleanup()
     assert.ok(fake.disposed.includes("session.hook:context"))
     assert.ok(fake.disposed.includes("tool.transform"))

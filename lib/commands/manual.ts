@@ -20,7 +20,7 @@ const MANUAL_MODE_ON = "Manual mode is now ON. Use /dcp-compress to trigger cont
 
 const MANUAL_MODE_OFF = "Manual mode is now OFF."
 
-const COMPRESS_TRIGGER_PROMPT = [
+export const COMPRESS_TRIGGER_PROMPT = [
     "<compress triggered manually>",
     "Manual mode trigger received. You must now use the compress tool.",
     "Find the most significant completed conversation content that can be compressed into a high-fidelity technical summary.",

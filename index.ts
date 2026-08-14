@@ -1,5 +1,6 @@
 import { getConfig } from "./lib/config"
 import { createCompressMessageTool, createCompressRangeTool } from "./lib/compress"
+import { COMPRESS_TRIGGER_PROMPT } from "./lib/commands/manual"
 import {
     compressDisabledByOpencode,
     hasExplicitToolPermission,
@@ -174,16 +175,27 @@ export default Plugin.define({
         }
 
         // 3. Command registration (using ctx.command.transform)
+        //
+        // v2 has no command-execution hook (`CommandDomain` only exposes
+        // `transform`/`reload`, never a per-invocation intercept like v1's
+        // `command.execute.before`). A command's `template` IS the entire
+        // prompt sent to the model -- there is nothing left to fill it in
+        // dynamically at execute time. So `dcp-compress` must carry the real
+        // compress-trigger instructions in its static template rather than
+        // an empty string (which used to rely on `createCommandExecuteHandler`
+        // to replace it before it was empty on submit).
         if (
             ctx.command?.transform &&
             config.commands.enabled &&
             config.compress.permission !== "deny"
         ) {
+            const compressCommandTemplate = `${COMPRESS_TRIGGER_PROMPT}\n\nIf additional user focus is specified below, prioritize compressing content related to it: $ARGUMENTS`
+
             const commandReg = await ctx.command.transform((draft: any) => {
                 if (draft && typeof draft.update === "function") {
                     draft.update("dcp-compress", (cmd: any) => {
                         if (cmd && typeof cmd === "object") {
-                            cmd.template = ""
+                            cmd.template = compressCommandTemplate
                             cmd.description =
                                 "Trigger DCP manual compression with: /dcp-compress [focus]"
                         }
