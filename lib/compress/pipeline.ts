@@ -12,13 +12,13 @@ import type { SearchContext } from "./types"
 import { applyPendingCompressionDurations } from "./timing"
 
 interface RunContext {
-    ask(input: {
+    ask?(input: {
         permission: string
         patterns: string[]
         always: string[]
         metadata: Record<string, unknown>
     }): Promise<void>
-    metadata(input: { title: string }): void
+    metadata?(input: { title: string }): void
     sessionID: string
 }
 
@@ -47,14 +47,23 @@ export async function prepareSession(
         )
     }
 
-    await toolCtx.ask({
-        permission: "compress",
-        patterns: ["*"],
-        always: ["*"],
-        metadata: {},
-    })
+    // v1's tool ctx offered ask()/metadata() (interactive permission prompt,
+    // UI title) that v2's real Tool.Context (@opencode-ai/plugin promise/effect
+    // tool.d.ts: sessionID/agent/messageID/id/progress only) does not expose at
+    // all. Calling them unconditionally crashed every compress execution under
+    // v2 with an opaque tool failure. Guard both as v1-only conveniences.
+    if (typeof toolCtx.ask === "function") {
+        await toolCtx.ask({
+            permission: "compress",
+            patterns: ["*"],
+            always: ["*"],
+            metadata: {},
+        })
+    }
 
-    toolCtx.metadata({ title })
+    if (typeof toolCtx.metadata === "function") {
+        toolCtx.metadata({ title })
+    }
 
     const rawMessages = await fetchSessionMessages(ctx.client, toolCtx.sessionID)
 

@@ -179,6 +179,59 @@ test("compress range rebuilds subagent message refs after session state was rese
     assert.equal(state.prune.messages.blocksById.size, 1)
 })
 
+// Regression coverage: every other test in this file (and every other
+// compress-tool test in the suite) mocks toolCtx with v1's ask()/metadata(),
+// which is why the real v2 Tool.Context shape (@opencode-ai/plugin promise
+// and effect tool.d.ts: sessionID/agent/messageID/id/progress only -- no
+// ask, no metadata) crashed every compress execution under v2 with an
+// opaque failure and no test ever caught it. This models the real v2 shape.
+test("compress range mode runs under the real v2 tool context (no ask/metadata)", async () => {
+    const sessionID = `ses_range_v2_context_${Date.now()}`
+    const rawMessages = buildMessages(sessionID)
+    const state = createSessionState()
+    const logger = new Logger(false)
+    const tool = createCompressRangeTool({
+        client: {
+            session: {
+                messages: async () => ({ data: rawMessages }),
+                get: async () => ({ data: { parentID: "ses_parent" } }),
+            },
+        },
+        state,
+        logger,
+        config: buildConfig(),
+        prompts: {
+            reload() {},
+            getRuntimePrompts() {
+                return { compressRange: "", compressMessage: "" }
+            },
+        },
+    } as any)
+
+    const result = await tool.execute(
+        {
+            topic: "v2 context shape",
+            content: [
+                {
+                    startId: "m0001",
+                    endId: "m0002",
+                    summary: "Captured the initial investigation and follow-up request.",
+                },
+            ],
+        },
+        {
+            sessionID,
+            agent: "assistant",
+            messageID: "msg-compress-v2",
+            id: "call-compress-v2",
+            progress: async () => {},
+        },
+    )
+
+    assert.equal(result, "Compressed 2 messages into [Compressed conversation section].")
+    assert.equal(state.prune.messages.blocksById.size, 1)
+})
+
 test("compress range mode appends protected prompt info", async () => {
     const sessionID = `ses_range_protect_tag_${Date.now()}`
     const rawMessages: WithParts[] = [
