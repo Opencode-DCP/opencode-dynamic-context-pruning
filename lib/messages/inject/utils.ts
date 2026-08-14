@@ -77,10 +77,10 @@ export function getModelInfo(messages: WithParts[]): LastUserModelContext {
         }
     }
 
-    const userInfo = lastUserMessage.info as UserMessage
+    const userInfo = lastUserMessage.info as any
     return {
-        providerId: userInfo.model.providerID,
-        modelId: userInfo.model.modelID,
+        providerId: userInfo?.model?.providerID,
+        modelId: userInfo?.model?.modelID,
     }
 }
 

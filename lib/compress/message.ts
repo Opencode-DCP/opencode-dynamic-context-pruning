@@ -1,4 +1,3 @@
-import { tool } from "@opencode-ai/plugin"
 import type { ToolContext } from "./types"
 import { countTokens } from "../token-utils"
 import { MESSAGE_FORMAT_EXTENSION } from "../prompts/extensions/tool"
@@ -13,39 +12,13 @@ import {
 } from "./state"
 import type { CompressMessageToolArgs } from "./types"
 
-function buildSchema() {
-    return {
-        topic: tool.schema
-            .string()
-            .describe(
-                "Short label (3-5 words) for the overall batch - e.g., 'Closed Research Notes'",
-            ),
-        content: tool.schema
-            .array(
-                tool.schema.object({
-                    messageId: tool.schema
-                        .string()
-                        .describe("Raw message ID to compress (e.g. m0001)"),
-                    topic: tool.schema
-                        .string()
-                        .describe("Short label (3-5 words) for this one message summary"),
-                    summary: tool.schema
-                        .string()
-                        .describe("Complete technical summary replacing that one message"),
-                }),
-            )
-            .describe("Batch of individual message summaries to create in one tool call"),
-    }
-}
-
-export function createCompressMessageTool(ctx: ToolContext): ReturnType<typeof tool> {
+export function createCompressMessageTool(ctx: ToolContext) {
     ctx.prompts.reload()
     const runtimePrompts = ctx.prompts.getRuntimePrompts()
 
-    return tool({
+    return {
         description: runtimePrompts.compressMessage + MESSAGE_FORMAT_EXTENSION,
-        args: buildSchema(),
-        async execute(args, toolCtx) {
+        async execute(args: CompressMessageToolArgs, toolCtx: any) {
             const input = args as CompressMessageToolArgs
             validateArgs(input)
             const callId =
@@ -141,5 +114,5 @@ export function createCompressMessageTool(ctx: ToolContext): ReturnType<typeof t
 
             return formatResult(plans.length, skippedIssues, skippedCount)
         },
-    })
+    }
 }

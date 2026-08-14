@@ -1,7 +1,8 @@
 import { readFileSync, writeFileSync, existsSync, mkdirSync, statSync } from "fs"
 import { join, dirname } from "path"
 import { homedir } from "os"
-import { parse } from "jsonc-parser/lib/esm/main.js"
+import * as jsonc from "jsonc-parser"
+const parse = jsonc.parse
 import type { PluginInput } from "@opencode-ai/plugin"
 
 type Permission = "ask" | "allow" | "deny"

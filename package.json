@@ -9,11 +9,13 @@
     "exports": {
         ".": {
             "types": "./dist/index.d.ts",
-            "import": "./dist/index.js"
+            "import": "./dist/index.js",
+            "default": "./dist/index.js"
         },
         "./server": {
             "types": "./dist/index.d.ts",
-            "import": "./dist/index.js"
+            "import": "./dist/index.js",
+            "default": "./dist/index.js"
         },
         "./tui": {
             "types": "./dist/tui.d.ts",
@@ -60,11 +62,11 @@
     },
     "dependencies": {
         "@anthropic-ai/tokenizer": "^0.0.4",
-        "@opencode-ai/sdk": "^1.4.3",
+        "@opencode-ai/plugin": "1.18.4",
+        "@opencode-ai/sdk": "^1.18.4",
         "jsonc-parser": "^3.3.1"
     },
     "devDependencies": {
-        "@opencode-ai/plugin": "^1.4.3",
         "@opentui/core": "^0.4.2",
         "@opentui/solid": "^0.4.2",
         "@types/node": "^25.5.0",

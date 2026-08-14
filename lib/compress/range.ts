@@ -1,4 +1,3 @@
-import { tool } from "@opencode-ai/plugin"
 import type { ToolContext } from "./types"
 import { countTokens } from "../token-utils"
 import { RANGE_FORMAT_EXTENSION } from "../prompts/extensions/tool"
@@ -26,41 +25,13 @@ import {
 } from "./state"
 import type { CompressRangeToolArgs } from "./types"
 
-function buildSchema() {
-    return {
-        topic: tool.schema
-            .string()
-            .describe("Short label (3-5 words) for display - e.g., 'Auth System Exploration'"),
-        content: tool.schema
-            .array(
-                tool.schema.object({
-                    startId: tool.schema
-                        .string()
-                        .describe(
-                            "Message or block ID marking the beginning of range (e.g. m0001, b2)",
-                        ),
-                    endId: tool.schema
-                        .string()
-                        .describe("Message or block ID marking the end of range (e.g. m0012, b5)"),
-                    summary: tool.schema
-                        .string()
-                        .describe("Complete technical summary replacing all content in range"),
-                }),
-            )
-            .describe(
-                "One or more ranges to compress, each with start/end boundaries and a summary",
-            ),
-    }
-}
-
-export function createCompressRangeTool(ctx: ToolContext): ReturnType<typeof tool> {
+export function createCompressRangeTool(ctx: ToolContext) {
     ctx.prompts.reload()
     const runtimePrompts = ctx.prompts.getRuntimePrompts()
 
-    return tool({
+    return {
         description: runtimePrompts.compressRange + RANGE_FORMAT_EXTENSION,
-        args: buildSchema(),
-        async execute(args, toolCtx) {
+        async execute(args: CompressRangeToolArgs, toolCtx: any) {
             const input = args as CompressRangeToolArgs
             validateArgs(input)
             const callId =
@@ -188,5 +159,5 @@ export function createCompressRangeTool(ctx: ToolContext): ReturnType<typeof too
 
             return `Compressed ${totalCompressedMessages} messages into ${COMPRESSED_BLOCK_HEADER}.`
         },
-    })
+    }
 }

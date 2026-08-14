@@ -14,12 +14,10 @@ export function isMessageWithInfo(message: unknown): message is WithParts {
     return (
         typeof info.id === "string" &&
         info.id.length > 0 &&
-        typeof info.sessionID === "string" &&
-        info.sessionID.length > 0 &&
-        (info.role === "user" || info.role === "assistant") &&
-        info.time &&
-        typeof info.time === "object" &&
-        typeof info.time.created === "number" &&
+        (info.role === "user" ||
+            info.role === "assistant" ||
+            info.role === "system" ||
+            info.role === "tool") &&
         Array.isArray(parts)
     )
 }

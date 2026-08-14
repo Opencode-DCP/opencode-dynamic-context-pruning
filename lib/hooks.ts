@@ -82,6 +82,12 @@ export function createSystemPromptHandler(
 
         prompts.reload()
         const runtimePrompts = prompts.getRuntimePrompts()
+        const baseSystemPrompt = runtimePrompts.system.trim()
+        if (baseSystemPrompt && systemText.includes(baseSystemPrompt)) {
+            logger.info("Skipping DCP system prompt injection (already present in system prompt)")
+            return
+        }
+
         const newPrompt = renderSystemPrompt(
             runtimePrompts,
             buildProtectedToolsExtension(config.compress.protectedTools),
@@ -92,6 +98,183 @@ export function createSystemPromptHandler(
             output.system[output.system.length - 1] += "\n\n" + newPrompt
         } else {
             output.system.push(newPrompt)
+        }
+    }
+}
+
+export interface ContextHookEvent {
+    sessionID?: string
+    agent?: string
+    model?: any
+    system?: any[]
+    messages?: WithParts[]
+    tools?: Record<string, any>
+}
+
+export function createContextHandler(
+    client: any,
+    state: SessionState,
+    logger: Logger,
+    config: PluginConfig,
+    prompts: PromptStore,
+    hostPermissions: HostPermissionSnapshot,
+) {
+    const systemHandler = createSystemPromptHandler(state, logger, config, prompts)
+    const chatHandler = createChatMessageTransformHandler(
+        client,
+        state,
+        logger,
+        config,
+        prompts,
+        hostPermissions,
+    )
+
+    return async (event: ContextHookEvent) => {
+        if (event.model?.limit?.context) {
+            state.modelContextLimit = event.model.limit.context
+            logger.debug("Cached model context limit", { limit: state.modelContextLimit })
+        }
+
+        if (event.system && Array.isArray(event.system)) {
+            const isObjectSystem = event.system.length > 0 && typeof event.system[0] === "object"
+            if (isObjectSystem) {
+                const stringArray = event.system.map((s: any) =>
+                    typeof s === "string" ? s : (s?.text ?? ""),
+                )
+                const tempOutput = { system: stringArray }
+                await systemHandler(
+                    { sessionID: event.sessionID, model: event.model },
+                    tempOutput,
+                )
+                if (tempOutput.system.length > stringArray.length) {
+                    for (let i = stringArray.length; i < tempOutput.system.length; i++) {
+                        event.system.push({ type: "text", text: tempOutput.system[i] })
+                    }
+                }
+                if (tempOutput.system.length > 0 && event.system.length > 0) {
+                    const lastTemp = tempOutput.system[stringArray.length - 1]
+                    const origLast = stringArray[stringArray.length - 1]
+                    if (lastTemp !== origLast) {
+                        const target = event.system[stringArray.length - 1]
+                        if (typeof target === "string") {
+                            event.system[stringArray.length - 1] = lastTemp
+                        } else if (target && typeof target === "object") {
+                            target.text = lastTemp
+                        }
+                    }
+                }
+            } else {
+                const tempOutput = { system: event.system }
+                await systemHandler(
+                    { sessionID: event.sessionID, model: event.model },
+                    tempOutput as any,
+                )
+            }
+        }
+
+        if (event.messages && Array.isArray(event.messages)) {
+            const v2Meta = new Map<
+                any,
+                {
+                    wasArray: boolean
+                    originalContent: any
+                    hadSyntheticInfo: boolean
+                    hadSyntheticParts: boolean
+                }
+            >()
+            for (let i = 0; i < event.messages.length; i++) {
+                const msg = event.messages[i] as any
+                if (!msg || typeof msg !== "object") continue
+
+                const wasArray = Array.isArray(msg.content)
+                const hadSyntheticInfo = !msg.info || typeof msg.info !== "object"
+                const hadSyntheticParts = !Array.isArray(msg.parts)
+
+                v2Meta.set(msg, {
+                    wasArray,
+                    originalContent: msg.content,
+                    hadSyntheticInfo,
+                    hadSyntheticParts,
+                })
+
+                if (hadSyntheticInfo) {
+                    msg.info = {
+                        id: msg.id ?? `m${i.toString().padStart(4, "0")}`,
+                        sessionID: event.sessionID ?? state.sessionId ?? "default",
+                        role: msg.role ?? "user",
+                        time: { created: Date.now() - (event.messages.length - i) * 1000 },
+                    }
+                }
+                if (hadSyntheticParts) {
+                    if (Array.isArray(msg.content)) {
+                        msg.parts = msg.content
+                    } else if (msg.role === "tool" || msg.tool_call_id) {
+                        msg.parts = [
+                            {
+                                type: "tool",
+                                callID: msg.tool_call_id ?? msg.id ?? `call_${i}`,
+                                state: {
+                                    status: "completed",
+                                    output:
+                                        typeof msg.content === "string"
+                                            ? msg.content
+                                            : JSON.stringify(msg.content ?? ""),
+                                },
+                            },
+                        ]
+                    } else if (msg.role === "assistant" && Array.isArray(msg.tool_calls)) {
+                        msg.parts = []
+                        if (typeof msg.content === "string" && msg.content.length > 0) {
+                            msg.parts.push({ type: "text", text: msg.content })
+                        }
+                        for (const tc of msg.tool_calls) {
+                            msg.parts.push({
+                                type: "tool",
+                                tool: tc.function?.name ?? tc.name ?? "unknown",
+                                callID: tc.id,
+                                state: {
+                                    status: "running",
+                                    input: tc.function?.arguments ?? tc.arguments,
+                                },
+                            })
+                        }
+                    } else if (typeof msg.content === "string") {
+                        msg.parts = [{ type: "text", text: msg.content }]
+                    } else {
+                        msg.parts = []
+                    }
+                }
+            }
+
+            await chatHandler({ sessionID: event.sessionID }, { messages: event.messages })
+
+            for (const [msg, meta] of v2Meta.entries()) {
+                if (!msg) continue
+                if (meta.wasArray) {
+                    msg.content = msg.parts
+                } else if (typeof meta.originalContent === "string") {
+                    const textParts = (msg.parts || [])
+                        .filter((p: any) => p.type === "text")
+                        .map((p: any) => p.text ?? "")
+                    if (textParts.length > 0) {
+                        msg.content = textParts.join("\n")
+                    } else if (msg.role === "tool") {
+                        const toolPart = (msg.parts || []).find((p: any) => p.type === "tool")
+                        if (toolPart?.state?.output !== undefined) {
+                            msg.content =
+                                typeof toolPart.state.output === "string"
+                                    ? toolPart.state.output
+                                    : JSON.stringify(toolPart.state.output)
+                        }
+                    }
+                }
+                if (meta.hadSyntheticInfo) {
+                    delete msg.info
+                }
+                if (meta.hadSyntheticParts && !meta.wasArray) {
+                    delete msg.parts
+                }
+            }
         }
     }
 }
