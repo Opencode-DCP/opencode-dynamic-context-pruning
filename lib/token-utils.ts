@@ -14,7 +14,18 @@ export function getCurrentTokenUsage(state: SessionState, messages: WithParts[])
         }
 
         const assistantInfo = msg.info as AssistantMessage
-        if ((assistantInfo.tokens?.output || 0) <= 0) {
+        const rawTokens = (assistantInfo as any).tokens
+        if (rawTokens === undefined) {
+            // The v2 `session.hook("context")` event adapts native LLM-request
+            // messages (`@opencode-ai/ai` Message: id/role/content only) into
+            // this shape. Unlike a real SessionMessage.AssistantMessage,
+            // `tokens` is never attached to those synthetic entries, so no
+            // host-reported usage will ever be found by scanning further back.
+            // Fall back to a local estimate instead of silently reporting 0.
+            break
+        }
+
+        if ((rawTokens.output || 0) <= 0) {
             continue
         }
 
@@ -26,15 +37,30 @@ export function getCurrentTokenUsage(state: SessionState, messages: WithParts[])
             return 0
         }
 
-        const input = assistantInfo.tokens?.input || 0
-        const output = assistantInfo.tokens?.output || 0
-        const reasoning = assistantInfo.tokens?.reasoning || 0
-        const cacheRead = assistantInfo.tokens?.cache?.read || 0
-        const cacheWrite = assistantInfo.tokens?.cache?.write || 0
+        const input = rawTokens.input || 0
+        const output = rawTokens.output || 0
+        const reasoning = rawTokens.reasoning || 0
+        const cacheRead = rawTokens.cache?.read || 0
+        const cacheWrite = rawTokens.cache?.write || 0
         return input + output + reasoning + cacheRead + cacheWrite
     }
 
-    return 0
+    return estimateCurrentTokenUsage(messages)
+}
+
+/**
+ * Local fallback for contexts where the host never attaches token usage
+ * stats to messages (see `getCurrentTokenUsage`). Estimates the live context
+ * size from the message content actually present in `messages`, which by the
+ * time this runs already reflects pruning/compression applied earlier in the
+ * pipeline.
+ */
+function estimateCurrentTokenUsage(messages: WithParts[]): number {
+    let total = 0
+    for (const msg of messages) {
+        total += countAllMessageTokens(msg)
+    }
+    return total
 }
 
 export function getCurrentParams(

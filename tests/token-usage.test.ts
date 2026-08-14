@@ -210,6 +210,75 @@ test("getCurrentTokenUsage returns 0 until a fresh assistant follows compaction"
     assert.equal(getCurrentTokenUsage(state, messages), 0)
 })
 
+// Regression coverage for the v2 port: `session.hook("context")` adapts
+// native LLM-request messages (`@opencode-ai/ai` Message: id/role/content
+// only) into the `WithParts` shape this plugin operates on, and never
+// attaches `.tokens` to the synthetic `info` it fabricates -- unlike a real
+// SessionMessage.AssistantMessage, where `tokens` is a required field. Before
+// this fix, `getCurrentTokenUsage` silently returned 0 for every v2 turn,
+// so `isContextOverLimits`/`injectCompressNudges` never fired no matter how
+// large the context grew.
+function buildNativeV2Messages(): WithParts[] {
+    const sessionID = "ses_v2_native"
+
+    return [
+        {
+            info: {
+                id: "m0001",
+                role: "user",
+                sessionID,
+                agent: "assistant",
+                time: { created: 1 },
+            } as WithParts["info"],
+            parts: [textPart("m0001", sessionID, "m0001-part", repeatedWord("investigate", 50))],
+        },
+        {
+            info: {
+                // No `tokens` field: the host never reports usage on native
+                // v2 context-hook messages.
+                id: "m0002",
+                role: "assistant",
+                sessionID,
+                agent: "assistant",
+                time: { created: 2 },
+            } as WithParts["info"],
+            parts: [textPart("m0002", sessionID, "m0002-part", repeatedWord("finding", 400))],
+        },
+    ]
+}
+
+test("getCurrentTokenUsage estimates from content when the host never reports usage (v2 native messages)", () => {
+    const state = createSessionState()
+    const messages = buildNativeV2Messages()
+
+    const usage = getCurrentTokenUsage(state, messages)
+    assert.ok(usage > 0, `expected a positive local estimate for v2 native messages, got ${usage}`)
+})
+
+test("isContextOverLimits fires for v2 native messages once the estimate crosses maxContextLimit", () => {
+    const state = createSessionState()
+    const messages = buildNativeV2Messages()
+    const usage = getCurrentTokenUsage(state, messages)
+
+    const stillUnder = isContextOverLimits(
+        buildConfig(usage + 1, 1),
+        state,
+        undefined,
+        undefined,
+        messages,
+    )
+    assert.equal(stillUnder.overMaxLimit, false)
+
+    const nowOver = isContextOverLimits(
+        buildConfig(usage - 1, 1),
+        state,
+        undefined,
+        undefined,
+        messages,
+    )
+    assert.equal(nowOver.overMaxLimit, true)
+})
+
 test("isContextOverLimits ignores stale summary totals and resumes with fresh reported totals", () => {
     const messages = buildCompactedMessages()
     const state = createSessionState()

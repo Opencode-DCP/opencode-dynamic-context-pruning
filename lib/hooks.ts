@@ -46,6 +46,47 @@ const INTERNAL_AGENT_SIGNATURES = [
     "Summarize what was done in this conversation",
 ]
 
+// Caches provider/model -> context window size resolved via `client.model.list()`.
+// The v2 `session.hook("context")` event only carries a `Model.Ref`
+// (id/providerID/variant), never the full `Model.Info.limit.context` that v1's
+// chat hooks received directly, so percentage-based `maxContextLimit`/
+// `minContextLimit` configs need this looked up out-of-band at least once per
+// provider/model pair.
+const modelContextLimitCache = new Map<string, number>()
+
+export async function resolveModelContextLimit(
+    client: any,
+    providerID: string | undefined,
+    modelID: string | undefined,
+): Promise<number | undefined> {
+    if (!providerID || !modelID || typeof client?.model?.list !== "function") {
+        return undefined
+    }
+
+    const cacheKey = `${providerID}/${modelID}`
+    const cached = modelContextLimitCache.get(cacheKey)
+    if (cached !== undefined) {
+        return cached
+    }
+
+    try {
+        const response = await client.model.list()
+        const models = (response?.data ?? response ?? []) as any[]
+        for (const model of models) {
+            const context = model?.limit?.context
+            if (typeof context !== "number") {
+                continue
+            }
+            const key = `${model.providerID}/${model.modelID ?? model.id}`
+            modelContextLimitCache.set(key, context)
+        }
+    } catch {
+        return undefined
+    }
+
+    return modelContextLimitCache.get(cacheKey)
+}
+
 export function createSystemPromptHandler(
     state: SessionState,
     logger: Logger,
@@ -133,6 +174,18 @@ export function createContextHandler(
         if (event.model?.limit?.context) {
             state.modelContextLimit = event.model.limit.context
             logger.debug("Cached model context limit", { limit: state.modelContextLimit })
+        } else if (state.modelContextLimit === undefined) {
+            const resolved = await resolveModelContextLimit(
+                client,
+                event.model?.providerID,
+                event.model?.id,
+            )
+            if (resolved !== undefined) {
+                state.modelContextLimit = resolved
+                logger.debug("Resolved model context limit via model catalog", {
+                    limit: resolved,
+                })
+            }
         }
 
         if (event.system && Array.isArray(event.system)) {
@@ -142,10 +195,7 @@ export function createContextHandler(
                     typeof s === "string" ? s : (s?.text ?? ""),
                 )
                 const tempOutput = { system: stringArray }
-                await systemHandler(
-                    { sessionID: event.sessionID, model: event.model },
-                    tempOutput,
-                )
+                await systemHandler({ sessionID: event.sessionID, model: event.model }, tempOutput)
                 if (tempOutput.system.length > stringArray.length) {
                     for (let i = stringArray.length; i < tempOutput.system.length; i++) {
                         event.system.push({ type: "text", text: tempOutput.system[i] })
