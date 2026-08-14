@@ -438,3 +438,146 @@ test("context hook preserves assistant tool_calls and tool responses without dro
 
     await cleanup()
 })
+
+// Regression coverage for the fourth v2-port bug: every test above (and the
+// original 96/96 "passing" suite from the prior port) builds its fake ctx
+// with a full v1-shaped `ctx.client` (session.get/session.messages/tui.show
+// Toast all present) -- which is exactly why `const client = ctx?.client`
+// being permanently `undefined` under a real v2 host was never caught. The
+// real @opencode-ai/plugin Context has no `.client` field at all; it only
+// exposes domain-scoped capabilities (ctx.catalog, ctx.session with a
+// restricted method set, etc.). This fixture omits `client` entirely and
+// only wires up what v2 genuinely provides, then drives the exact sequence
+// that crashed live: a context-hook turn (which is the only place a v2
+// plugin ever sees message history) followed by a real compress-tool
+// execution with a real v2 Tool.Context (sessionID/agent/messageID/id/
+// progress only).
+function fakeV2OnlyContext() {
+    const hooks = new Map<string, (event: any) => Promise<void>>()
+    const tools = new Map<string, any>()
+    const commands = new Map<string, any>()
+    const models = [
+        {
+            providerID: "anthropic",
+            modelID: "claude-sonnet-4-6",
+            limit: { context: 200_000 },
+        },
+    ]
+
+    const createRegistration = (name: string) => ({ dispose: async () => {} })
+
+    const value = {
+        app: { name: "opencode", version: "2", channel: "test" },
+        directory: process.cwd(),
+        // Deliberately no `client` field -- this is the real v2 shape.
+        catalog: {
+            model: {
+                list: async () => ({ data: models }),
+            },
+        },
+        session: {
+            get: async ({ sessionID }: { sessionID: string }) => ({
+                id: sessionID,
+                parentID: undefined,
+            }),
+            hook: async (name: string, callback: (event: any) => Promise<void>) => {
+                hooks.set(name, callback)
+                return createRegistration(`session.hook:${name}`)
+            },
+        },
+        tool: {
+            transform: async (callback: (draft: any) => void) => {
+                callback({
+                    add: (toolDef: any) => {
+                        tools.set(toolDef.name, toolDef)
+                    },
+                })
+                return createRegistration("tool.transform")
+            },
+        },
+        command: {
+            transform: async (callback: (draft: any) => void) => {
+                callback({
+                    update: (id: string, updater: any) => {
+                        const entry: any = { name: id, template: "", description: "" }
+                        if (typeof updater === "function") updater(entry)
+                        commands.set(id, entry)
+                    },
+                })
+                return createRegistration("command.transform")
+            },
+        },
+        event: {
+            subscribe: async () => createRegistration("event.subscribe"),
+        },
+    }
+
+    return { value, hooks, tools, commands }
+}
+
+test("compress tool completes end-to-end with no ctx.client at all (real v2 shape)", async () => {
+    const fake = fakeV2OnlyContext()
+    const cleanup = await plugin.setup(fake.value)
+
+    const sessionID = "ses_v2_no_client"
+    const contextHook = fake.hooks.get("context")!
+    assert.ok(contextHook)
+
+    // A real context-hook turn is the only way v2 ever exposes message
+    // history to this plugin -- this is what populates the message cache
+    // that the compress tool falls back to instead of a nonexistent
+    // client.session.messages() call.
+    const event = {
+        sessionID,
+        agent: "general",
+        model: { id: "claude-sonnet-4-6", providerID: "anthropic" },
+        system: [{ type: "text", text: "You are a helpful assistant." }],
+        messages: [
+            { role: "user", content: "Investigate the auth module." },
+            { role: "assistant", content: "Found the relevant code path." },
+            { role: "user", content: "Please summarize what we found so far." },
+        ],
+        tools: {},
+    }
+
+    await contextHook(event)
+
+    // Model context limit must resolve via ctx.catalog.model.list(), not a
+    // nonexistent client.model.list().
+    assert.equal(fake.hooks.size > 0, true)
+
+    const compressTool = fake.tools.get("compress")
+    assert.ok(compressTool)
+
+    // Real v2 Tool.Context: no ask, no metadata, no client.
+    const toolCtx = {
+        sessionID,
+        agent: "general",
+        messageID: "msg-compress-call",
+        id: "call-compress-v2-only",
+        progress: async () => {},
+    }
+
+    const messageIds = Array.from((event.messages as any[]).keys()).map(
+        (i) => `m${(i + 1).toString().padStart(4, "0")}`,
+    )
+
+    const result = await compressTool.execute(
+        {
+            topic: "v2 client-less compress",
+            content: [
+                {
+                    startId: messageIds[0],
+                    endId: messageIds[1],
+                    summary: "Investigated the auth module and found the relevant code path.",
+                },
+            ],
+        },
+        toolCtx,
+    )
+
+    assert.equal(typeof result?.content?.[0]?.text, "string")
+    assert.ok(result.content[0].text.includes("Compressed"))
+
+    await cleanup()
+})

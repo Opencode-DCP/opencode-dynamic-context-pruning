@@ -25,6 +25,10 @@ export function startAutoUpdate(ctx: PluginInput, enabled: boolean): void {
         .then((result) => {
             if (!result.updated) return
             setTimeout(() => {
+                // v2's plugin ctx has no toast/TUI domain at all -- guard
+                // rather than crash inside this bare setTimeout callback
+                // (which no surrounding try/catch protects).
+                if (typeof ctx.client?.tui?.showToast !== "function") return
                 ctx.client.tui.showToast({
                     body: {
                         title: "DCP update ready",

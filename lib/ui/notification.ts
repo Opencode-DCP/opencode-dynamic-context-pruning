@@ -120,14 +120,24 @@ export async function sendUnifiedNotification(
         toastMessage =
             config.pruneNotification === "minimal" ? toastMessage : truncateToastBody(toastMessage)
 
-        await client.tui.showToast({
-            body: {
-                title: "DCP: Compress Notification",
-                message: toastMessage,
-                variant: "info",
-                duration: 5000,
-            },
-        })
+        if (typeof client?.tui?.showToast !== "function") {
+            logger.debug("Toast notifications are not available on this host; skipping")
+            return false
+        }
+
+        try {
+            await client.tui.showToast({
+                body: {
+                    title: "DCP: Compress Notification",
+                    message: toastMessage,
+                    variant: "info",
+                    duration: 5000,
+                },
+            })
+        } catch (error: any) {
+            logger.warn("Failed to show toast notification", { error: error?.message })
+            return false
+        }
         return true
     }
 
@@ -290,14 +300,24 @@ export async function sendCompressNotification(
         toastMessage =
             config.pruneNotification === "minimal" ? toastMessage : truncateToastBody(toastMessage)
 
-        await client.tui.showToast({
-            body: {
-                title: "DCP: Compress Notification",
-                message: toastMessage,
-                variant: "info",
-                duration: 5000,
-            },
-        })
+        if (typeof client?.tui?.showToast !== "function") {
+            logger.debug("Toast notifications are not available on this host; skipping")
+            return false
+        }
+
+        try {
+            await client.tui.showToast({
+                body: {
+                    title: "DCP: Compress Notification",
+                    message: toastMessage,
+                    variant: "info",
+                    duration: 5000,
+                },
+            })
+        } catch (error: any) {
+            logger.warn("Failed to show toast notification", { error: error?.message })
+            return false
+        }
         return true
     }
 

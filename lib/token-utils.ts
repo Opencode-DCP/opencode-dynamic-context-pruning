@@ -85,9 +85,15 @@ export function getCurrentParams(
     }
     const userInfo = userMsg.info as UserMessage
     const agent: string = userInfo.agent
-    const providerId: string | undefined = userInfo.model.providerID
-    const modelId: string | undefined = userInfo.model.modelID
-    const variant: string | undefined = userInfo.model.variant
+    // v1's UserMessage.info always carried `.model` (a real SessionMessage).
+    // v2's context hook fabricates synthetic `.info` for native AI SDK
+    // messages ({id, sessionID, role, time} only, in hooks.ts's
+    // createContextHandler) -- it never sets `.model`. Guard rather than
+    // crash finalizeSession (and lose an already-applied compression) when
+    // it's absent.
+    const providerId: string | undefined = userInfo.model?.providerID
+    const modelId: string | undefined = userInfo.model?.modelID
+    const variant: string | undefined = userInfo.model?.variant
 
     return { providerId, modelId, agent, variant }
 }

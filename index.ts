@@ -19,6 +19,7 @@ import {
 } from "./lib/hooks"
 import { configureClientAuth, isSecureMode } from "./lib/auth"
 import { startAutoUpdate } from "./lib/update"
+import { buildV2ClientCompat } from "./lib/v2-client-shim"
 
 export const Plugin = {
     define<T extends { id: string; setup: (ctx: any) => any }>(definition: T): T {
@@ -44,10 +45,17 @@ export default Plugin.define({
             agents: {},
         }
 
-        const client = ctx?.client
+        // v2's setup ctx has no `.client` field at all (confirmed against the
+        // real @opencode-ai/plugin Context type) -- `ctx?.client` is always
+        // undefined under v2, which is why every client.* call below crashed
+        // or silently no-op'd. Fall back to a compatibility shim built from
+        // the real v2 domains (ctx.catalog, ctx.session) wherever one exists;
+        // see lib/v2-client-shim.ts for what is and is not translatable.
+        const realClient = ctx?.client
+        const client = realClient ?? buildV2ClientCompat(ctx)
 
-        if (isSecureMode() && client) {
-            configureClientAuth(client)
+        if (isSecureMode() && realClient) {
+            configureClientAuth(realClient)
         }
 
         logger.info("DCP initialized", {

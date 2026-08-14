@@ -38,6 +38,7 @@ import { type HostPermissionSnapshot } from "./host-permissions"
 import { compressPermission, syncCompressPermissionState } from "./compress-permission"
 import { checkSession, ensureSessionInitialized, saveSessionState, syncToolCache } from "./state"
 import { cacheSystemPromptTokens } from "./ui/utils"
+import { setLastKnownMessages } from "./state/message-cache"
 
 const INTERNAL_AGENT_SIGNATURES = [
     "You are a title generator",
@@ -337,7 +338,7 @@ export function createChatMessageTransformHandler(
     prompts: PromptStore,
     hostPermissions: HostPermissionSnapshot,
 ) {
-    return async (input: {}, output: { messages: WithParts[] }) => {
+    return async (input: { sessionID?: string }, output: { messages: WithParts[] }) => {
         const receivedMessages = Array.isArray(output.messages) ? output.messages.length : 0
         const messages = filterMessagesInPlace(output.messages)
         if (messages.length !== receivedMessages) {
@@ -358,6 +359,27 @@ export function createChatMessageTransformHandler(
         stripHallucinations(output.messages)
         cacheSystemPromptTokens(state, output.messages)
         assignMessageRefs(state, output.messages)
+
+        // v2 plugins have no way to fetch a session's message history on
+        // demand (see lib/v2-client-shim.ts) -- the only place the full,
+        // live message list is ever handed to this plugin is right here, on
+        // every context-hook turn. Cache it (pre-pruning, matching what v1's
+        // client.session.messages() returned: raw session content, not this
+        // turn's in-flight redactions) so the compress tool and subagent
+        // output expansion can read it back instead of crashing.
+        setLastKnownMessages(
+            input.sessionID ?? state.sessionId,
+            output.messages.map((m) =>
+                m && typeof m === "object"
+                    ? {
+                          ...m,
+                          parts: Array.isArray((m as any).parts)
+                              ? [...(m as any).parts]
+                              : (m as any).parts,
+                      }
+                    : m,
+            ),
+        )
         syncCompressionBlocks(state, logger, output.messages)
         syncToolCache(state, config, logger, output.messages)
         buildToolIdList(state, output.messages)
