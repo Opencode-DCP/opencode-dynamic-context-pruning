@@ -7,6 +7,7 @@ import {
 } from "../protected-patterns"
 import {
     buildSubagentResultText,
+    extractTaskResultBody,
     getSubAgentId,
     mergeSubagentResult,
 } from "../subagents/subagent-results"
@@ -167,25 +168,31 @@ export async function appendProtectedTools(
                                 )
                             }
                         } else {
-                            const subAgentSessionId = getSubAgentId(part)
-                            if (subAgentSessionId) {
-                                let subAgentResultText = ""
-                                try {
-                                    const subAgentMessages = await fetchSessionMessages(
-                                        client,
-                                        subAgentSessionId,
-                                    )
-                                    subAgentResultText = buildSubagentResultText(subAgentMessages)
-                                } catch {
-                                    subAgentResultText = ""
-                                }
+                            const extractedResult = extractTaskResultBody(part.state.output)
+                            if (extractedResult) {
+                                state.subAgentResultCache.set(part.callID, extractedResult)
+                                output = mergeSubagentResult(part.state.output, extractedResult)
+                            } else {
+                                const subAgentSessionId = getSubAgentId(part)
+                                if (subAgentSessionId) {
+                                    let subAgentResultText = ""
+                                    try {
+                                        const subAgentMessages = await fetchSessionMessages(
+                                            client,
+                                            subAgentSessionId,
+                                        )
+                                        subAgentResultText = buildSubagentResultText(subAgentMessages)
+                                    } catch {
+                                        subAgentResultText = ""
+                                    }
 
-                                if (subAgentResultText) {
-                                    state.subAgentResultCache.set(part.callID, subAgentResultText)
-                                    output = mergeSubagentResult(
-                                        part.state.output,
-                                        subAgentResultText,
-                                    )
+                                    if (subAgentResultText) {
+                                        state.subAgentResultCache.set(part.callID, subAgentResultText)
+                                        output = mergeSubagentResult(
+                                            part.state.output,
+                                            subAgentResultText,
+                                        )
+                                    }
                                 }
                             }
                         }
