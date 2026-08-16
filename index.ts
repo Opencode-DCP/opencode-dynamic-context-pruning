@@ -16,6 +16,7 @@ import {
     createSystemPromptHandler,
     createTextCompleteHandler,
 } from "./lib/hooks"
+import { registerOpencodeCommands } from "./lib/commands/register"
 import { configureClientAuth, isSecureMode } from "./lib/auth"
 import { startAutoUpdate } from "./lib/update"
 
@@ -94,13 +95,7 @@ const server: Plugin = (async (ctx) => {
                 config.compress.permission = "deny"
             }
 
-            if (config.commands.enabled && config.compress.permission !== "deny") {
-                opencodeConfig.command ??= {}
-                opencodeConfig.command["dcp-compress"] = {
-                    template: "",
-                    description: "Trigger DCP manual compression with: /dcp-compress [focus]",
-                }
-            }
+            registerOpencodeCommands(opencodeConfig, config)
 
             const toolsToAdd: string[] = []
             if (config.compress.permission !== "deny" && !config.experimental.allowSubAgents) {
