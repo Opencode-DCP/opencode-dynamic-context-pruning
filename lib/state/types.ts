@@ -108,4 +108,5 @@ export interface SessionState {
     currentTurn: number
     modelContextLimit: number | undefined
     systemPromptTokens: number | undefined
+    needsReconstruction: boolean
 }

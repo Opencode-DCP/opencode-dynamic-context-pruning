@@ -1,6 +1,7 @@
 import type { SessionState, ToolParameterEntry, WithParts } from "./types"
 import type { Logger } from "../logger"
 import { applyPendingCompressionDurations } from "../compress/timing"
+import { hasCompressHistory } from "../compress/reconstruct"
 import { loadManualModeSetting, loadSessionState, saveSessionState } from "./persistence"
 import {
     isSubAgentSession,
@@ -52,6 +53,11 @@ export const checkSession = async (
             timestamp: lastCompactionTimestamp,
         })
 
+        if (hasCompressHistory(messages)) {
+            state.needsReconstruction = true
+            logger.info("Post-compaction compression history detected — reconstruction needed")
+        }
+
         saveSessionState(state, logger).catch((error) => {
             logger.warn("Failed to persist state reset after compaction", {
                 error: error instanceof Error ? error.message : String(error),
@@ -99,6 +105,7 @@ export function createSessionState(): SessionState {
         currentTurn: 0,
         modelContextLimit: undefined,
         systemPromptTokens: undefined,
+        needsReconstruction: false,
     }
 }
 
@@ -133,6 +140,7 @@ export function resetSessionState(state: SessionState): void {
     state.currentTurn = 0
     state.modelContextLimit = undefined
     state.systemPromptTokens = undefined
+    state.needsReconstruction = false
 }
 
 export async function ensureSessionInitialized(
@@ -164,6 +172,10 @@ export async function ensureSessionInitialized(
 
     const persisted = await loadSessionState(sessionId, logger)
     if (persisted === null) {
+        if (hasCompressHistory(messages)) {
+            state.needsReconstruction = true
+            logger.info("New session with compression history detected — reconstruction needed")
+        }
         return
     }
 
