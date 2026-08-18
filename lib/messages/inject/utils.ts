@@ -154,7 +154,12 @@ export function isContextOverLimits(
     const currentTokens = getCurrentTokenUsage(state, messages)
 
     const overMaxLimit = maxContextLimit === undefined ? false : currentTokens > maxContextLimit
-    const overMinLimit = minContextLimit === undefined ? true : currentTokens >= minContextLimit
+    // minContextLimit 无法解析时（如重启后第一轮，modelContextLimit 尚未被
+    // system.prompt hook 缓存）不能无条件触发：在 1M 模型上会把 300K 的正常
+    // 上下文误判为超限，每轮注入压缩提醒。此时跳过 nudge——模型 limit 是
+    // 会话常量，第二轮起 system.prompt 已缓存，判定即恢复正常。
+    const overMinLimit =
+        minContextLimit === undefined ? false : currentTokens >= minContextLimit
 
     return {
         overMaxLimit,
