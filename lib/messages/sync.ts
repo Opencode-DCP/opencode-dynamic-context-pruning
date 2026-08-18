@@ -43,10 +43,31 @@ export const syncCompressionBlocks = (
             messageIds.has(block.compressMessageId)
 
         if (!hasOriginMessage) {
-            block.active = false
-            block.deactivatedAt = now
+            // compressMessageId（执行压缩的 assistant 消息）可能因被 DCP 标记为
+            // ignored/synthetic 而从未持久化，重启后会缺失。此时只要锚点消息仍在，
+            // 压缩摘要依然有效，应保留 active 使摘要继续注入 LLM 上下文；
+            // 否则每次重启压缩都会失效，上下文重新膨胀导致频繁触发压缩提醒。
+            const hasAnchorMessage =
+                typeof block.anchorMessageId === "string" &&
+                block.anchorMessageId.length > 0 &&
+                messageIds.has(block.anchorMessageId)
+
+            if (!hasAnchorMessage) {
+                block.active = false
+                block.deactivatedAt = now
+                block.deactivatedByBlockId = undefined
+                missingOriginBlockIds.push(block.blockId)
+                continue
+            }
+
+            block.active = true
+            block.deactivatedAt = undefined
             block.deactivatedByBlockId = undefined
-            missingOriginBlockIds.push(block.blockId)
+            messagesState.activeBlockIds.add(block.blockId)
+            messagesState.activeByAnchorMessageId.set(block.anchorMessageId, block.blockId)
+            logger.warn("Compress block origin message missing; keeping active via anchor", {
+                blockId: block.blockId,
+            })
             continue
         }
 
