@@ -681,8 +681,10 @@ const defaultConfig: PluginConfig = {
         permission: "allow",
         showCompression: false,
         summaryBuffer: true,
-        maxContextLimit: 100000,
-        minContextLimit: 50000,
+        // 默认按模型 context 的百分比计算阈值：绝对 100K/50K 对现代大 context 模型
+        // （256K~1M）过小，会在上下文很早期就触发压缩提醒。
+        maxContextLimit: "85%",
+        minContextLimit: "60%",
         nudgeFrequency: 5,
         iterationNudgeThreshold: 15,
         nudgeForce: "soft",

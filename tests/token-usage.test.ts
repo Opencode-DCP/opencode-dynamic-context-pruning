@@ -7,7 +7,10 @@ import { createSessionState, type WithParts } from "../lib/state"
 import type { CompressionBlock } from "../lib/state"
 import { getCurrentTokenUsage } from "../lib/token-utils"
 
-function buildConfig(maxContextLimit: number, minContextLimit = 1): PluginConfig {
+function buildConfig(
+    maxContextLimit: number | `${number}%`,
+    minContextLimit: number | `${number}%` = 1,
+): PluginConfig {
     return {
         enabled: true,
         debug: false,
@@ -297,4 +300,39 @@ test("isContextOverLimits does not extend the max threshold when summaryBuffer i
     const overLimit = isContextOverLimits(config, state, undefined, undefined, messages)
 
     assert.equal(overLimit.overMaxLimit, true)
+})
+
+test("isContextOverLimits skips min threshold when modelContextLimit is unknown", () => {
+    // 回归：modelContextLimit 未缓存（如重启后第一轮）时，
+    // 修复前 overMinLimit 无条件 true（每轮注入压缩提醒）；
+    // 修复后应跳过判定，避免 1M 模型上 300K 正常上下文被误判。
+    const messages = buildCompactedMessages()
+    messages.push(buildPostCompactionAssistantMessage())
+    const state = createSessionState() // modelContextLimit = undefined
+
+    const pctConfig = buildConfig("85%", "60%")
+    const result = isContextOverLimits(pctConfig, state, undefined, undefined, messages)
+    assert.equal(result.overMinLimit, false)
+    assert.equal(result.overMaxLimit, false)
+})
+
+test("isContextOverLimits does not force compression for large-but-normal context when limit is unknown", () => {
+    // 关键回归：1M 模型上 300K 上下文（30%）在 modelContextLimit 未知时
+    // 绝不能触发强制压缩警告（修复前 min 侧 fallback 误判导致误压缩）。
+    const messages = buildCompactedMessages()
+    messages.push(buildPostCompactionAssistantMessage())
+    const state = createSessionState()
+
+    const lastMsg = messages[messages.length - 1]
+    ;(lastMsg.info as any).tokens = {
+        input: 300000,
+        output: 500,
+        reasoning: 0,
+        cache: { read: 100, write: 0 },
+    }
+
+    const pctConfig = buildConfig("85%", "60%")
+    const result = isContextOverLimits(pctConfig, state, undefined, undefined, messages)
+    assert.equal(result.overMaxLimit, false)
+    assert.equal(result.overMinLimit, false)
 })
