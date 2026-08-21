@@ -10,6 +10,7 @@ import { Logger } from "./lib/logger"
 import { createSessionState } from "./lib/state"
 import { PromptStore } from "./lib/prompts/store"
 import {
+    createChatMessageHandler,
     createChatMessageTransformHandler,
     createCommandExecuteHandler,
     createEventHandler,
@@ -75,6 +76,13 @@ const server: Plugin = (async (ctx) => {
             logger,
             config,
             ctx.directory,
+            hostPermissions,
+        ),
+        "chat.message": createChatMessageHandler(
+            ctx.client,
+            state,
+            logger,
+            config,
             hostPermissions,
         ),
         event: createEventHandler(state, logger),

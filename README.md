@@ -192,6 +192,20 @@ DCP provides a TUI panel and one prompt-producing slash command:
 - `/dcp` — Opens the DCP panel with context, stats, and manual-mode controls.
 - `/dcp-compress [focus]` — Asks the model to run one compression pass. Optional focus text directs what content to compress, following the active `compress.mode`.
 
+> [!NOTE]
+> On some OpenCode versions the slash-command list is snapshotted before plugin `config` hooks run, so `/dcp-compress` may not appear in the autocomplete list even though DCP loaded correctly. Typing `/dcp-compress [focus]` as a plain message still works — DCP intercepts it via its `chat.message` hook and triggers compression identically. To also restore autocomplete, declare the command in `opencode.json`:
+>
+> ```jsonc
+> {
+>   "command": {
+>     "dcp-compress": {
+>       "template": "",
+>       "description": "Trigger DCP manual compression with: /dcp-compress [focus]"
+>     }
+>   }
+> }
+> ```
+
 ### Prompt Overrides
 
 DCP exposes six editable prompts:

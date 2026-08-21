@@ -289,6 +289,99 @@ export function createCommandExecuteHandler(
     }
 }
 
+export function createChatMessageHandler(
+    client: any,
+    state: SessionState,
+    logger: Logger,
+    config: PluginConfig,
+    hostPermissions: HostPermissionSnapshot,
+) {
+    return async (
+        input: { sessionID: string },
+        output: { parts: any[] },
+    ) => {
+        if (!config.commands.enabled) {
+            return
+        }
+
+        // Fallback for hosts that never registered the dcp-compress command
+        // (e.g. OpenCode builds its slash-command snapshot before plugin
+        // config hooks run). A plain-text "/dcp-compress [focus]" message is
+        // intercepted here and routed through the same manual-trigger path as
+        // the slash command.
+        const textPart = output.parts.find(
+            (part) =>
+                part?.type === "text" &&
+                typeof part.text === "string" &&
+                !part.ignored &&
+                !part.synthetic,
+        )
+        if (!textPart) {
+            return
+        }
+
+        const trimmed = textPart.text.trim()
+        if (!trimmed.startsWith("/dcp-compress")) {
+            return
+        }
+
+        // The slash-command path already set a pending trigger for this turn;
+        // don't double-process it.
+        if (state.pendingManualTrigger) {
+            return
+        }
+
+        const messagesResponse = await client.session.messages({
+            path: { id: input.sessionID },
+        })
+        const messages = filterMessages(messagesResponse.data || messagesResponse)
+
+        await ensureSessionInitialized(
+            client,
+            state,
+            input.sessionID,
+            logger,
+            messages,
+            config.manualMode.enabled,
+        )
+
+        syncCompressPermissionState(state, config, hostPermissions, messages)
+
+        if (compressPermission(state, config) === "deny") {
+            return
+        }
+
+        const focus = trimmed.slice("/dcp-compress".length).trim()
+        const prompt = await handleManualTriggerCommand(
+            {
+                client,
+                state,
+                config,
+                logger,
+                sessionId: input.sessionID,
+                messages,
+            },
+            "compress",
+            focus,
+        )
+        if (!prompt) {
+            return
+        }
+
+        state.manualMode = "compress-pending"
+        state.pendingManualTrigger = {
+            sessionId: input.sessionID,
+            prompt,
+        }
+        // Normalize the stored message to the canonical marker so downstream
+        // pruning/summary logic sees exactly what the slash-command path emits.
+        textPart.text = focus ? `/dcp-compress ${focus}` : "/dcp-compress"
+        logger.info("Intercepted plain-text /dcp-compress message", {
+            sessionId: input.sessionID,
+        })
+    }
+}
+
 export function createTextCompleteHandler() {
     return async (
         _input: { sessionID: string; messageID: string; partID: string },
