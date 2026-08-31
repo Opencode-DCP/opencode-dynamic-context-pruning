@@ -12,6 +12,7 @@ import {
 import {
     appendMissingBlockSummaries,
     injectBlockPlaceholders,
+    isSummaryShrinkViolation,
     parseBlockPlaceholders,
     resolveRanges,
     validateArgs,
@@ -147,6 +148,27 @@ export function createCompressRangeTool(ctx: ToolContext): ReturnType<typeof too
                     ctx.state.idFormat,
                     condense,
                 )
+
+                if (ctx.config.compress.enforceSummaryShrink) {
+                    let compressedTokens = 0
+                    for (const tokenCount of plan.selection.messageTokenById.values()) {
+                        compressedTokens += tokenCount
+                    }
+                    for (const consumedBlockId of completedSummary.consumedBlockIds) {
+                        const consumedBlock = searchContext.summaryByBlockId.get(consumedBlockId)
+                        if (consumedBlock) {
+                            compressedTokens += consumedBlock.summaryTokens
+                        }
+                    }
+                    const summaryTokens = countTokens(completedSummary.expandedSummary)
+                    if (isSummaryShrinkViolation(summaryTokens, compressedTokens)) {
+                        throw new Error(
+                            `Compression rejected: summary (~${summaryTokens} tokens) is not smaller than the content it replaces (~${compressedTokens} tokens). ` +
+                                "Write a much more condensed summary - it must be significantly smaller than what it replaces. " +
+                                "Prefer merging existing compressed blocks into one parent instead of restating their full content.",
+                        )
+                    }
+                }
 
                 preparedPlans.push({
                     entry: plan.entry,

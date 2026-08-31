@@ -4,6 +4,7 @@ import type { CompressionBlock } from "../lib/state"
 import {
     appendMissingBlockSummaries,
     injectBlockPlaceholders,
+    isSummaryShrinkViolation,
     parseBlockPlaceholders,
     validateSummaryPlaceholders,
 } from "../lib/compress/range-utils"
@@ -247,4 +248,13 @@ test("condense mode appends condensed refs for omitted required blocks", () => {
     assert.match(finalSummary.expandedSummary, /\[condensed block b1\]/)
     assert.doesNotMatch(finalSummary.expandedSummary, /Omitted compressed body/)
     assert.deepEqual(finalSummary.consumedBlockIds, [1])
+})
+
+test("isSummaryShrinkViolation rejects summaries no smaller than replaced content", () => {
+    assert.equal(isSummaryShrinkViolation(453, 121), true)
+    assert.equal(isSummaryShrinkViolation(17500, 6700), true)
+    assert.equal(isSummaryShrinkViolation(15300, 88800), false)
+    assert.equal(isSummaryShrinkViolation(500, 500), true)
+    assert.equal(isSummaryShrinkViolation(0, 0), false)
+    assert.equal(isSummaryShrinkViolation(800, 0), false)
 })

@@ -390,3 +390,7 @@ function injectBoundarySummary(
     consumed.push(reference.blockId)
     return next
 }
+
+export function isSummaryShrinkViolation(summaryTokens: number, compressedTokens: number): boolean {
+    return compressedTokens > 0 && summaryTokens >= compressedTokens
+}
