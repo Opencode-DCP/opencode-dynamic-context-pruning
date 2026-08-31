@@ -7,6 +7,14 @@ export function rangePrompt(format: IdFormat = "xml"): string {
     const placeholder = compact ? "@b1@" : "(bN)"
     return `Collapse a range in the conversation into a detailed summary.
 
+COMPRESSION STRATEGY - READ FIRST
+The whole point of compressing is to REDUCE the tokens in context. Pick ranges and write summaries accordingly:
+
+- MERGE EXISTING BLOCKS FIRST: If the conversation already contains compressed blocks (bN) and context is still filling up, the highest-value action is to consolidate multiple blocks into ONE parent block. Choose startId/endId as the outermost boundaries (e.g. from b1 to b6), include every required \`(bN)\` placeholder exactly once, and write a single condensed summary. This reclaims the space each child summary currently occupies. Only when no blocks are worth merging should you compress fresh raw messages.
+- PREFER LARGER RANGES OVER SINGLE MESSAGES: Compressing one message into one new summary block adds a new summary to context. Compressing a whole closed phase in one entry removes many messages while adding only one summary. A single entry that folds a large resolved span is almost always better than several one-message entries.
+- SUMMARY MUST BE MUCH SMALLER THAN WHAT IT REPLACES: A summary is a lossy distillation, not a mirror. Aim for the summary to be well under half the size of the content it replaces, often much less. If the summary you are about to write is roughly as long as the content, you are not actually saving context - reconsider the range or write more tersely.
+- DO NOT CREATE LEFTOVER SUMMARY JUNK: Avoid compressing a single small message into a near-identical long recap. That converts raw messages into an equally large summary block and never helps. Only compress a message if the resulting summary is clearly smaller and the content is genuinely closed.
+
 THE SUMMARY
 Your summary must be EXHAUSTIVE. Capture file paths, function signatures, decisions made, constraints discovered, key findings... EVERYTHING that maintains context integrity. This is not a brief note - it is an authoritative record so faithful that the original conversation adds no value.
 

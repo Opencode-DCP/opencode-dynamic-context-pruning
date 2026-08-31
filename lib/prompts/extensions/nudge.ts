@@ -9,11 +9,25 @@ export function buildCompressedBlockGuidance(state: SessionState): string {
     const blockCount = refs.length
     const blockList = blockCount > 0 ? refs.join(", ") : "none"
 
-    return [
+    const lines: string[] = [
         "Compressed block context:",
         `- Active compressed blocks in this session: ${blockCount} (${blockList})`,
         `- If your selected compression range includes any listed block, include each required placeholder exactly once in the summary using \`${state.idFormat === "compact" ? "@b1@" : "(bN)"}\`.`,
-    ].join("\n")
+    ]
+
+    if (blockCount >= 2) {
+        lines.push(
+            "- MERGING PRIORITY: When context is still filling up, prefer consolidating multiple already-compressed blocks into ONE parent block. Set startId/endId to the outermost boundary (e.g. from b1 to b6) so DCP consumes all intermediate blocks, and write a single condensed summary. This reclaims the space taken by each child summary.",
+        )
+    }
+
+    if (blockCount >= 1) {
+        lines.push(
+            "- KEEP SUMMARIES LEAN: A compression summary should be significantly SMALLER than the content it replaces. Do not write an exhaustive recap of what you already summarized in a child block - the child block will be removed from context once consumed.",
+        )
+    }
+
+    return lines.join("\n")
 }
 
 export function renderMessagePriorityGuidance(priorityLabel: string, refs: string[]): string {
