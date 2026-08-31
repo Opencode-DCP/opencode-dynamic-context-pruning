@@ -46,6 +46,15 @@ const INTERNAL_AGENT_SIGNATURES = [
     "Summarize what was done in this conversation",
 ]
 
+function isInternalAgentCall(systemPrompts: string[]): boolean {
+    const primaryPrompt = systemPrompts[0]
+    if (typeof primaryPrompt !== "string" || primaryPrompt.length === 0) {
+        return false
+    }
+
+    return INTERNAL_AGENT_SIGNATURES.some((signature) => primaryPrompt.includes(signature))
+}
+
 export function createSystemPromptHandler(
     state: SessionState,
     logger: Logger,
@@ -65,8 +74,7 @@ export function createSystemPromptHandler(
             return
         }
 
-        const systemText = output.system.join("\n")
-        if (INTERNAL_AGENT_SIGNATURES.some((sig) => systemText.includes(sig))) {
+        if (isInternalAgentCall(output.system)) {
             logger.info("Skipping DCP system prompt injection for internal agent")
             return
         }

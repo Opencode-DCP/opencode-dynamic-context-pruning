@@ -114,6 +114,69 @@ test("system prompt handler caches full model context for percentage thresholds"
     assert.equal(state.modelContextLimit, 200000)
 })
 
+function buildPromptStore() {
+    return {
+        reload() {},
+        getRuntimePrompts() {
+            return {
+                system: "DCP-RUNTIME-PROMPT",
+                manualExtension: "",
+                subagentExtension: "",
+            }
+        },
+    } as any
+}
+
+test("system prompt handler injects nudges for main session with bundled internal prompts", async () => {
+    const state = createSessionState()
+    const handler = createSystemPromptHandler(
+        state,
+        new Logger(false),
+        buildConfig("allow"),
+        buildPromptStore(),
+    )
+    const output = {
+        system: [
+            "You are the primary coding assistant for this repository.",
+            "You are a title generator for short session names.",
+        ],
+    }
+
+    await handler(
+        {
+            sessionID: "session-1",
+            model: { limit: { context: 200000 } },
+        } as any,
+        output,
+    )
+
+    assert.match(output.system[output.system.length - 1], /DCP-RUNTIME-PROMPT/)
+})
+
+test("system prompt handler skips injection for internal agent calls", async () => {
+    const state = createSessionState()
+    const handler = createSystemPromptHandler(
+        state,
+        new Logger(false),
+        buildConfig("allow"),
+        buildPromptStore(),
+    )
+    const output = {
+        system: ["You are a title generator. Return only a short title."],
+    }
+
+    await handler(
+        {
+            sessionID: "session-1",
+            model: { limit: { context: 200000 } },
+        } as any,
+        output,
+    )
+
+    assert.equal(output.system.length, 1)
+    assert.doesNotMatch(output.system[0], /DCP-RUNTIME-PROMPT/)
+})
+
 test("chat message transform strips hallucinated tags even when compress is denied", async () => {
     const state = createSessionState()
     const logger = new Logger(false)

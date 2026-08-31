@@ -1,5 +1,9 @@
 function normalizePath(input: string): string {
-    return input.replaceAll("\\\\", "/")
+    // A single backslash. In source, "\\" is the one-character string; the
+    // previous "\\\\" was a *two*-character string, so it only ever matched a
+    // doubled separator -- which a real Windows path does not contain. The
+    // normalisation was therefore a no-op on the only platform that needs it.
+    return input.replaceAll("\\", "/")
 }
 
 function escapeRegExpChar(ch: string): string {

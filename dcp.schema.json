@@ -5,6 +5,7 @@
     "description": "Configuration schema for the OpenCode Dynamic Context Pruning plugin",
     "type": "object",
     "additionalProperties": false,
+    "allowTrailingCommas": true,
     "properties": {
         "$schema": {
             "type": "string",

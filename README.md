@@ -238,7 +238,7 @@ LLM providers cache prompts based on exact prefix matching. When DCP prunes cont
 
 **No impact for:**
 
-- **Request-based billing** — Providers like GitHub Copilot that charge per request, not tokens.
+- **Request-based billing** — Some providers charge per request, not tokens.
 - **Uniform token pricing** — Providers like Cerebras that bill cached and uncached tokens at the same rate.
 
 ## License
