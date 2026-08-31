@@ -12,6 +12,11 @@ export interface Deduplication {
     protectedTools: string[]
 }
 
+export interface CompressionLearningConfig {
+    enabled: boolean
+    notifications: boolean
+}
+
 export interface CompressConfig {
     mode: CompressMode
     permission: Permission
@@ -27,6 +32,7 @@ export interface CompressConfig {
     protectedTools: string[]
     protectTags: boolean
     protectUserMessages: boolean
+    learning: CompressionLearningConfig
 }
 
 export interface Commands {
@@ -126,6 +132,9 @@ export const VALID_CONFIG_KEYS = new Set([
     "compress.protectedTools",
     "compress.protectTags",
     "compress.protectUserMessages",
+    "compress.learning",
+    "compress.learning.enabled",
+    "compress.learning.notifications",
     "strategies",
     "strategies.deduplication",
     "strategies.deduplication.enabled",
@@ -443,6 +452,36 @@ export function validateConfigTypes(config: Record<string, any>): ValidationErro
                 })
             }
 
+            if (compress.learning !== undefined) {
+                if (
+                    typeof compress.learning !== "object" ||
+                    compress.learning === null ||
+                    Array.isArray(compress.learning)
+                ) {
+                    errors.push({
+                        key: "compress.learning",
+                        expected: "object",
+                        actual: typeof compress.learning,
+                    })
+                } else {
+                    if (typeof compress.learning.enabled !== "boolean") {
+                        errors.push({
+                            key: "compress.learning.enabled",
+                            expected: "boolean",
+                            actual: typeof compress.learning.enabled,
+                        })
+                    }
+
+                    if (typeof compress.learning.notifications !== "boolean") {
+                        errors.push({
+                            key: "compress.learning.notifications",
+                            expected: "boolean",
+                            actual: typeof compress.learning.notifications,
+                        })
+                    }
+                }
+            }
+
             if (
                 typeof compress.iterationNudgeThreshold === "number" &&
                 compress.iterationNudgeThreshold < 1
@@ -689,6 +728,10 @@ const defaultConfig: PluginConfig = {
         protectedTools: [...COMPRESS_DEFAULT_PROTECTED_TOOLS],
         protectTags: false,
         protectUserMessages: false,
+        learning: {
+            enabled: false,
+            notifications: true,
+        },
     },
     strategies: {
         deduplication: {
@@ -855,6 +898,10 @@ function mergeCompress(
         protectedTools: [...new Set([...base.protectedTools, ...(override.protectedTools ?? [])])],
         protectTags: override.protectTags ?? base.protectTags,
         protectUserMessages: override.protectUserMessages ?? base.protectUserMessages,
+        learning: {
+            enabled: override.learning?.enabled ?? base.learning.enabled,
+            notifications: override.learning?.notifications ?? base.learning.notifications,
+        },
     }
 }
 
@@ -915,6 +962,7 @@ function deepCloneConfig(config: PluginConfig): PluginConfig {
             modelMaxLimits: { ...config.compress.modelMaxLimits },
             modelMinLimits: { ...config.compress.modelMinLimits },
             protectedTools: [...config.compress.protectedTools],
+            learning: { ...config.compress.learning },
         },
         strategies: {
             deduplication: {
