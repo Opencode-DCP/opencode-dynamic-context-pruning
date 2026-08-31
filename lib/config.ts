@@ -37,6 +37,7 @@ export interface CompressConfig {
     protectedTools: string[]
     protectTags: boolean
     protectUserMessages: boolean
+    recursiveCondense: boolean
 }
 
 export interface Commands {
@@ -136,6 +137,7 @@ export const VALID_CONFIG_KEYS = new Set([
     "compress.protectedTools",
     "compress.protectTags",
     "compress.protectUserMessages",
+    "compress.recursiveCondense",
     "strategies",
     "strategies.deduplication",
     "strategies.deduplication.enabled",
@@ -454,6 +456,17 @@ export function validateConfigTypes(config: Record<string, any>): ValidationErro
             }
 
             if (
+                compress.recursiveCondense !== undefined &&
+                typeof compress.recursiveCondense !== "boolean"
+            ) {
+                errors.push({
+                    key: "compress.recursiveCondense",
+                    expected: "boolean",
+                    actual: typeof compress.recursiveCondense,
+                })
+            }
+
+            if (
                 typeof compress.iterationNudgeThreshold === "number" &&
                 compress.iterationNudgeThreshold < 1
             ) {
@@ -699,6 +712,7 @@ const defaultConfig: PluginConfig = {
         protectedTools: [...COMPRESS_DEFAULT_PROTECTED_TOOLS],
         protectTags: false,
         protectUserMessages: false,
+        recursiveCondense: false,
     },
     strategies: {
         deduplication: {
@@ -865,6 +879,7 @@ function mergeCompress(
         protectedTools: [...new Set([...base.protectedTools, ...(override.protectedTools ?? [])])],
         protectTags: override.protectTags ?? base.protectTags,
         protectUserMessages: override.protectUserMessages ?? base.protectUserMessages,
+        recursiveCondense: override.recursiveCondense ?? base.recursiveCondense,
     }
 }
 

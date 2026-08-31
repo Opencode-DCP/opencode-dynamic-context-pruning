@@ -37,6 +37,16 @@ Rules:
 
 These placeholders are semantic references. They will be replaced with the full stored compressed block content when the tool processes your output.
 
+RECURSIVE CONDENSATION
+When recursive condensation is enabled (compress.recursiveCondense: true), placeholders are NOT expanded with the full stored block content. Instead:
+
+- Each \`(bN)\` placeholder is replaced with a compact \`[condensed block bN]\` reference, and that block becomes a child of this compression.
+- You must therefore write the key content of each referenced block DIRECTLY into your summary text, condensed as needed. Do not rely on the placeholder to preserve details.
+- Protected content from child blocks (protected tool outputs, user messages, and protected prompt information) is preserved automatically by the system; you do not need to copy it.
+- The overall goal is that this parent summary is meaningfully smaller than the sum of its child summaries, while still capturing every decision, constraint, and finding needed for future work.
+
+When recursive condensation is disabled (the default), the rules in FLOW PRESERVATION WITH PLACEHOLDERS below apply and placeholders are expanded to the full stored block content.
+
 FLOW PRESERVATION WITH PLACEHOLDERS
 When you use compressed block placeholders, write the surrounding summary text so it still reads correctly AFTER placeholder expansion.
 

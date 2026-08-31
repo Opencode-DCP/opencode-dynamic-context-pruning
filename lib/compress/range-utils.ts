@@ -12,6 +12,37 @@ import type {
 
 const BLOCK_PLACEHOLDER_REGEX = /\(b(\d+)\)|\{block_(\d+)\}/gi
 
+const CONDENSED_BLOCK_REF_PREFIX = "[condensed block"
+
+const PROTECTED_SECTION_HEADINGS = [
+    "The following user messages were sent in this conversation verbatim:",
+    "The following protected prompt information was included in this conversation verbatim:",
+    "The following protected tools were used in this conversation as well:",
+    "The following previously compressed summaries were also part of this conversation section:",
+]
+
+function extractProtectedSections(summary: string): string {
+    let startIndex = -1
+    for (const heading of PROTECTED_SECTION_HEADINGS) {
+        const index = summary.indexOf(heading)
+        if (index !== -1 && (startIndex === -1 || index < startIndex)) {
+            startIndex = index
+        }
+    }
+
+    if (startIndex === -1) {
+        return ""
+    }
+
+    const protectedText = summary.slice(startIndex)
+    const withoutLeadingBreaks = protectedText.replace(/^(?:\r?\n)+/, "")
+    return withoutLeadingBreaks.replace(/(?:\r?\n)+$/, "")
+}
+
+function formatCondensedBlockRef(blockId: number): string {
+    return `${CONDENSED_BLOCK_REF_PREFIX} b${blockId}]`
+}
+
 export function validateArgs(args: CompressRangeToolArgs): void {
     if (typeof args.topic !== "string" || args.topic.trim().length === 0) {
         throw new Error("topic is required and must be a non-empty string")
@@ -177,11 +208,13 @@ export function injectBlockPlaceholders(
     summaryByBlockId: Map<number, CompressionBlock>,
     startReference: BoundaryReference,
     endReference: BoundaryReference,
+    condense = false,
 ): InjectedSummaryResult {
     let cursor = 0
     let expanded = summary
     const consumed: number[] = []
     const consumedSeen = new Set<number>()
+    const preservedSections: string[] = []
 
     if (placeholders.length > 0) {
         expanded = ""
@@ -192,7 +225,15 @@ export function injectBlockPlaceholders(
             }
 
             expanded += summary.slice(cursor, placeholder.startIndex)
-            expanded += restoreSummary(target.summary)
+            if (condense) {
+                expanded += formatCondensedBlockRef(placeholder.blockId)
+                const protectedSections = extractProtectedSections(restoreSummary(target.summary))
+                if (protectedSections) {
+                    preservedSections.push(protectedSections)
+                }
+            } else {
+                expanded += restoreSummary(target.summary)
+            }
             cursor = placeholder.endIndex
 
             if (!consumedSeen.has(placeholder.blockId)) {
@@ -211,6 +252,8 @@ export function injectBlockPlaceholders(
         summaryByBlockId,
         consumed,
         consumedSeen,
+        condense,
+        preservedSections,
     )
     expanded = injectBoundarySummary(
         expanded,
@@ -219,7 +262,13 @@ export function injectBlockPlaceholders(
         summaryByBlockId,
         consumed,
         consumedSeen,
+        condense,
+        preservedSections,
     )
+
+    if (preservedSections.length > 0) {
+        expanded = `${expanded}\n\n${preservedSections.join("\n\n")}`
+    }
 
     return {
         expandedSummary: expanded,
@@ -233,6 +282,7 @@ export function appendMissingBlockSummaries(
     summaryByBlockId: Map<number, CompressionBlock>,
     consumedBlockIds: number[],
     format: IdFormat = "xml",
+    condense = false,
 ): InjectedSummaryResult {
     const consumedSeen = new Set<number>(consumedBlockIds)
     const consumed = [...consumedBlockIds]
@@ -249,7 +299,18 @@ export function appendMissingBlockSummaries(
         }
 
         const label = format === "compact" ? `compressed block ${blockId}` : `(b${blockId})`
-        missingSummaries.push(`\n### ${label}\n${restoreSummary(target.summary)}`)
+
+        if (condense) {
+            const restored = restoreSummary(target.summary)
+            const protectedSections = extractProtectedSections(restored)
+            if (protectedSections) {
+                missingSummaries.push(`\n### ${label}\n${protectedSections}`)
+            } else {
+                missingSummaries.push(`\n### ${label}\n${formatCondensedBlockRef(blockId)}`)
+            }
+        } else {
+            missingSummaries.push(`\n### ${label}\n${restoreSummary(target.summary)}`)
+        }
         consumedSeen.add(blockId)
         consumed.push(blockId)
     }
@@ -291,6 +352,8 @@ function injectBoundarySummary(
     summaryByBlockId: Map<number, CompressionBlock>,
     consumed: number[],
     consumedSeen: Set<number>,
+    condense = false,
+    preservedSections: string[] = [],
 ): string {
     if (reference.kind !== "compressed-block" || reference.blockId === undefined) {
         return summary
@@ -302,6 +365,20 @@ function injectBoundarySummary(
     const target = summaryByBlockId.get(reference.blockId)
     if (!target) {
         throw new Error(`Compressed block not found: (b${reference.blockId})`)
+    }
+
+    if (condense) {
+        const protectedSections = extractProtectedSections(restoreSummary(target.summary))
+        if (protectedSections) {
+            preservedSections.push(protectedSections)
+        }
+        const injectedBody = formatCondensedBlockRef(reference.blockId)
+        const left = position === "start" ? injectedBody.trim() : summary.trim()
+        const right = position === "start" ? summary.trim() : injectedBody.trim()
+        const next = !left ? right : !right ? left : `${left}\n\n${right}`
+        consumedSeen.add(reference.blockId)
+        consumed.push(reference.blockId)
+        return next
     }
 
     const injectedBody = restoreSummary(target.summary)

@@ -90,6 +90,7 @@ export function createCompressRangeTool(ctx: ToolContext): ReturnType<typeof too
             let totalCompressedMessages = 0
 
             for (const plan of resolvedPlans) {
+                const condense = ctx.config.compress.recursiveCondense === true
                 const parsedPlaceholders = parseBlockPlaceholders(
                     plan.entry.summary,
                     ctx.state.idFormat,
@@ -108,6 +109,7 @@ export function createCompressRangeTool(ctx: ToolContext): ReturnType<typeof too
                     searchContext.summaryByBlockId,
                     plan.selection.startReference,
                     plan.selection.endReference,
+                    condense,
                 )
 
                 const summaryWithUsers = appendProtectedUserMessages(
@@ -143,6 +145,7 @@ export function createCompressRangeTool(ctx: ToolContext): ReturnType<typeof too
                     searchContext.summaryByBlockId,
                     injected.consumedBlockIds,
                     ctx.state.idFormat,
+                    condense,
                 )
 
                 preparedPlans.push({

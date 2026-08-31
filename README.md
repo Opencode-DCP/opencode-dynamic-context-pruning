@@ -42,6 +42,12 @@ DCP supports two compression modes:
 
 In `range` mode, when a new compression overlaps an earlier one, the earlier summary is nested inside the new one so information is preserved through layers of compression rather than diluted away. In both modes, protected tool outputs (such as subagents and skills) and protected file patterns are kept in compression summaries, ensuring that the most important information is never lost. You can also enable `protectUserMessages` to preserve your messages verbatim during compression, though note that large prompts (e.g. copy-pasting log files in the prompt) will then never be compressed away.
 
+### Recursive Condensation
+
+By default, nesting a previously compressed block (`bN`) into a new compression expands the child block's full summary into the parent. This preserves information perfectly, but the parent is never smaller than the sum of its children, so deeply nested compressions grow rather than shrink.
+
+Enable `compress.recursiveCondense` to change this behavior. When active, the model condenses each referenced block's content directly into its own summary text, and `(bN)` placeholders become compact `[condensed block bN]` references instead of full expansions. Each merge layer is then meaningfully smaller than the sum of its children. Protected content (protected tool outputs, user messages, and protected prompt information) from child blocks is still preserved automatically.
+
 ### Deduplication
 
 Identifies repeated tool calls (same tool, same arguments) and keeps only the most recent output. Recalculated when the compress tool runs, so prompt cache is only impacted alongside compression.
@@ -159,6 +165,10 @@ Each level overrides the previous, so project settings take priority over global
         // Preserve your messages during compression.
         // Warning: large copy-pasted prompts will never be compressed away
         "protectUserMessages": false,
+        // When merging an already-compressed block, condense its content
+        // instead of expanding its full summary into the parent. Keeps each
+        // compression layer smaller than the sum of its children.
+        "recursiveCondense": false,
     },
     // Automatic pruning strategies
     "strategies": {
