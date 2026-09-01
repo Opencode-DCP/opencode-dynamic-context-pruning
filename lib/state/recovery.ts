@@ -46,7 +46,7 @@ import {
     wrapCompressedSummary,
 } from "../compress/state"
 import { saveSessionState } from "./persistence"
-import type { SessionState, WithParts } from "./types"
+import type { ProtectedContent, SessionState, WithParts } from "./types"
 import type {
     CompressMessageToolArgs,
     CompressRangeToolArgs,
@@ -124,6 +124,7 @@ interface PreparedRangePlan {
     anchorMessageId: string
     finalSummary: string
     consumedBlockIds: number[]
+    protectedContent: ProtectedContent[]
 }
 
 async function prepareRangePlans(
@@ -157,7 +158,7 @@ async function prepareRangePlans(
             condense,
         )
 
-        const summaryWithUsers = appendProtectedUserMessages(
+        const users = appendProtectedUserMessages(
             injected.expandedSummary,
             plan.selection,
             searchContext,
@@ -165,19 +166,19 @@ async function prepareRangePlans(
             config.compress.protectUserMessages,
         )
 
-        const summaryWithPromptInfo = appendProtectedPromptInfo(
-            summaryWithUsers,
+        const promptInfo = appendProtectedPromptInfo(
+            users.summaryText,
             plan.selection,
             searchContext,
             state,
             config.compress.protectTags,
         )
 
-        const summaryWithTools = await appendProtectedTools(
+        const tools = await appendProtectedTools(
             client,
             state,
             config.experimental.allowSubAgents,
-            summaryWithPromptInfo,
+            promptInfo.summaryText,
             plan.selection,
             searchContext,
             config.compress.protectedTools,
@@ -185,7 +186,7 @@ async function prepareRangePlans(
         )
 
         const completedSummary = appendMissingBlockSummaries(
-            summaryWithTools,
+            tools.summaryText,
             missingBlockIds,
             searchContext.summaryByBlockId,
             injected.consumedBlockIds,
@@ -198,6 +199,11 @@ async function prepareRangePlans(
             anchorMessageId: plan.anchorMessageId,
             finalSummary: completedSummary.expandedSummary,
             consumedBlockIds: completedSummary.consumedBlockIds,
+            protectedContent: [
+                ...users.protectedContent,
+                ...promptInfo.protectedContent,
+                ...tools.protectedContent,
+            ],
         })
     }
 
@@ -240,6 +246,7 @@ async function replayRangeCall(
             blockId,
             storedSummary,
             plan.consumedBlockIds,
+            plan.protectedContent,
         )
         created++
     }
@@ -272,7 +279,7 @@ async function replayMessageCall(
             client,
             state,
             config.experimental.allowSubAgents,
-            summaryWithPromptInfo,
+            summaryWithPromptInfo.summaryText,
             plan.selection,
             searchContext,
             config.compress.protectedTools,
@@ -280,7 +287,7 @@ async function replayMessageCall(
         )
 
         const blockId = allocateBlockId(state)
-        const storedSummary = wrapCompressedSummary(blockId, summaryWithTools)
+        const storedSummary = wrapCompressedSummary(blockId, summaryWithTools.summaryText)
         const summaryTokens = countTokens(storedSummary)
 
         applyCompressionState(
@@ -301,6 +308,7 @@ async function replayMessageCall(
             blockId,
             storedSummary,
             [],
+            summaryWithTools.protectedContent,
         )
         created++
     }

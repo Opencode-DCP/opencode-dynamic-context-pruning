@@ -27,6 +27,7 @@ import {
     wrapCompressedSummary,
 } from "./state"
 import type { CompressRangeToolArgs } from "./types"
+import type { ProtectedContent } from "../state"
 
 function buildSchema(format: IdFormat) {
     return {
@@ -87,6 +88,7 @@ export function createCompressRangeTool(ctx: ToolContext): ReturnType<typeof too
                 anchorMessageId: string
                 finalSummary: string
                 consumedBlockIds: number[]
+                protectedContent: ProtectedContent[]
             }> = []
             let totalCompressedMessages = 0
 
@@ -113,7 +115,7 @@ export function createCompressRangeTool(ctx: ToolContext): ReturnType<typeof too
                     condense,
                 )
 
-                const summaryWithUsers = appendProtectedUserMessages(
+                const users = appendProtectedUserMessages(
                     injected.expandedSummary,
                     plan.selection,
                     searchContext,
@@ -121,19 +123,19 @@ export function createCompressRangeTool(ctx: ToolContext): ReturnType<typeof too
                     ctx.config.compress.protectUserMessages,
                 )
 
-                const summaryWithPromptInfo = appendProtectedPromptInfo(
-                    summaryWithUsers,
+                const promptInfo = appendProtectedPromptInfo(
+                    users.summaryText,
                     plan.selection,
                     searchContext,
                     ctx.state,
                     ctx.config.compress.protectTags,
                 )
 
-                const summaryWithTools = await appendProtectedTools(
+                const tools = await appendProtectedTools(
                     ctx.client,
                     ctx.state,
                     ctx.config.experimental.allowSubAgents,
-                    summaryWithPromptInfo,
+                    promptInfo.summaryText,
                     plan.selection,
                     searchContext,
                     ctx.config.compress.protectedTools,
@@ -141,13 +143,19 @@ export function createCompressRangeTool(ctx: ToolContext): ReturnType<typeof too
                 )
 
                 const completedSummary = appendMissingBlockSummaries(
-                    summaryWithTools,
+                    tools.summaryText,
                     missingBlockIds,
                     searchContext.summaryByBlockId,
                     injected.consumedBlockIds,
                     ctx.state.idFormat,
                     condense,
                 )
+
+                const protectedContent = [
+                    ...users.protectedContent,
+                    ...promptInfo.protectedContent,
+                    ...tools.protectedContent,
+                ]
 
                 if (ctx.config.compress.enforceSummaryShrink) {
                     let compressedTokens = 0
@@ -176,6 +184,7 @@ export function createCompressRangeTool(ctx: ToolContext): ReturnType<typeof too
                     anchorMessageId: plan.anchorMessageId,
                     finalSummary: completedSummary.expandedSummary,
                     consumedBlockIds: completedSummary.consumedBlockIds,
+                    protectedContent,
                 })
             }
 
@@ -208,6 +217,7 @@ export function createCompressRangeTool(ctx: ToolContext): ReturnType<typeof too
                     blockId,
                     storedSummary,
                     preparedPlan.consumedBlockIds,
+                    preparedPlan.protectedContent,
                 )
 
                 totalCompressedMessages += applied.messageIds.length
