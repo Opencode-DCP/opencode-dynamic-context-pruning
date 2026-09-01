@@ -375,11 +375,12 @@ export function createEventHandler(state: SessionState, logger: Logger) {
             })
             return
         }
-
         if (part.state.status === "completed") {
             if (typeof part.callID !== "string" || typeof part.messageID !== "string") {
                 return
             }
+
+            state.lastDcpCompression = Date.now()
 
             const key = buildCompressionTimingKey(part.messageID, part.callID)
             const start = consumeCompressionStart(state, part.messageID, part.callID)

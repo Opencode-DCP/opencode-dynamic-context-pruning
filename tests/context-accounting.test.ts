@@ -204,6 +204,9 @@ test("buildContextSnapshot computes thresholds and over-limit flags", () => {
     assert.equal(snapshot.overMaxLimit, true)
     assert.equal(snapshot.overMinLimit, true)
     assert.equal(snapshot.justCompressed, false)
+    assert.equal(snapshot.lastDcpCompression, 0)
+    assert.equal(snapshot.reportedStale, false)
+    assert.equal(snapshot.estimatedTransformedTokens, snapshot.rawEstimatedTokens)
 })
 
 test("formatContextSnapshot renders a human readable block", () => {

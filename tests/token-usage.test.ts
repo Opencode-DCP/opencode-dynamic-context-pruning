@@ -5,7 +5,10 @@ import { isContextOverLimits } from "../lib/messages/inject/utils"
 import { wrapCompressedSummary } from "../lib/compress/state"
 import { createSessionState, type WithParts } from "../lib/state"
 import type { CompressionBlock } from "../lib/state"
-import { getCurrentTokenUsage } from "../lib/token-utils"
+import {
+    getCurrentTokenUsage,
+    isReportedTokensStaleAfterDcpCompression,
+} from "../lib/token-utils"
 
 function buildConfig(maxContextLimit: number, minContextLimit = 1): PluginConfig {
     return {
@@ -297,4 +300,139 @@ test("isContextOverLimits does not extend the max threshold when summaryBuffer i
     const overLimit = isContextOverLimits(config, state, undefined, undefined, messages)
 
     assert.equal(overLimit.overMaxLimit, true)
+})
+
+function buildPostDcpCompressionMessages(): WithParts[] {
+    const sessionID = "ses_dcp_cooldown"
+    return [
+        {
+            info: {
+                id: "msg-user-a",
+                role: "user",
+                sessionID,
+                agent: "assistant",
+                model: { providerID: "anthropic", modelID: "claude-test" },
+                time: { created: 1 },
+            } as WithParts["info"],
+            parts: [textPart("msg-user-a", sessionID, "pa1", repeatedWord("large", 500))],
+        },
+        {
+            info: {
+                id: "msg-asst-pre-compress",
+                role: "assistant",
+                sessionID,
+                agent: "assistant",
+                time: { created: 2 },
+                tokens: {
+                    input: 50000,
+                    output: 800,
+                    reasoning: 200,
+                    cache: { read: 3000, write: 0 },
+                },
+            } as WithParts["info"],
+            parts: [
+                textPart("msg-asst-pre-compress", sessionID, "pa2", repeatedWord("done", 100)),
+            ],
+        },
+        {
+            info: {
+                id: "msg-user-after",
+                role: "user",
+                sessionID,
+                agent: "assistant",
+                model: { providerID: "anthropic", modelID: "claude-test" },
+                time: { created: 5 },
+            } as WithParts["info"],
+            parts: [textPart("msg-user-after", sessionID, "pa3", "continue")],
+        },
+    ]
+}
+
+test("isReportedTokensStaleAfterDcpCompression flags totals older than the last DCP compression", () => {
+    const messages = buildPostDcpCompressionMessages()
+    const state = createSessionState()
+
+    // No DCP compression yet: not stale.
+    assert.equal(isReportedTokensStaleAfterDcpCompression(state, messages), false)
+
+    // DCP compressed after the last reported assistant message: stale.
+    state.lastDcpCompression = 3
+    assert.equal(isReportedTokensStaleAfterDcpCompression(state, messages), true)
+
+    // A fresh assistant message after the compression: not stale.
+    messages.push({
+        info: {
+            id: "msg-asst-fresh",
+            role: "assistant",
+            sessionID: "ses_dcp_cooldown",
+            agent: "assistant",
+            time: { created: 6 },
+            tokens: {
+                input: 2000,
+                output: 300,
+                reasoning: 0,
+                cache: { read: 500, write: 0 },
+            },
+        } as WithParts["info"],
+        parts: [],
+    })
+    assert.equal(isReportedTokensStaleAfterDcpCompression(state, messages), false)
+})
+
+test("isContextOverLimits suppresses emergency max nudge from stale post-DCP totals", () => {
+    const messages = buildPostDcpCompressionMessages()
+    const state = createSessionState()
+    state.lastDcpCompression = 3
+
+    // The stale reported total (54K) exceeds the max limit, but the local
+    // estimate of the pruned view does not.
+    const staleTotal = 50000 + 800 + 200 + 3000
+    const result = isContextOverLimits(
+        buildConfig(staleTotal - 1, 1),
+        state,
+        undefined,
+        undefined,
+        messages,
+    )
+
+    assert.equal(result.reportedStale, true)
+    assert.equal(result.overMaxLimit, false)
+    assert.equal(result.currentTokens, staleTotal)
+    assert.ok(result.estimatedTransformedTokens < staleTotal)
+})
+
+test("isContextOverLimits keeps emergency nudge when the estimated transformed view is also over", () => {
+    const messages = buildPostDcpCompressionMessages()
+    const state = createSessionState()
+    state.lastDcpCompression = 3
+
+    const staleTotal = 50000 + 800 + 200 + 3000
+    // max limit below both the stale total AND the estimated transformed view.
+    const result = isContextOverLimits(
+        buildConfig(100, 1),
+        state,
+        undefined,
+        undefined,
+        messages,
+    )
+
+    assert.equal(result.reportedStale, true)
+    assert.equal(result.overMaxLimit, true)
+})
+
+test("isContextOverLimits uses reported totals when no DCP compression happened", () => {
+    const messages = buildPostDcpCompressionMessages()
+    const state = createSessionState()
+
+    const staleTotal = 50000 + 800 + 200 + 3000
+    const result = isContextOverLimits(
+        buildConfig(staleTotal - 1, 1),
+        state,
+        undefined,
+        undefined,
+        messages,
+    )
+
+    assert.equal(result.reportedStale, false)
+    assert.equal(result.overMaxLimit, true)
 })

@@ -86,6 +86,10 @@ export async function finalizeSession(
     entries: NotificationEntry[],
     batchTopic: string | undefined,
 ): Promise<void> {
+    if (entries.length > 0) {
+        ctx.state.lastDcpCompression = Date.now()
+    }
+
     if (ctx.state.manualMode === "compress-pending") {
         ctx.state.manualMode = false
         await refreshManualMode(

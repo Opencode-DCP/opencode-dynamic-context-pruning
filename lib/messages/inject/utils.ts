@@ -19,8 +19,12 @@ import {
     hasContent,
 } from "../utils"
 import { getLastUserMessage, isIgnoredUserMessage } from "../query"
-import { getCurrentTokenUsage } from "../../token-utils"
-import { getActiveSummaryTokenUsage } from "../../state/utils"
+import {
+    countAllMessageTokens,
+    getCurrentTokenUsage,
+    isReportedTokensStaleAfterDcpCompression,
+} from "../../token-utils"
+import { getActiveSummaryTokenUsage, isMessageCompacted } from "../../state/utils"
 
 const MESSAGE_MODE_NUDGE_PRIORITY: MessagePriority = "high"
 
@@ -129,13 +133,45 @@ export function resolveContextTokenLimit(
     return parseLimitValue(globalLimit)
 }
 
+export interface ContextLimitsResult {
+    overMaxLimit: boolean
+    overMinLimit: boolean
+    currentTokens: number
+    estimatedTransformedTokens: number
+    reportedStale: boolean
+    maxContextLimit: number | undefined
+    minContextLimit: number | undefined
+    summaryTokenExtension: number
+}
+
+/**
+ * Estimate the token cost of the transformed view DCP will actually send:
+ * messages not covered by an active block (their full content) plus the
+ * injected active summaries. This is the local, explainable counterpart to the
+ * provider-reported total.
+ */
+export function estimateTransformedTokens(
+    state: SessionState,
+    messages: WithParts[],
+): number {
+    let total = 0
+    for (const message of messages) {
+        if (isMessageCompacted(state, message)) {
+            continue
+        }
+        total += countAllMessageTokens(message)
+    }
+    total += getActiveSummaryTokenUsage(state)
+    return total
+}
+
 export function isContextOverLimits(
     config: PluginConfig,
     state: SessionState,
     providerId: string | undefined,
     modelId: string | undefined,
     messages: WithParts[],
-) {
+): ContextLimitsResult {
     const summaryTokenExtension = config.compress.summaryBuffer
         ? getActiveSummaryTokenUsage(state)
         : 0
@@ -152,13 +188,29 @@ export function isContextOverLimits(
             : resolvedMaxContextLimit + summaryTokenExtension
     const minContextLimit = resolveContextTokenLimit(config, state, providerId, modelId, "min")
     const currentTokens = getCurrentTokenUsage(state, messages)
+    const estimatedTransformedTokens = estimateTransformedTokens(state, messages)
+    const reportedStale = isReportedTokensStaleAfterDcpCompression(state, messages)
 
-    const overMaxLimit = maxContextLimit === undefined ? false : currentTokens > maxContextLimit
-    const overMinLimit = minContextLimit === undefined ? true : currentTokens >= minContextLimit
+    // After a DCP compression the provider-reported total still describes the
+    // pre-compression request. Do not re-trigger the emergency max nudge from
+    // that stale number alone; only keep it if the local estimate of the
+    // pruned view is itself over the limit.
+    const effectiveMaxTokens = reportedStale ? estimatedTransformedTokens : currentTokens
+
+    const overMaxLimit =
+        maxContextLimit === undefined ? false : effectiveMaxTokens > maxContextLimit
+    const overMinLimit =
+        minContextLimit === undefined ? true : currentTokens >= minContextLimit
 
     return {
         overMaxLimit,
         overMinLimit,
+        currentTokens,
+        estimatedTransformedTokens,
+        reportedStale,
+        maxContextLimit,
+        minContextLimit,
+        summaryTokenExtension,
     }
 }
 

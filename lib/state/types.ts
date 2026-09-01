@@ -117,6 +117,7 @@ export interface SessionState {
     toolIdList: string[]
     messageIds: MessageIdState
     lastCompaction: number
+    lastDcpCompression: number
     currentTurn: number
     modelContextLimit: number | undefined
     systemPromptTokens: number | undefined

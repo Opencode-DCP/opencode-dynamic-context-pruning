@@ -103,6 +103,7 @@ export function createSessionState(idFormat: IdFormat = "xml"): SessionState {
         },
         lastCompaction: 0,
         currentTurn: 0,
+        lastDcpCompression: 0,
         modelContextLimit: undefined,
         systemPromptTokens: undefined,
     }
@@ -137,6 +138,7 @@ export function resetSessionState(state: SessionState): void {
     }
     state.lastCompaction = 0
     state.currentTurn = 0
+    state.lastDcpCompression = 0
     state.modelContextLimit = undefined
     state.systemPromptTokens = undefined
 }
@@ -194,6 +196,12 @@ export async function ensureSessionInitialized(
     state.stats = {
         pruneTokenCounter: persisted.stats?.pruneTokenCounter || 0,
         totalPruneTokens: persisted.stats?.totalPruneTokens || 0,
+    }
+    if (typeof persisted.lastCompaction === "number" && persisted.lastCompaction > 0) {
+        state.lastCompaction = persisted.lastCompaction
+    }
+    if (typeof persisted.lastDcpCompression === "number" && persisted.lastDcpCompression > 0) {
+        state.lastDcpCompression = persisted.lastDcpCompression
     }
 
     if (config) {

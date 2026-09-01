@@ -19,7 +19,10 @@ import type { PluginConfig } from "../config"
 import type { SessionState, WithParts } from "../state"
 import { countAllMessageTokens, countTokens, extractCompletedToolOutput } from "../token-utils"
 import { getActiveSummaryTokenUsage, isMessageCompacted } from "../state/utils"
-import { resolveContextTokenLimit } from "../messages/inject/utils"
+import {
+    estimateTransformedTokens,
+    resolveContextTokenLimit,
+} from "../messages/inject/utils"
 import type { AssistantMessage } from "@opencode-ai/sdk/v2"
 
 export interface ReportedTokenReport {
@@ -68,6 +71,9 @@ export interface ContextAccountingSnapshot {
     overMaxLimit: boolean
     overMinLimit: boolean
     justCompressed: boolean
+    lastDcpCompression: number
+    reportedStale: boolean
+    estimatedTransformedTokens: number
 }
 
 export function getReportedTokens(messages: WithParts[]): ReportedTokenReport {
@@ -172,7 +178,22 @@ export function buildContextSnapshot(
     const minLimit = resolveContextTokenLimit(config, state, providerId, modelId, "min")
     const reported = getReportedTokens(messages)
     const currentTokens = reported.total
-    const overMaxLimit = effectiveMax === undefined ? false : currentTokens > effectiveMax
+    const estimatedTransformedTokens = estimateTransformedTokens(state, messages)
+    const reportedStale =
+        state.lastDcpCompression > 0 &&
+        (() => {
+            for (let i = messages.length - 1; i >= 0; i--) {
+                const msg = messages[i]
+                if (msg.info.role !== "assistant") continue
+                const info = msg.info as AssistantMessage
+                if ((info.tokens?.output || 0) > 0) {
+                    return msg.info.time.created < state.lastDcpCompression
+                }
+            }
+            return false
+        })()
+    const effectiveMaxTokens = reportedStale ? estimatedTransformedTokens : currentTokens
+    const overMaxLimit = effectiveMax === undefined ? false : effectiveMaxTokens > effectiveMax
     const overMinLimit = minLimit === undefined ? true : currentTokens >= minLimit
 
     let justCompressed = false
@@ -211,6 +232,9 @@ export function buildContextSnapshot(
         overMaxLimit,
         overMinLimit,
         justCompressed,
+        lastDcpCompression: state.lastDcpCompression,
+        reportedStale,
+        estimatedTransformedTokens,
     }
 }
 
@@ -227,6 +251,9 @@ export function formatContextSnapshot(snapshot: ContextAccountingSnapshot): stri
     )
     lines.push(
         `  Transformed:        ${snapshot.transformedMessageCount} (~${snapshot.transformedEstimatedTokens.toLocaleString()} tok)`,
+    )
+    lines.push(
+        `  Estimated sent:     ~${snapshot.estimatedTransformedTokens.toLocaleString()} tok`,
     )
     lines.push(
         `  Blocks:             ${snapshot.activeBlockCount} active / ${snapshot.totalBlockCount} total`,
@@ -247,5 +274,11 @@ export function formatContextSnapshot(snapshot: ContextAccountingSnapshot): stri
     lines.push(`  Over max limit:     ${snapshot.overMaxLimit}`)
     lines.push(`  Over min limit:     ${snapshot.overMinLimit}`)
     lines.push(`  Just compressed:    ${snapshot.justCompressed}`)
+    lines.push(`  Reported stale:     ${snapshot.reportedStale}`)
+    if (snapshot.lastDcpCompression > 0) {
+        lines.push(
+            `  Last DCP compress:  ${new Date(snapshot.lastDcpCompression).toISOString()}`,
+        )
+    }
     return lines.join("\n")
 }
