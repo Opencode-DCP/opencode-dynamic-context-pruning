@@ -1,5 +1,6 @@
 import type { SessionState, ToolParameterEntry, WithParts } from "./types"
 import type { Logger } from "../logger"
+import type { PluginConfig } from "../config"
 import { applyPendingCompressionDurations } from "../compress/timing"
 import { loadManualModeSetting, loadSessionState, saveSessionState } from "./persistence"
 import {
@@ -12,6 +13,7 @@ import {
     loadPruneMap,
     collectTurnNudgeAnchors,
 } from "./utils"
+import { replayCompletedCompressions } from "./recovery"
 import { getLastUserMessage } from "../messages/query"
 import type { IdFormat } from "../message-ids"
 
@@ -21,6 +23,7 @@ export const checkSession = async (
     logger: Logger,
     messages: WithParts[],
     manualModeDefault: boolean,
+    config?: PluginConfig,
 ): Promise<void> => {
     const lastUserMessage = getLastUserMessage(messages)
     if (!lastUserMessage) {
@@ -39,6 +42,7 @@ export const checkSession = async (
                 logger,
                 messages,
                 manualModeDefault,
+                config,
             )
         } catch (err: any) {
             logger.error("Failed to initialize session state", { error: err.message })
@@ -144,6 +148,7 @@ export async function ensureSessionInitialized(
     logger: Logger,
     messages: WithParts[],
     manualModeEnabled: boolean,
+    config?: PluginConfig,
 ): Promise<void> {
     if (state.sessionId === sessionId) {
         return
@@ -166,6 +171,9 @@ export async function ensureSessionInitialized(
 
     const persisted = await loadSessionState(sessionId, logger)
     if (persisted === null) {
+        if (config) {
+            await replayCompletedCompressions(client, state, logger, config, messages)
+        }
         return
     }
 
@@ -186,6 +194,10 @@ export async function ensureSessionInitialized(
     state.stats = {
         pruneTokenCounter: persisted.stats?.pruneTokenCounter || 0,
         totalPruneTokens: persisted.stats?.totalPruneTokens || 0,
+    }
+
+    if (config) {
+        await replayCompletedCompressions(client, state, logger, config, messages)
     }
 
     const applied = applyPendingCompressionDurations(state)

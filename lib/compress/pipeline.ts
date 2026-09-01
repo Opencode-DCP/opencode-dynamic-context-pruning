@@ -65,6 +65,7 @@ export async function prepareSession(
         ctx.logger,
         rawMessages,
         ctx.config.manualMode.enabled,
+        ctx.config,
     )
 
     assignMessageRefs(ctx.state, rawMessages)
