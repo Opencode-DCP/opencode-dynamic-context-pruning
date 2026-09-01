@@ -726,7 +726,7 @@ const defaultConfig: PluginConfig = {
         protectTags: false,
         protectUserMessages: false,
         recursiveCondense: false,
-        enforceSummaryShrink: true,
+        enforceSummaryShrink: false,
     },
     strategies: {
         deduplication: {

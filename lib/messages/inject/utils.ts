@@ -84,7 +84,7 @@ export function getModelInfo(messages: WithParts[]): LastUserModelContext {
     }
 }
 
-function resolveContextTokenLimit(
+export function resolveContextTokenLimit(
     config: PluginConfig,
     state: SessionState,
     providerId: string | undefined,

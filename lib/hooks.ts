@@ -38,6 +38,15 @@ import { type HostPermissionSnapshot } from "./host-permissions"
 import { compressPermission, syncCompressPermissionState } from "./compress-permission"
 import { checkSession, ensureSessionInitialized, saveSessionState, syncToolCache } from "./state"
 import { cacheSystemPromptTokens } from "./ui/utils"
+import {
+    buildContextSnapshot,
+    collectUncoveredToolOutputs,
+    computeCoverage,
+    estimateMessageSetStats,
+    formatContextSnapshot,
+    getReportedTokens,
+} from "./context/accounting"
+import { getModelInfo } from "./messages/inject/utils"
 
 const INTERNAL_AGENT_SIGNATURES = [
     "You are a title generator",
@@ -136,6 +145,11 @@ export function createChatMessageTransformHandler(
         syncCompressionBlocks(state, logger, output.messages)
         syncToolCache(state, config, logger, output.messages)
         buildToolIdList(state, output.messages)
+
+        const rawStats = estimateMessageSetStats(output.messages)
+        const coverage = computeCoverage(state, output.messages)
+        const uncoveredTools = collectUncoveredToolOutputs(state, output.messages)
+
         prune(state, logger, config, output.messages)
         await injectExtendedSubAgentResults(
             client,
@@ -157,6 +171,31 @@ export function createChatMessageTransformHandler(
         injectMessageIds(state, config, output.messages, compressionPriorities)
         applyPendingManualTrigger(state, output.messages, logger)
         stripStaleMetadata(output.messages)
+
+        const transformedStats = estimateMessageSetStats(output.messages)
+        const { providerId, modelId } = getModelInfo(output.messages)
+        state.lastContextSnapshot = buildContextSnapshot(
+            state,
+            config,
+            providerId,
+            modelId,
+            rawStats,
+            transformedStats,
+            coverage,
+            uncoveredTools,
+            output.messages,
+        )
+        logger.debug("Context accounting snapshot", {
+            rawMessages: state.lastContextSnapshot.rawMessageCount,
+            rawTokens: state.lastContextSnapshot.rawEstimatedTokens,
+            transformedMessages: state.lastContextSnapshot.transformedMessageCount,
+            transformedTokens: state.lastContextSnapshot.transformedEstimatedTokens,
+            activeBlocks: state.lastContextSnapshot.activeBlockCount,
+            uncoveredTokens: state.lastContextSnapshot.uncoveredMessageTokens,
+            reportedTotal: state.lastContextSnapshot.reported.total,
+            overMax: state.lastContextSnapshot.overMaxLimit,
+            overMin: state.lastContextSnapshot.overMinLimit,
+        })
 
         if (state.sessionId) {
             await logger.saveContext(state.sessionId, output.messages)

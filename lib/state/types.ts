@@ -1,4 +1,5 @@
 import type { CompressionTimingState } from "../compress/timing"
+import type { ContextAccountingSnapshot } from "../context/accounting"
 import type { IdFormat } from "../message-ids"
 import { Message, Part } from "@opencode-ai/sdk/v2"
 
@@ -111,4 +112,5 @@ export interface SessionState {
     currentTurn: number
     modelContextLimit: number | undefined
     systemPromptTokens: number | undefined
+    lastContextSnapshot?: import("../context/accounting").ContextAccountingSnapshot
 }
