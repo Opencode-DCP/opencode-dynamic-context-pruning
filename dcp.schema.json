@@ -28,13 +28,20 @@
         },
         "pruneNotification": {
             "type": "string",
-            "enum": ["off", "minimal", "detailed"],
+            "enum": [
+                "off",
+                "minimal",
+                "detailed"
+            ],
             "default": "detailed",
             "description": "Level of notification shown when context management occurs"
         },
         "pruneNotificationType": {
             "type": "string",
-            "enum": ["chat", "toast"],
+            "enum": [
+                "chat",
+                "toast"
+            ],
             "default": "chat",
             "description": "Where to display notifications (chat message or toast notification)"
         },
@@ -136,13 +143,20 @@
             "properties": {
                 "mode": {
                     "type": "string",
-                    "enum": ["range", "message"],
+                    "enum": [
+                        "range",
+                        "message"
+                    ],
                     "default": "range",
                     "description": "Compression mode. 'range' compresses spans into block summaries, 'message' compresses individual raw messages."
                 },
                 "permission": {
                     "type": "string",
-                    "enum": ["ask", "allow", "deny"],
+                    "enum": [
+                        "ask",
+                        "allow",
+                        "deny"
+                    ],
                     "default": "allow",
                     "description": "Permission mode (deny disables the tool)"
                 },
@@ -226,9 +240,18 @@
                 },
                 "nudgeForce": {
                     "type": "string",
-                    "enum": ["strong", "soft"],
+                    "enum": [
+                        "strong",
+                        "soft"
+                    ],
                     "default": "soft",
                     "description": "Controls how likely compression is after user messages. 'strong' is more likely, 'soft' is less likely."
+                },
+                "pollCooldown": {
+                    "type": "number",
+                    "default": 3,
+                    "minimum": 0,
+                    "description": "Number of consecutive tool-only assistant turns (no new user message) after which the emergency max-context nudge is suppressed. 0 disables the cooldown."
                 },
                 "protectedTools": {
                     "type": "array",

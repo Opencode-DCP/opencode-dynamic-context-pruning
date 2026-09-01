@@ -1,7 +1,7 @@
 import assert from "node:assert/strict"
 import test from "node:test"
 import type { PluginConfig } from "../lib/config"
-import { isContextOverLimits } from "../lib/messages/inject/utils"
+import { isContextOverLimits, isPollOnlyTurn } from "../lib/messages/inject/utils"
 import { wrapCompressedSummary } from "../lib/compress/state"
 import { createSessionState, type WithParts } from "../lib/state"
 import type { CompressionBlock } from "../lib/state"
@@ -43,6 +43,7 @@ function buildConfig(maxContextLimit: number, minContextLimit = 1): PluginConfig
             nudgeFrequency: 5,
             iterationNudgeThreshold: 15,
             nudgeForce: "soft",
+            pollCooldown: 3,
             protectedTools: ["task"],
             protectTags: false,
             protectUserMessages: false,
@@ -435,4 +436,136 @@ test("isContextOverLimits uses reported totals when no DCP compression happened"
 
     assert.equal(result.reportedStale, false)
     assert.equal(result.overMaxLimit, true)
+})
+
+function buildPollTurnMessages(): WithParts[] {
+    const sessionID = "ses_poll"
+    return [
+        {
+            info: {
+                id: "msg-user-1",
+                role: "user",
+                sessionID,
+                agent: "assistant",
+                model: { providerID: "anthropic", modelID: "claude-test" },
+                time: { created: 1 },
+            } as WithParts["info"],
+            parts: [textPart("msg-user-1", sessionID, "pp1", "start the server")],
+        },
+        {
+            info: {
+                id: "msg-asst-poll-1",
+                role: "assistant",
+                sessionID,
+                agent: "assistant",
+                time: { created: 2 },
+            } as WithParts["info"],
+            parts: [
+                textPart("msg-asst-poll-1", sessionID, "pp2", "checking status"),
+                {
+                    id: "pp2-tool",
+                    messageID: "msg-asst-poll-1",
+                    sessionID,
+                    type: "tool" as const,
+                    tool: "bash",
+                    callID: "call-poll-1",
+                    state: {
+                        status: "completed" as const,
+                        input: { command: "check" },
+                        output: "NOT_DONE",
+                    },
+                },
+            ],
+        },
+        {
+            info: {
+                id: "msg-asst-poll-2",
+                role: "assistant",
+                sessionID,
+                agent: "assistant",
+                time: { created: 3 },
+            } as WithParts["info"],
+            parts: [
+                textPart("msg-asst-poll-2", sessionID, "pp3", "checking status again"),
+                {
+                    id: "pp3-tool",
+                    messageID: "msg-asst-poll-2",
+                    sessionID,
+                    type: "tool" as const,
+                    tool: "bash",
+                    callID: "call-poll-2",
+                    state: {
+                        status: "completed" as const,
+                        input: { command: "check" },
+                        output: "NOT_DONE",
+                    },
+                },
+            ],
+        },
+        {
+            info: {
+                id: "msg-asst-poll-3",
+                role: "assistant",
+                sessionID,
+                agent: "assistant",
+                time: { created: 4 },
+            } as WithParts["info"],
+            parts: [
+                textPart("msg-asst-poll-3", sessionID, "pp4", "checking status once more"),
+                {
+                    id: "pp4-tool",
+                    messageID: "msg-asst-poll-3",
+                    sessionID,
+                    type: "tool" as const,
+                    tool: "bash",
+                    callID: "call-poll-3",
+                    state: {
+                        status: "completed" as const,
+                        input: { command: "check" },
+                        output: "NOT_DONE",
+                    },
+                },
+            ],
+        },
+    ]
+}
+
+test("isPollOnlyTurn detects repeated tool-only assistant turns without user input", () => {
+    const messages = buildPollTurnMessages()
+    const state = createSessionState()
+
+    assert.equal(isPollOnlyTurn(state, messages, 3), true)
+    assert.equal(isPollOnlyTurn(state, messages, 4), false)
+})
+
+test("isPollOnlyTurn returns false when a fresh user message resets the loop", () => {
+    const messages = buildPollTurnMessages()
+    messages.push({
+        info: {
+            id: "msg-user-2",
+            role: "user",
+            sessionID: "ses_poll",
+            agent: "assistant",
+            model: { providerID: "anthropic", modelID: "claude-test" },
+            time: { created: 5 },
+        } as WithParts["info"],
+        parts: [textPart("msg-user-2", "ses_poll", "pp5", "it is still not done?")],
+    })
+
+    const state = createSessionState()
+    assert.equal(isPollOnlyTurn(state, messages, 3), false)
+})
+
+test("isPollOnlyTurn returns false for assistant turns without tool calls", () => {
+    const messages = buildPollTurnMessages()
+    const state = createSessionState()
+
+    // Strip the tool parts -> assistant turns are plain text, not polling.
+    for (const msg of messages) {
+        if (msg.info.role === "assistant") {
+            msg.parts = msg.parts.filter((part) => part.type !== "tool")
+        }
+    }
+
+    assert.equal(isPollOnlyTurn(state, messages, 3), false)
 })

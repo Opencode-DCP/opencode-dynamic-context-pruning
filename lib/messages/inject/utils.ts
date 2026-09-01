@@ -36,9 +36,7 @@ export interface LastUserModelContext {
 export interface LastNonIgnoredMessage {
     message: WithParts
     index: number
-}
-
-export function getNudgeFrequency(config: PluginConfig): number {
+}export function getNudgeFrequency(config: PluginConfig): number {
     return Math.max(1, Math.floor(config.compress.nudgeFrequency || 1))
 }
 
@@ -212,6 +210,50 @@ export function isContextOverLimits(
         minContextLimit,
         summaryTokenExtension,
     }
+}
+
+/**
+ * Detect "poll-only" turns: consecutive assistant messages that only repeat
+ * tool calls (e.g. polling a server status) without any new user message in
+ * between. During such turns the emergency max-context nudge should not re-fire
+ * on every iteration; the model already has the warning and there is no new
+ * user input to react to.
+ */
+export function isPollOnlyTurn(
+    state: SessionState,
+    messages: WithParts[],
+    pollTurns: number,
+): boolean {
+    const threshold = Math.max(1, pollTurns)
+    let consecutiveToolOnlyAssistant = 0
+
+    for (let i = messages.length - 1; i >= 0; i--) {
+        const message = messages[i]
+        if (isIgnoredUserMessage(message)) {
+            continue
+        }
+
+        if (message.info.role === "user") {
+            break
+        }
+
+        if (message.info.role !== "assistant") {
+            break
+        }
+
+        const parts = Array.isArray(message.parts) ? message.parts : []
+        const hasToolCall = parts.some((part) => part.type === "tool")
+        if (!hasToolCall) {
+            break
+        }
+
+        consecutiveToolOnlyAssistant++
+        if (consecutiveToolOnlyAssistant >= threshold) {
+            return true
+        }
+    }
+
+    return false
 }
 
 export function addAnchor(

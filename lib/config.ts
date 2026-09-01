@@ -34,6 +34,7 @@ export interface CompressConfig {
     nudgeFrequency: number
     iterationNudgeThreshold: number
     nudgeForce: "strong" | "soft"
+    pollCooldown: number
     protectedTools: string[]
     protectTags: boolean
     protectUserMessages: boolean
@@ -135,6 +136,7 @@ export const VALID_CONFIG_KEYS = new Set([
     "compress.nudgeFrequency",
     "compress.iterationNudgeThreshold",
     "compress.nudgeForce",
+    "compress.pollCooldown",
     "compress.protectedTools",
     "compress.protectTags",
     "compress.protectUserMessages",
@@ -430,6 +432,25 @@ export function validateConfigTypes(config: Record<string, any>): ValidationErro
                 })
             }
 
+            if (
+                compress.pollCooldown !== undefined &&
+                typeof compress.pollCooldown !== "number"
+            ) {
+                errors.push({
+                    key: "compress.pollCooldown",
+                    expected: "number",
+                    actual: typeof compress.pollCooldown,
+                })
+            }
+
+            if (typeof compress.pollCooldown === "number" && compress.pollCooldown < 0) {
+                errors.push({
+                    key: "compress.pollCooldown",
+                    expected: "non-negative number (>= 0)",
+                    actual: `${compress.pollCooldown} (will be clamped to 0)`,
+                })
+            }
+
             if (compress.protectedTools !== undefined && !Array.isArray(compress.protectedTools)) {
                 errors.push({
                     key: "compress.protectedTools",
@@ -722,6 +743,7 @@ const defaultConfig: PluginConfig = {
         nudgeFrequency: 5,
         iterationNudgeThreshold: 15,
         nudgeForce: "soft",
+        pollCooldown: 3,
         protectedTools: [...COMPRESS_DEFAULT_PROTECTED_TOOLS],
         protectTags: false,
         protectUserMessages: false,
@@ -890,6 +912,7 @@ function mergeCompress(
         nudgeFrequency: override.nudgeFrequency ?? base.nudgeFrequency,
         iterationNudgeThreshold: override.iterationNudgeThreshold ?? base.iterationNudgeThreshold,
         nudgeForce: override.nudgeForce ?? base.nudgeForce,
+        pollCooldown: override.pollCooldown ?? base.pollCooldown,
         protectedTools: [...new Set([...base.protectedTools, ...(override.protectedTools ?? [])])],
         protectTags: override.protectTags ?? base.protectTags,
         protectUserMessages: override.protectUserMessages ?? base.protectUserMessages,

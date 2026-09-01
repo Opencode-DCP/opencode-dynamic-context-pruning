@@ -27,6 +27,14 @@ export function buildCompressedBlockGuidance(state: SessionState): string {
         )
     }
 
+    lines.push(
+        "- NO SINGLE-MESSAGE COMPRESSIONS: Compressing one fresh message into a new summary block adds context instead of saving it. If the only compressible range you can find is a single small message, do NOT compress it - merge existing blocks first, or pick a larger closed range.",
+    )
+
+    lines.push(
+        "- POLL TURNS: If you are only polling a server/status and receiving NO_DONE/NOT_DONE results with no new user instruction, do not repeatedly run compress on each poll iteration. Wait for a new user message or a genuinely closed phase before compressing again.",
+    )
+
     return lines.join("\n")
 }
 

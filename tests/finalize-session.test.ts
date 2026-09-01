@@ -30,6 +30,7 @@ function buildConfig(manualMode = false): PluginConfig {
             nudgeFrequency: 5,
             iterationNudgeThreshold: 15,
             nudgeForce: "soft",
+            pollCooldown: 3,
             protectedTools: ["task"],
             protectTags: false,
             protectUserMessages: false,
