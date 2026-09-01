@@ -48,6 +48,14 @@ By default, nesting a previously compressed block (`bN`) into a new compression 
 
 Enable `compress.recursiveCondense` to change this behavior. When active, the model condenses each referenced block's content directly into its own summary text, and `(bN)` placeholders become compact `[condensed block bN]` references instead of full expansions. Each merge layer is then meaningfully smaller than the sum of its children. Protected content (protected tool outputs, user messages, and protected prompt information) from child blocks is still preserved automatically.
 
+### Fork / Inherited Session Recovery
+
+When opencode forks a session, the child inherits the parent's raw messages but not the DCP state file (keyed by sessionId), so the inherited prefix - often dominated by large read/grep/webfetch outputs - was never covered by any compression block. DCP now replays the session's own history on first load: completed `compress` tool parts persist their full input arguments, so the same blocks are rebuilt deterministically (deduplicated by `compressCallId`, stale `mNNNN` references skipped with a warning). No configuration needed.
+
+### Context Accounting (`/dcp context`)
+
+`/dcp context` now also prints a Context Accounting Snapshot captured on every messages transform: raw vs transformed message/token counts, active compression-block coverage, the largest uncovered tool outputs, provider-reported token totals, the effective max/min thresholds, whether a compression just completed, and whether the reported total is stale relative to the last DCP compression. Use this to explain the gap between the UI percentage and DCP's own pruning instead of guessing.
+
 ### Deduplication
 
 Identifies repeated tool calls (same tool, same arguments) and keeps only the most recent output. Recalculated when the compress tool runs, so prompt cache is only impacted alongside compression.
@@ -158,6 +166,10 @@ Each level overrides the previous, so project settings take priority over global
         // Controls how likely compression is after user messages
         // ("strong" = more likely, "soft" = less likely)
         "nudgeForce": "soft",
+        // Number of consecutive tool-only assistant turns (no new user
+        // message) after which the emergency max-context nudge is
+        // suppressed. Prevents re-nudging during poll loops. 0 disables.
+        "pollCooldown": 3,
         // Tool names whose completed outputs are appended to the compression
         "protectedTools": [],
         // Preserve text wrapped in <protect>...</protect> when compressed
@@ -169,6 +181,11 @@ Each level overrides the previous, so project settings take priority over global
         // instead of expanding its full summary into the parent. Keeps each
         // compression layer smaller than the sum of its children.
         "recursiveCondense": false,
+        // When true, reject a compression whose summary is not smaller
+        // than the content it replaces (default false). Disabled by
+        // default because it can cause retry loops when a range cannot
+        // shrink; prefer the prompt guidance instead.
+        "enforceSummaryShrink": false,
     },
     // Automatic pruning strategies
     "strategies": {
