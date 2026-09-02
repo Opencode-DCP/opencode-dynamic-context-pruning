@@ -19,7 +19,12 @@ function buildConfig(manualMode = false): PluginConfig {
         commands: { enabled: true, protectedTools: [] },
         manualMode: { enabled: manualMode, automaticStrategies: true },
         turnProtection: { enabled: false, turns: 4 },
-        experimental: { allowSubAgents: false, customPrompts: false },
+        experimental: {
+            allowSubAgents: false,
+            contextAccounting: false,
+            recoverInherited: false,
+            customPrompts: false,
+        },
         protectedFilePatterns: [],
         compress: {
             mode: "message",

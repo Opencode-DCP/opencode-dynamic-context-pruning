@@ -121,6 +121,16 @@
                     "type": "boolean",
                     "default": false,
                     "description": "Enable user-editable prompt overrides under dcp-prompts directories"
+                },
+                "contextAccounting": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Compute the detailed context accounting snapshot on every message transform (expensive on long sessions; use /dcp context with this enabled, or enable only when debugging). Default false keeps the transform hot path cheap."
+                },
+                "recoverInherited": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Replay completed compress tool parts from session history on first load to rebuild compression blocks for forked/inherited sessions. Expensive on long histories; default false (opt-in diagnostic)."
                 }
             },
             "default": {

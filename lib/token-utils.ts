@@ -2,9 +2,24 @@ import { SessionState, WithParts } from "./state"
 import { AssistantMessage, UserMessage } from "@opencode-ai/sdk/v2"
 import { Logger } from "./logger"
 import * as _anthropicTokenizer from "@anthropic-ai/tokenizer"
-const anthropicCountTokens = (_anthropicTokenizer.countTokens ??
-    (_anthropicTokenizer as any).default?.countTokens) as typeof _anthropicTokenizer.countTokens
+const anthropicGetTokenizer = (_anthropicTokenizer.getTokenizer ??
+    (_anthropicTokenizer as any).default?.getTokenizer) as () => ReturnType<
+    typeof _anthropicTokenizer.getTokenizer
+>
 import { getLastUserMessage } from "./messages/query"
+
+let sharedTokenizer: ReturnType<typeof anthropicGetTokenizer> | null = null
+
+function getSharedTokenizer(): ReturnType<typeof anthropicGetTokenizer> {
+    if (sharedTokenizer === null) {
+        sharedTokenizer = anthropicGetTokenizer()
+    }
+    return sharedTokenizer
+}
+
+export function resetSharedTokenizerForTests(): void {
+    sharedTokenizer = null
+}
 
 export function getCurrentTokenUsage(state: SessionState, messages: WithParts[]): number {
     for (let i = messages.length - 1; i >= 0; i--) {
@@ -108,8 +123,11 @@ export function getCurrentParams(
 export function countTokens(text: string): number {
     if (!text) return 0
     try {
-        return anthropicCountTokens(text)
+        const tokenizer = getSharedTokenizer()
+        const encoded = tokenizer.encode(text.normalize("NFKC"), "all")
+        return encoded.length
     } catch {
+        sharedTokenizer = null
         return Math.round(text.length / 4)
     }
 }

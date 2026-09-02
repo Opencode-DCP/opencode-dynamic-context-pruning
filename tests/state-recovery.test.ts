@@ -41,6 +41,8 @@ function buildConfig(): PluginConfig {
         },
         experimental: {
             allowSubAgents: false,
+            contextAccounting: false,
+            recoverInherited: false,
             customPrompts: false,
         },
         protectedFilePatterns: [],
@@ -382,6 +384,7 @@ test("recovery integrates with ensureSessionInitialized when no persisted state 
     const state = createSessionState()
     const logger = new Logger(false)
     const config = buildConfig()
+    config.experimental.recoverInherited = true
 
     const { ensureSessionInitialized } = await import("../lib/state/state")
     await ensureSessionInitialized(

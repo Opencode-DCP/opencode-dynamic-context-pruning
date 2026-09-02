@@ -43,8 +43,6 @@ import {
     collectUncoveredToolOutputs,
     computeCoverage,
     estimateMessageSetStats,
-    formatContextSnapshot,
-    getReportedTokens,
 } from "./context/accounting"
 import { getModelInfo } from "./messages/inject/utils"
 
@@ -146,9 +144,14 @@ export function createChatMessageTransformHandler(
         syncToolCache(state, config, logger, output.messages)
         buildToolIdList(state, output.messages)
 
-        const rawStats = estimateMessageSetStats(output.messages)
-        const coverage = computeCoverage(state, output.messages)
-        const uncoveredTools = collectUncoveredToolOutputs(state, output.messages)
+        const accountingEnabled = config.experimental.contextAccounting === true
+        const rawStats = accountingEnabled
+            ? estimateMessageSetStats(output.messages)
+            : undefined
+        const coverage = accountingEnabled ? computeCoverage(state, output.messages) : undefined
+        const uncoveredTools = accountingEnabled
+            ? collectUncoveredToolOutputs(state, output.messages)
+            : undefined
 
         prune(state, logger, config, output.messages)
         await injectExtendedSubAgentResults(
@@ -172,30 +175,34 @@ export function createChatMessageTransformHandler(
         applyPendingManualTrigger(state, output.messages, logger)
         stripStaleMetadata(output.messages)
 
-        const transformedStats = estimateMessageSetStats(output.messages)
-        const { providerId, modelId } = getModelInfo(output.messages)
-        state.lastContextSnapshot = buildContextSnapshot(
-            state,
-            config,
-            providerId,
-            modelId,
-            rawStats,
-            transformedStats,
-            coverage,
-            uncoveredTools,
-            output.messages,
-        )
-        logger.debug("Context accounting snapshot", {
-            rawMessages: state.lastContextSnapshot.rawMessageCount,
-            rawTokens: state.lastContextSnapshot.rawEstimatedTokens,
-            transformedMessages: state.lastContextSnapshot.transformedMessageCount,
-            transformedTokens: state.lastContextSnapshot.transformedEstimatedTokens,
-            activeBlocks: state.lastContextSnapshot.activeBlockCount,
-            uncoveredTokens: state.lastContextSnapshot.uncoveredMessageTokens,
-            reportedTotal: state.lastContextSnapshot.reported.total,
-            overMax: state.lastContextSnapshot.overMaxLimit,
-            overMin: state.lastContextSnapshot.overMinLimit,
-        })
+        if (accountingEnabled && rawStats && coverage && uncoveredTools) {
+            const transformedStats = estimateMessageSetStats(output.messages)
+            const { providerId, modelId } = getModelInfo(output.messages)
+            state.lastContextSnapshot = buildContextSnapshot(
+                state,
+                config,
+                providerId,
+                modelId,
+                rawStats,
+                transformedStats,
+                coverage,
+                uncoveredTools,
+                output.messages,
+            )
+            logger.debug("Context accounting snapshot", {
+                rawMessages: state.lastContextSnapshot.rawMessageCount,
+                rawTokens: state.lastContextSnapshot.rawEstimatedTokens,
+                transformedMessages: state.lastContextSnapshot.transformedMessageCount,
+                transformedTokens: state.lastContextSnapshot.transformedEstimatedTokens,
+                activeBlocks: state.lastContextSnapshot.activeBlockCount,
+                uncoveredTokens: state.lastContextSnapshot.uncoveredMessageTokens,
+                reportedTotal: state.lastContextSnapshot.reported.total,
+                overMax: state.lastContextSnapshot.overMaxLimit,
+                overMin: state.lastContextSnapshot.overMinLimit,
+            })
+        } else if (accountingEnabled) {
+            state.lastContextSnapshot = undefined
+        }
 
         if (state.sessionId) {
             await logger.saveContext(state.sessionId, output.messages)

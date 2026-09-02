@@ -40,6 +40,8 @@ function buildConfig(mode: "message" | "range"): PluginConfig {
         },
         experimental: {
             allowSubAgents: false,
+            contextAccounting: false,
+            recoverInherited: false,
             customPrompts: false,
         },
         protectedFilePatterns: [],

@@ -37,6 +37,8 @@ function buildConfig(): PluginConfig {
         },
         experimental: {
             allowSubAgents: false,
+            contextAccounting: false,
+            recoverInherited: false,
             customPrompts: false,
         },
         protectedFilePatterns: [],

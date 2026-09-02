@@ -38,6 +38,8 @@ function buildConfig(permission: "allow" | "ask" | "deny" = "allow"): PluginConf
         },
         experimental: {
             allowSubAgents: false,
+            contextAccounting: false,
+            recoverInherited: false,
             customPrompts: false,
         },
         protectedFilePatterns: [],

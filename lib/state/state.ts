@@ -173,7 +173,7 @@ export async function ensureSessionInitialized(
 
     const persisted = await loadSessionState(sessionId, logger)
     if (persisted === null) {
-        if (config) {
+        if (config?.experimental.recoverInherited === true) {
             await replayCompletedCompressions(client, state, logger, config, messages)
         }
         return
@@ -204,7 +204,7 @@ export async function ensureSessionInitialized(
         state.lastDcpCompression = persisted.lastDcpCompression
     }
 
-    if (config) {
+    if (config?.experimental.recoverInherited === true) {
         await replayCompletedCompressions(client, state, logger, config, messages)
     }
 

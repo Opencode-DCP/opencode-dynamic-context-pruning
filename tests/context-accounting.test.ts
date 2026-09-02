@@ -31,6 +31,8 @@ function buildConfig(maxContextLimit: number, minContextLimit = 1): PluginConfig
         },
         experimental: {
             allowSubAgents: false,
+            contextAccounting: false,
+            recoverInherited: false,
             customPrompts: false,
         },
         protectedFilePatterns: [],

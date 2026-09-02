@@ -186,13 +186,18 @@ export function isContextOverLimits(
             : resolvedMaxContextLimit + summaryTokenExtension
     const minContextLimit = resolveContextTokenLimit(config, state, providerId, modelId, "min")
     const currentTokens = getCurrentTokenUsage(state, messages)
-    const estimatedTransformedTokens = estimateTransformedTokens(state, messages)
     const reportedStale = isReportedTokensStaleAfterDcpCompression(state, messages)
 
     // After a DCP compression the provider-reported total still describes the
     // pre-compression request. Do not re-trigger the emergency max nudge from
     // that stale number alone; only keep it if the local estimate of the
-    // pruned view is itself over the limit.
+    // pruned view is itself over the limit. The local estimate requires a full
+    // tokenization pass, so it is computed only when actually needed.
+    const estimatedTransformedTokens =
+        reportedStale && maxContextLimit !== undefined
+            ? estimateTransformedTokens(state, messages)
+            : 0
+
     const effectiveMaxTokens = reportedStale ? estimatedTransformedTokens : currentTokens
 
     const overMaxLimit =
