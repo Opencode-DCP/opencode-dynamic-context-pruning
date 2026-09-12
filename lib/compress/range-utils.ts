@@ -1,7 +1,9 @@
 import type { CompressionBlock, SessionState } from "../state"
+import { coerceContentArray } from "./args"
 import { resolveAnchorMessageId, resolveBoundaryIds, resolveSelection } from "./search"
 import type {
     BoundaryReference,
+    CompressRangeEntry,
     CompressRangeToolArgs,
     InjectedSummaryResult,
     ParsedBlockPlaceholder,
@@ -10,6 +12,38 @@ import type {
 } from "./types"
 
 const BLOCK_PLACEHOLDER_REGEX = /\(b(\d+)\)|\{block_(\d+)\}/gi
+
+export function isRangeEntry(value: unknown): value is CompressRangeEntry {
+    if (value === null || typeof value !== "object" || Array.isArray(value)) {
+        return false
+    }
+    const entry = value as Record<string, unknown>
+    return (
+        typeof entry.startId === "string" &&
+        typeof entry.endId === "string" &&
+        typeof entry.summary === "string"
+    )
+}
+
+export function normalizeRangeArgs(args: unknown): CompressRangeToolArgs {
+    if (args === null || typeof args !== "object" || Array.isArray(args)) {
+        throw new Error(
+            'compress takes a JSON object with "topic" (string) and "content" (array of ranges). ' +
+                'Re-send as: { "topic": "...", "content": [{ "startId": "m0001", "endId": "m0031", "summary": "..." }] }',
+        )
+    }
+    const { topic, content } = args as Record<string, unknown>
+    return {
+        topic: topic as string,
+        content: coerceContentArray(
+            content,
+            isRangeEntry,
+            're-send with content as an array of range objects: [{ "startId": "m0001", "endId": "m0031", "summary": "..." }]. ' +
+                "startId and endId must be the message (mNNNN) or compressed-block (bN) IDs, visible as <dcp-message-id> tags in context, " +
+                "that bound the range your summary covers. A summary string alone does not say which messages to replace.",
+        ),
+    }
+}
 
 export function validateArgs(args: CompressRangeToolArgs): void {
     if (typeof args.topic !== "string" || args.topic.trim().length === 0) {
