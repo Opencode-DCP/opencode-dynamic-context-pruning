@@ -432,6 +432,13 @@ test("compress range still rejects empty content arrays", () => {
     assert.throws(() => validateArgs(input), /content is required and must be a non-empty array/)
 })
 
+test("compress range rejects a JSON-encoded empty content array with the non-empty error", () => {
+    assert.throws(
+        () => normalizeRangeArgs({ topic: "Range fix", content: "[]" }),
+        /content is required and must be a non-empty array/,
+    )
+})
+
 test("compress range rejects a whole-args string with re-send guidance", () => {
     assert.throws(
         () => normalizeRangeArgs("Just a summary string."),

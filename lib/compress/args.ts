@@ -20,16 +20,20 @@ export function coerceContentArray<T>(
     if (typeof raw === "string") {
         const trimmed = raw.trim()
         if (trimmed.startsWith("[") || trimmed.startsWith("{")) {
+            let parsed: unknown
             try {
-                const parsed: unknown = JSON.parse(trimmed)
-                if (Array.isArray(parsed) && parsed.length > 0) {
-                    return parsed as T[]
-                }
-                if (isEntry(parsed)) {
-                    return [parsed]
-                }
+                parsed = JSON.parse(trimmed)
             } catch {
-                // Not JSON: fall through to the string guidance error.
+                parsed = undefined
+            }
+            if (Array.isArray(parsed)) {
+                if (parsed.length === 0) {
+                    throw new Error("content is required and must be a non-empty array")
+                }
+                return parsed as T[]
+            }
+            if (isEntry(parsed)) {
+                return [parsed]
             }
         }
         throw new Error(`content must be a JSON array, not a plain string. ${guidance}`)

@@ -917,6 +917,13 @@ test("compress message still rejects empty content arrays", () => {
     assert.throws(() => validateArgs(input), /content is required and must be a non-empty array/)
 })
 
+test("compress message rejects a JSON-encoded empty content array with the non-empty error", () => {
+    assert.throws(
+        () => normalizeMessageArgs({ topic: "Message fix", content: "[]" }),
+        /content is required and must be a non-empty array/,
+    )
+})
+
 test("compress message execute rejects the captured string-content payload with guidance", async () => {
     const tool = createCompressMessageTool({
         client: {},
