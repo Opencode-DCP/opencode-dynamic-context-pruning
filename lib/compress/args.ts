@@ -11,6 +11,8 @@
  * chain the tool's `validateArgs`, which reports the specific missing field.
  */
 
+export const NON_EMPTY_ARRAY_ERROR_MESSAGE = "content is required and must be a non-empty array"
+
 export function isStringFields(value: unknown, keys: readonly string[]): boolean {
     if (value === null || typeof value !== "object" || Array.isArray(value)) {
         return false
@@ -39,7 +41,7 @@ export function coerceContentArray<T>(
             }
             if (Array.isArray(parsed)) {
                 if (parsed.length === 0) {
-                    throw new Error("content is required and must be a non-empty array")
+                    throw new Error(NON_EMPTY_ARRAY_ERROR_MESSAGE)
                 }
                 return parsed as T[]
             }
@@ -54,7 +56,7 @@ export function coerceContentArray<T>(
         return [raw as T]
     }
 
-    throw new Error("content is required and must be a non-empty array")
+    throw new Error(NON_EMPTY_ARRAY_ERROR_MESSAGE)
 }
 
 export interface CompressArgsSpec<TEntry> {

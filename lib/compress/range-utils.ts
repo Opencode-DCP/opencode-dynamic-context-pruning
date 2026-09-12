@@ -1,5 +1,5 @@
 import type { CompressionBlock, SessionState } from "../state"
-import { isStringFields, normalizeCompressArgs } from "./args"
+import { NON_EMPTY_ARRAY_ERROR_MESSAGE, isStringFields, normalizeCompressArgs } from "./args"
 import { resolveAnchorMessageId, resolveBoundaryIds, resolveSelection } from "./search"
 import type {
     BoundaryReference,
@@ -40,7 +40,7 @@ export function validateArgs(args: CompressRangeToolArgs): void {
     }
 
     if (!Array.isArray(args.content) || args.content.length === 0) {
-        throw new Error("content is required and must be a non-empty array")
+        throw new Error(NON_EMPTY_ARRAY_ERROR_MESSAGE)
     }
 
     for (let index = 0; index < args.content.length; index++) {
