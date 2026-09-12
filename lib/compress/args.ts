@@ -6,7 +6,18 @@
  * unambiguous we coerce it into the array form; when the payload is a plain
  * string (a summary with no range boundaries) we throw a guiding error that
  * tells the model exactly how to re-send the call.
+ *
+ * `coerceContentArray` does not check the shape of array elements; call sites
+ * chain the tool's `validateArgs`, which reports the specific missing field.
  */
+
+export function isStringFields(value: unknown, keys: readonly string[]): boolean {
+    if (value === null || typeof value !== "object" || Array.isArray(value)) {
+        return false
+    }
+    const record = value as Record<string, unknown>
+    return keys.every((key) => typeof record[key] === "string")
+}
 
 export function coerceContentArray<T>(
     raw: unknown,
@@ -44,4 +55,28 @@ export function coerceContentArray<T>(
     }
 
     throw new Error("content is required and must be a non-empty array")
+}
+
+export interface CompressArgsSpec<TEntry> {
+    isEntry: (value: unknown) => value is TEntry
+    contentNoun: string
+    shapeExample: string
+    contentGuidance: string
+}
+
+export function normalizeCompressArgs<TEntry>(
+    args: unknown,
+    spec: CompressArgsSpec<TEntry>,
+): { topic: string; content: TEntry[] } {
+    if (args === null || typeof args !== "object" || Array.isArray(args)) {
+        throw new Error(
+            `compress takes a JSON object with "topic" (string) and "content" (array of ${spec.contentNoun}). ` +
+                `Re-send as: ${spec.shapeExample}`,
+        )
+    }
+    const { topic, content } = args as Record<string, unknown>
+    return {
+        topic: topic as string,
+        content: coerceContentArray(content, spec.isEntry, spec.contentGuidance),
+    }
 }
