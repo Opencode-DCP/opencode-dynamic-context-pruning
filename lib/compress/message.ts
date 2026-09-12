@@ -2,7 +2,13 @@ import { tool } from "@opencode-ai/plugin"
 import type { ToolContext } from "./types"
 import { countTokens } from "../token-utils"
 import { MESSAGE_FORMAT_EXTENSION } from "../prompts/extensions/tool"
-import { formatIssues, formatResult, resolveMessages, validateArgs } from "./message-utils"
+import {
+    formatIssues,
+    formatResult,
+    normalizeMessageArgs,
+    resolveMessages,
+    validateArgs,
+} from "./message-utils"
 import { finalizeSession, prepareSession, type NotificationEntry } from "./pipeline"
 import { appendProtectedPromptInfo, appendProtectedTools } from "./protected-content"
 import {
@@ -11,7 +17,6 @@ import {
     applyCompressionState,
     wrapCompressedSummary,
 } from "./state"
-import type { CompressMessageToolArgs } from "./types"
 
 function buildSchema() {
     return {
@@ -46,7 +51,7 @@ export function createCompressMessageTool(ctx: ToolContext): ReturnType<typeof t
         description: runtimePrompts.compressMessage + MESSAGE_FORMAT_EXTENSION,
         args: buildSchema(),
         async execute(args, toolCtx) {
-            const input = args as CompressMessageToolArgs
+            const input = normalizeMessageArgs(args)
             validateArgs(input)
             const callId =
                 typeof (toolCtx as unknown as { callID?: unknown }).callID === "string"
