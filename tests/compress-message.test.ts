@@ -4,6 +4,7 @@ import { join } from "node:path"
 import { tmpdir } from "node:os"
 import { mkdirSync } from "node:fs"
 import { createCompressMessageTool } from "../lib/compress/message"
+import { normalizeMessageArgs, validateArgs } from "../lib/compress/message-utils"
 import { createSessionState, type WithParts } from "../lib/state"
 import type { PluginConfig } from "../lib/config"
 import { Logger } from "../lib/logger"
@@ -887,4 +888,62 @@ test("compress message mode reports issues when every batch entry is skipped", a
     )
 
     assert.equal(state.prune.messages.blocksById.size, 0)
+})
+
+test("compress message normalizes single-object content into an array", () => {
+    const input = normalizeMessageArgs({
+        topic: "Message fix",
+        content: { messageId: "m0001", topic: "Label", summary: "Summary text." },
+    })
+    assert.deepEqual(input.content, [
+        { messageId: "m0001", topic: "Label", summary: "Summary text." },
+    ])
+    assert.doesNotThrow(() => validateArgs(input))
+})
+
+test("compress message rejects plain-string content with re-send guidance", () => {
+    assert.throws(
+        () =>
+            normalizeMessageArgs({
+                topic: "Message fix",
+                content: "A plain summary without a message id.",
+            }),
+        (err: Error) => err.message.includes("JSON array") && err.message.includes("messageId"),
+    )
+})
+
+test("compress message still rejects empty content arrays", () => {
+    const input = normalizeMessageArgs({ topic: "Message fix", content: [] })
+    assert.throws(() => validateArgs(input), /content is required and must be a non-empty array/)
+})
+
+test("compress message execute rejects the captured string-content payload with guidance", async () => {
+    const tool = createCompressMessageTool({
+        client: {},
+        state: createSessionState(),
+        logger: new Logger(false),
+        config: buildConfig(),
+        prompts: {
+            reload() {},
+            getRuntimePrompts() {
+                return { compressMessage: "", compressRange: "" }
+            },
+        },
+    } as any)
+
+    await assert.rejects(
+        tool.execute(
+            {
+                topic: "Closed research notes",
+                content: "Summary of the research session with no message id.",
+            },
+            {
+                ask: async () => {},
+                metadata: () => {},
+                sessionID: "ses_message_string_content_replay",
+                messageID: "msg-compress-message-string",
+            },
+        ),
+        (err: Error) => err.message.includes("JSON array") && err.message.includes("messageId"),
+    )
 })

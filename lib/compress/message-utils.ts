@@ -2,6 +2,7 @@ import type { PluginConfig } from "../config"
 import type { SessionState } from "../state"
 import { parseBoundaryId, type IdFormat } from "../message-ids"
 import { isIgnoredUserMessage, isProtectedUserMessage } from "../messages/query"
+import { coerceContentArray } from "./args"
 import { resolveAnchorMessageId, resolveBoundaryIds, resolveSelection } from "./search"
 import { COMPRESSED_BLOCK_HEADER } from "./state"
 import type {
@@ -11,6 +12,38 @@ import type {
     ResolvedMessageCompressionsResult,
     SearchContext,
 } from "./types"
+
+export function isMessageEntry(value: unknown): value is CompressMessageEntry {
+    if (value === null || typeof value !== "object" || Array.isArray(value)) {
+        return false
+    }
+    const entry = value as Record<string, unknown>
+    return (
+        typeof entry.messageId === "string" &&
+        typeof entry.topic === "string" &&
+        typeof entry.summary === "string"
+    )
+}
+
+export function normalizeMessageArgs(args: unknown): CompressMessageToolArgs {
+    if (args === null || typeof args !== "object" || Array.isArray(args)) {
+        throw new Error(
+            'compress takes a JSON object with "topic" (string) and "content" (array of messages). ' +
+                'Re-send as: { "topic": "...", "content": [{ "messageId": "m0001", "topic": "...", "summary": "..." }] }',
+        )
+    }
+    const { topic, content } = args as Record<string, unknown>
+    return {
+        topic: topic as string,
+        content: coerceContentArray(
+            content,
+            isMessageEntry,
+            're-send with content as an array of message objects: [{ "messageId": "m0001", "topic": "...", "summary": "..." }]. ' +
+                "messageId must be the message ID (mNNNN), visible as a <dcp-message-id> tag in context, that your summary covers. " +
+                "A summary string alone does not say which message to replace.",
+        ),
+    }
+}
 
 interface SkippedIssue {
     kind: string
