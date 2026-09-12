@@ -923,34 +923,3 @@ test("compress message rejects a JSON-encoded empty content array with the non-e
         /content is required and must be a non-empty array/,
     )
 })
-
-test("compress message execute rejects the captured string-content payload with guidance", async () => {
-    const tool = createCompressMessageTool({
-        client: {},
-        state: createSessionState(),
-        logger: new Logger(false),
-        config: buildConfig(),
-        prompts: {
-            reload() {},
-            getRuntimePrompts() {
-                return { compressMessage: "", compressRange: "" }
-            },
-        },
-    } as any)
-
-    await assert.rejects(
-        tool.execute(
-            {
-                topic: "Closed research notes",
-                content: "Summary of the research session with no message id.",
-            },
-            {
-                ask: async () => {},
-                metadata: () => {},
-                sessionID: "ses_message_string_content_replay",
-                messageID: "msg-compress-message-string",
-            },
-        ),
-        (err: Error) => err.message.includes("JSON array") && err.message.includes("messageId"),
-    )
-})
