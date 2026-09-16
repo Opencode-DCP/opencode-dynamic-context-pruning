@@ -37,12 +37,18 @@ export const injectCompressNudges = (
     messages: WithParts[],
     prompts: RuntimePrompts,
     compressionPriorities?: CompressionPriorityMap,
+    createAnchors = true,
 ): void => {
     if (compressPermission(state, config) === "deny") {
         return
     }
 
     if (state.manualMode) {
+        return
+    }
+
+    if (!createAnchors) {
+        applyAnchoredNudges(state, config, messages, prompts, compressionPriorities)
         return
     }
 

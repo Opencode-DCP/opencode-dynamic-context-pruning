@@ -11,6 +11,7 @@ export type ToolStatus = "pending" | "running" | "completed" | "error"
 export interface ToolParameterEntry {
     tool: string
     parameters: any
+    metadata?: Record<string, unknown>
     status?: ToolStatus
     error?: string
     turn: number

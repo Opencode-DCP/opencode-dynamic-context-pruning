@@ -17,11 +17,7 @@ import { isIgnoredUserMessage } from "../messages/query"
 import { buildToolIdList } from "../messages/utils"
 import { saveSessionState } from "../state/persistence"
 import { isMessageCompacted } from "../state/utils"
-import {
-    getFilePathsFromParameters,
-    isFilePathProtected,
-    isToolNameProtected,
-} from "../protected-patterns"
+import { isToolProtected } from "../protected-patterns"
 import { syncToolCache } from "../state/tool-cache"
 
 export interface SweepCommandContext {
@@ -176,13 +172,16 @@ export async function handleSweepCommand(ctx: SweepCommandContext): Promise<void
         if (!entry) {
             return true
         }
-        if (isToolNameProtected(entry.tool, protectedTools)) {
+        if (
+            isToolProtected(
+                entry.tool,
+                entry.parameters,
+                protectedTools,
+                config.protectedFilePatterns,
+                entry.metadata,
+            )
+        ) {
             logger.debug(`Sweep: skipping protected tool ${entry.tool} (${id})`)
-            return false
-        }
-        const filePaths = getFilePathsFromParameters(entry.tool, entry.parameters)
-        if (isFilePathProtected(filePaths, config.protectedFilePatterns)) {
-            logger.debug(`Sweep: skipping protected file path(s) ${filePaths.join(", ")} (${id})`)
             return false
         }
         return true
@@ -194,14 +193,13 @@ export async function handleSweepCommand(ctx: SweepCommandContext): Promise<void
         if (!entry) {
             return false
         }
-        if (isToolNameProtected(entry.tool, protectedTools)) {
-            return true
-        }
-        const filePaths = getFilePathsFromParameters(entry.tool, entry.parameters)
-        if (isFilePathProtected(filePaths, config.protectedFilePatterns)) {
-            return true
-        }
-        return false
+        return isToolProtected(
+            entry.tool,
+            entry.parameters,
+            protectedTools,
+            config.protectedFilePatterns,
+            entry.metadata,
+        )
     }).length
 
     if (newToolIds.length === 0) {

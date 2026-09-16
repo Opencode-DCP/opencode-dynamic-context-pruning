@@ -31,7 +31,7 @@ export const injectExtendedSubAgentResults = async (
         const parts = Array.isArray(message.parts) ? message.parts : []
 
         for (const part of parts) {
-            if (part.type !== "tool" || part.tool !== "task" || !part.callID) {
+            if (part.type !== "tool" || !["task", "subagent"].includes(part.tool) || !part.callID) {
                 continue
             }
             if (state.prune.tools.has(part.callID)) {

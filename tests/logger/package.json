@@ -1,0 +1,37 @@
+{
+    "name": "opencode-request-logger",
+    "version": "0.1.0",
+    "private": true,
+    "type": "module",
+    "description": "Request capture for DCP development and sandbox testing",
+    "main": "./dist/index.js",
+    "types": "./dist/index.d.ts",
+    "files": [
+        "dist",
+        "server.js",
+        "relay.mjs",
+        "readable.mjs"
+    ],
+    "scripts": {
+        "clean": "rm -rf dist",
+        "build": "npm run clean && tsc",
+        "prepack": "npm run build",
+        "typecheck": "tsc --noEmit",
+        "test": "npm run build && node --test tests/*.test.mjs"
+    },
+    "peerDependencies": {
+        "@opencode-ai/plugin": ">=1.18.29",
+        "@opencode/plugin": "^2.0.4"
+    },
+    "peerDependenciesMeta": {
+        "@opencode-ai/plugin": {
+            "optional": true
+        },
+        "@opencode/plugin": {
+            "optional": true
+        }
+    },
+    "dependencies": {
+        "ws": "^8.21.3"
+    }
+}

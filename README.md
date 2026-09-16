@@ -17,11 +17,10 @@ opencode plugin @tarquinen/opencode-dcp@latest --global
 
 This installs the package and adds it to your global OpenCode config.
 
-## Project Status
+## Related Project
 
-Development on DCP has slowed because most new context-management work has moved to [Sleev](https://sleev.ai) and the `sleev` CLI. Sleev is a local proxy for Claude Code, Codex, and OpenCode that builds on DCP's core ideas with newer context-management features and will work with any harness/client.
-
-DCP remains available for OpenCode plugin users, but new features are landing in Sleev first. If you are starting fresh, we recommend trying Sleev:
+[Sleev](https://sleev.ai) is a local proxy for coding agents, including Claude Code,
+Codex, and OpenCode. It provides context management through the `sleev` CLI:
 
 ```bash
 npm i -g sleev
@@ -49,7 +48,7 @@ Identifies repeated tool calls (same tool, same arguments) and keeps only the mo
 
 ### Purge Errors
 
-Prunes inputs from errored tool calls after a configurable number of turns (default: 4). Error messages are preserved; only the potentially large input content is removed. Recalculated on compress tool use.
+Prunes inputs from errored tool calls after a configurable number of turns. Error messages are preserved; only the potentially large input content is removed. Recalculated on compress tool use.
 
 ## Configuration
 
@@ -62,7 +61,7 @@ DCP uses its own config file, searched in order:
 Each level overrides the previous, so project settings take priority over global. Restart OpenCode after making config changes.
 
 > [!NOTE]
-> If you use models with smaller context windows, such as GitHub Copilot models or local models, lower `compress.minContextLimit` and `compress.maxContextLimit` in your configuration to match the available context.
+> If your model has a smaller context window, lower `compress.minContextLimit` and `compress.maxContextLimit` in your configuration to match the available context.
 
 > [!IMPORTANT]
 > Defaults are applied automatically. Expand this if you want to review or override settings.
@@ -138,14 +137,12 @@ Each level overrides the previous, so project settings take priority over global
         // Accepts: number or "X%".
         // Example:
         // "modelMaxLimits": {
-        //     "openai/gpt-5.3-codex": 120000,
-        //     "anthropic/claude-sonnet-4.6": "80%"
+        //     "provider/model": "80%"
         // },
         // Optional per-model override for minContextLimit.
         // If present, this wins over the global minContextLimit.
         // "modelMinLimits": {
-        //     "openai/gpt-5.3-codex": 50000,
-        //     "anthropic/claude-sonnet-4.6": "25%"
+        //     "provider/model": "25%"
         // },
         // How often the context-limit nudge fires (1 = every fetch, 5 = every 5th)
         "nudgeFrequency": 5,
@@ -194,7 +191,7 @@ DCP provides a TUI panel and one prompt-producing slash command:
 
 ### Prompt Overrides
 
-DCP exposes six editable prompts:
+DCP exposes the following editable prompts:
 
 - `system`
 - `compress-range`
@@ -224,15 +221,18 @@ For the `compress` tool, `compress.protectedTools` ensures specific tool outputs
 
 LLM providers cache prompts based on exact prefix matching. When DCP prunes content, it changes messages, which invalidates cached prefixes from that point forward.
 
-**Trade-off:** You lose some cache reads but gain token savings from reduced context size and fewer hallucinations from stale context. In most cases, especially in long sessions, the savings outweigh the cache miss cost.
-
-> [!NOTE]
-> In testing, cache hit rates were approximately 85% with DCP vs 90% without.
+**Trade-off:** Pruning reduces context size but can increase cache misses. The cost
+balance depends on your conversation, compression frequency, and provider pricing.
 
 **No impact for:**
 
 - **Request-based billing** — Some providers charge per request, not tokens.
-- **Uniform token pricing** — Providers like Cerebras that bill cached and uncached tokens at the same rate.
+- **Uniform token pricing** — Providers that bill cached and uncached tokens at the same rate.
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup, local installation,
+and testing with the V1/V2 sandbox.
 
 ## License
 

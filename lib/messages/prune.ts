@@ -16,8 +16,9 @@ export const prune = (
     logger: Logger,
     config: PluginConfig,
     messages: WithParts[],
+    summaryBase?: WithParts,
 ): void => {
-    filterCompressedRanges(state, logger, config, messages)
+    filterCompressedRanges(state, logger, config, messages, summaryBase)
     // pruneFullTool(state, logger, messages)
     pruneToolOutputs(state, logger, messages)
     pruneToolInputs(state, logger, messages)
@@ -161,6 +162,7 @@ const filterCompressedRanges = (
     logger: Logger,
     config: PluginConfig,
     messages: WithParts[],
+    summaryBase?: WithParts,
 ): void => {
     if (
         state.prune.messages.byMessageId.size === 0 &&
@@ -192,7 +194,7 @@ const filterCompressedRanges = (
             } else {
                 // Find user message for variant and as base for synthetic message
                 const msgIndex = messages.indexOf(msg)
-                const userMessage = getLastUserMessage(messages, msgIndex)
+                const userMessage = getLastUserMessage(messages, msgIndex) ?? summaryBase
 
                 if (userMessage) {
                     const userInfo = userMessage.info as UserMessage
