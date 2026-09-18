@@ -1,8 +1,14 @@
 /** @jsxImportSource @opentui/solid */
 
+import type { BoxRenderable } from "@opentui/core"
+import { useTerminalDimensions } from "@opentui/solid"
+import { createSignal } from "solid-js"
 import type { JSX } from "solid-js"
 import { pct } from "./format"
 import type { Theme, ThemeColor, ViewApi } from "./types"
+
+// header (1-2) + divider (1) + footer (2) + gaps (3) + bottom padding (1)
+const FRAME_OVERHEAD = 9
 
 export function DcpFrame(props: {
     api: ViewApi
@@ -12,6 +18,13 @@ export function DcpFrame(props: {
     onBack?: () => void
 }) {
     const theme = props.api.theme.current
+    const dimensions = useTerminalDimensions()
+    let inner: BoxRenderable | undefined
+    const [naturalHeight, setNaturalHeight] = createSignal(0)
+    const available = () =>
+        Math.max(10, dimensions().height - Math.floor(dimensions().height / 4) - 2)
+    const bodyHeight = () =>
+        Math.min(naturalHeight() || available() - FRAME_OVERHEAD, available() - FRAME_OVERHEAD)
     return (
         <box paddingLeft={3} paddingRight={3} paddingBottom={1} gap={1}>
             <box flexDirection="row" justifyContent="space-between">
@@ -30,7 +43,14 @@ export function DcpFrame(props: {
                 </text>
             </box>
             <box height={1} border={["bottom"]} borderColor={theme.borderSubtle} />
-            {props.children}
+            <scrollbox height={bodyHeight()} scrollY>
+                <box
+                    ref={(r: BoxRenderable) => (inner = r)}
+                    onSizeChange={() => inner && setNaturalHeight(inner.height)}
+                >
+                    {props.children}
+                </box>
+            </scrollbox>
             <box flexDirection="row" justifyContent="space-between" paddingTop={1}>
                 {props.onBack ? (
                     <FooterButton
