@@ -1,6 +1,8 @@
 /** @jsxImportSource @opentui/solid */
 
 import { buildStatsReport } from "../commands/stats"
+import { analyzeContextTokens } from "../commands/context"
+import { compressPermission } from "../compress-permission"
 import type { PluginConfig } from "../config"
 import { saveManualModeSetting } from "../state/persistence"
 import { loadSessionData, logger } from "./data"
@@ -33,8 +35,7 @@ export function openContextModal(api: TuiApi, config: PluginConfig) {
         showDialog(api, () => (
             <ContextDialog
                 api={api}
-                state={data.state}
-                messages={data.messages}
+                breakdown={analyzeContextTokens(data.state, data.messages)}
                 onBack={() => openPanelModal(api, config)}
             />
         ))
@@ -65,8 +66,8 @@ export function openPanelModal(api: TuiApi, config: PluginConfig) {
         showDialog(api, () => (
             <PanelDialog
                 api={api}
-                state={data.state}
-                config={config}
+                manualMode={!!data.state.manualMode}
+                canCompress={compressPermission(data.state, config) !== "deny"}
                 onContext={() => openContextModal(api, config)}
                 onStats={() => openStatsModal(api, config)}
                 onManual={(enabled) => setManualMode(api, config, data.state.sessionId, enabled)}

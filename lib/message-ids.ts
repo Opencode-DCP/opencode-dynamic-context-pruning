@@ -3,7 +3,11 @@ import { isIgnoredUserMessage } from "./messages/query"
 
 const MESSAGE_REF_REGEX = /^m(\d{4})$/
 const BLOCK_REF_REGEX = /^b([1-9]\d*)$/
+const COMPACT_MESSAGE_REGEX = /^@([1-9]\d*)@$/
+const COMPACT_BLOCK_REGEX = /^@b([1-9]\d*)@$/
 const MESSAGE_ID_TAG_NAME = "dcp-message-id"
+
+export type IdFormat = "xml" | "compact"
 
 const MESSAGE_REF_WIDTH = 4
 const MESSAGE_REF_MIN_INDEX = 1
@@ -21,68 +25,66 @@ export type ParsedBoundaryId =
           blockId: number
       }
 
-export function formatMessageRef(index: number): string {
-    if (
-        !Number.isInteger(index) ||
-        index < MESSAGE_REF_MIN_INDEX ||
-        index > MESSAGE_REF_MAX_INDEX
-    ) {
-        throw new Error(
-            `Message ID index out of bounds: ${index}. Supported range is 0-${MESSAGE_REF_MAX_INDEX}.`,
-        )
+export function formatMessageRef(index: number, format: IdFormat = "xml"): string {
+    const max = format === "compact" ? Number.MAX_SAFE_INTEGER : MESSAGE_REF_MAX_INDEX
+    if (!Number.isSafeInteger(index) || index < MESSAGE_REF_MIN_INDEX || index > max) {
+        throw new Error(`Message ID index out of bounds: ${index}. Supported range is 1-${max}.`)
     }
-    return `m${index.toString().padStart(MESSAGE_REF_WIDTH, "0")}`
+    return format === "compact"
+        ? `@${index}@`
+        : `m${index.toString().padStart(MESSAGE_REF_WIDTH, "0")}`
 }
 
-export function formatBlockRef(blockId: number): string {
+export function formatBlockRef(blockId: number, format: IdFormat = "xml"): string {
     if (!Number.isInteger(blockId) || blockId < 1) {
         throw new Error(`Invalid block ID: ${blockId}`)
     }
-    return `b${blockId}`
+    return format === "compact" ? `@b${blockId}@` : `b${blockId}`
 }
 
-export function parseMessageRef(ref: string): number | null {
+export function parseMessageRef(ref: string, format: IdFormat = "xml"): number | null {
     const normalized = ref.trim().toLowerCase()
-    const match = normalized.match(MESSAGE_REF_REGEX)
+    const match = normalized.match(format === "compact" ? COMPACT_MESSAGE_REGEX : MESSAGE_REF_REGEX)
     if (!match) {
         return null
     }
     const index = Number.parseInt(match[1], 10)
-    if (!Number.isInteger(index)) {
+    if (!Number.isSafeInteger(index)) {
         return null
     }
-    if (index < MESSAGE_REF_MIN_INDEX || index > MESSAGE_REF_MAX_INDEX) {
+    const max = format === "compact" ? Number.MAX_SAFE_INTEGER : MESSAGE_REF_MAX_INDEX
+    if (index < MESSAGE_REF_MIN_INDEX || index > max) {
         return null
     }
     return index
 }
 
-export function parseBlockRef(ref: string): number | null {
+export function parseBlockRef(ref: string, format: IdFormat = "xml"): number | null {
     const normalized = ref.trim().toLowerCase()
-    const match = normalized.match(BLOCK_REF_REGEX)
+    const match = normalized.match(format === "compact" ? COMPACT_BLOCK_REGEX : BLOCK_REF_REGEX)
     if (!match) {
         return null
     }
     const id = Number.parseInt(match[1], 10)
-    return Number.isInteger(id) ? id : null
+    return Number.isSafeInteger(id) ? id : null
 }
 
-export function parseBoundaryId(id: string): ParsedBoundaryId | null {
+export function parseBoundaryId(id: string, format: IdFormat = "xml"): ParsedBoundaryId | null {
     const normalized = id.trim().toLowerCase()
-    const messageIndex = parseMessageRef(normalized)
+    const messageIndex = parseMessageRef(normalized, format)
     if (messageIndex !== null) {
         return {
             kind: "message",
-            ref: formatMessageRef(messageIndex),
+            ref: formatMessageRef(messageIndex, format),
             index: messageIndex,
         }
     }
 
-    const blockId = parseBlockRef(normalized)
+    const blockId = parseBlockRef(normalized, format)
     if (blockId !== null) {
         return {
             kind: "compressed-block",
-            ref: formatBlockRef(blockId),
+            ref: formatBlockRef(blockId, format),
             blockId,
         }
     }
@@ -101,7 +103,13 @@ function escapeXmlAttribute(value: string): string {
 export function formatMessageIdTag(
     ref: string,
     attributes?: Record<string, string | undefined>,
+    format: IdFormat = "xml",
 ): string {
+    if (format === "compact") {
+        if (ref === "BLOCKED") return "\n@blocked@"
+        const priority = attributes?.priority
+        return `\n${ref}${priority ? ` [${priority}]` : ""}`
+    }
     const serializedAttributes = Object.entries(attributes || {})
         .sort(([left], [right]) => left.localeCompare(right))
         .map(([name, value]) => {
@@ -157,8 +165,9 @@ function allocateNextMessageRef(state: SessionState): string {
         ? Math.max(MESSAGE_REF_MIN_INDEX, state.messageIds.nextRef)
         : MESSAGE_REF_MIN_INDEX
 
-    while (candidate <= MESSAGE_REF_MAX_INDEX) {
-        const ref = formatMessageRef(candidate)
+    const max = state.idFormat === "compact" ? Number.MAX_SAFE_INTEGER : MESSAGE_REF_MAX_INDEX
+    while (candidate <= max) {
+        const ref = formatMessageRef(candidate, state.idFormat)
         if (!state.messageIds.byRef.has(ref)) {
             state.messageIds.nextRef = candidate + 1
             return ref
@@ -167,6 +176,6 @@ function allocateNextMessageRef(state: SessionState): string {
     }
 
     throw new Error(
-        `Message ID alias capacity exceeded. Cannot allocate more than ${formatMessageRef(MESSAGE_REF_MAX_INDEX)} aliases in this session.`,
+        `Message ID alias capacity exceeded. Cannot allocate more than ${formatMessageRef(max, state.idFormat)} aliases in this session.`,
     )
 }

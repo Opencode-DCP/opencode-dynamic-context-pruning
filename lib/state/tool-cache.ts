@@ -56,6 +56,7 @@ export function syncToolCache(
                 state.toolParameters.set(part.callID, {
                     tool: part.tool,
                     parameters: part.state?.input ?? {},
+                    metadata: "metadata" in part.state ? part.state.metadata : undefined,
                     status: part.state.status as ToolStatus | undefined,
                     error: part.state.status === "error" ? part.state.error : undefined,
                     turn: turnCounter,

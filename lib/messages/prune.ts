@@ -5,6 +5,7 @@ import { isMessageCompacted } from "../state/utils"
 import { createSyntheticUserMessage, replaceBlockIdsWithBlocked } from "./utils"
 import { getLastUserMessage } from "./query"
 import type { UserMessage } from "@opencode-ai/sdk/v2"
+import { formatBlockRef } from "../message-ids"
 
 const PRUNED_TOOL_OUTPUT_REPLACEMENT =
     "[Output removed to save context - information superseded or no longer needed]"
@@ -16,8 +17,9 @@ export const prune = (
     logger: Logger,
     config: PluginConfig,
     messages: WithParts[],
+    summaryBase?: WithParts,
 ): void => {
-    filterCompressedRanges(state, logger, config, messages)
+    filterCompressedRanges(state, logger, config, messages, summaryBase)
     // pruneFullTool(state, logger, messages)
     pruneToolOutputs(state, logger, messages)
     pruneToolInputs(state, logger, messages)
@@ -161,6 +163,7 @@ const filterCompressedRanges = (
     logger: Logger,
     config: PluginConfig,
     messages: WithParts[],
+    summaryBase?: WithParts,
 ): void => {
     if (
         state.prune.messages.byMessageId.size === 0 &&
@@ -192,14 +195,22 @@ const filterCompressedRanges = (
             } else {
                 // Find user message for variant and as base for synthetic message
                 const msgIndex = messages.indexOf(msg)
-                const userMessage = getLastUserMessage(messages, msgIndex)
+                const userMessage = getLastUserMessage(messages, msgIndex) ?? summaryBase
 
                 if (userMessage) {
                     const userInfo = userMessage.info as UserMessage
+                    // Persisted summaries can outlive the host's tag format.
+                    let renderedSummary = rawSummaryContent
+                    if (state.idFormat === "compact") {
+                        renderedSummary = renderedSummary.replace(
+                            /<dcp-message-id>b(\d+)<\/dcp-message-id>\s*$/i,
+                            (_, id) => formatBlockRef(Number(id), "compact"),
+                        )
+                    }
                     const summaryContent =
                         config.compress.mode === "message"
-                            ? replaceBlockIdsWithBlocked(rawSummaryContent)
-                            : rawSummaryContent
+                            ? replaceBlockIdsWithBlocked(renderedSummary, state.idFormat)
+                            : renderedSummary
                     const summarySeed = `${summary.blockId}:${summary.anchorMessageId}`
                     result.push(
                         createSyntheticUserMessage(userMessage, summaryContent, summarySeed),

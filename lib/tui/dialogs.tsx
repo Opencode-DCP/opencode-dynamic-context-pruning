@@ -1,17 +1,13 @@
 /** @jsxImportSource @opentui/solid */
 
-import { compressPermission } from "../compress-permission"
-import { analyzeContextTokens } from "../commands/context"
-import type { PluginConfig } from "../config"
-import type { SessionState, WithParts } from "../state"
+import type { analyzeContextTokens } from "../commands/context"
 import { formatTokenCount } from "../ui/utils"
-import { TextAttributes } from "@opentui/core"
 import { formatDuration, formatRatio } from "./format"
 import { ActionRow, Card, DcpFrame, Metric, Progress, PromptRow, StatusPill } from "./ui"
-import type { StatsReport, TuiApi } from "./types"
+import type { StatsReport, ViewApi } from "./types"
 
 export function StatusDialog(props: {
-    api: TuiApi
+    api: ViewApi
     title: string
     eyebrow: string
     message: string
@@ -26,13 +22,12 @@ export function StatusDialog(props: {
 }
 
 export function ContextDialog(props: {
-    api: TuiApi
-    state: SessionState
-    messages: WithParts[]
+    api: ViewApi
+    breakdown: ReturnType<typeof analyzeContextTokens>
     onBack: () => void
 }) {
     const theme = props.api.theme.current
-    const breakdown = analyzeContextTokens(props.state, props.messages)
+    const breakdown = props.breakdown
     const total = Math.max(0, breakdown.total)
     const activePruned = breakdown.prunedToolCount + breakdown.prunedMessageCount
 
@@ -96,7 +91,7 @@ export function ContextDialog(props: {
     )
 }
 
-export function StatsDialog(props: { api: TuiApi; report: StatsReport; onBack: () => void }) {
+export function StatsDialog(props: { api: ViewApi; report: StatsReport; onBack: () => void }) {
     const theme = props.api.theme.current
     const ratio = formatRatio(props.report.sessionTokens, props.report.sessionSummaryTokens)
     return (
@@ -155,15 +150,16 @@ export function StatsDialog(props: { api: TuiApi; report: StatsReport; onBack: (
 }
 
 export function PanelDialog(props: {
-    api: TuiApi
-    state: SessionState
-    config: PluginConfig
+    api: ViewApi
+    manualMode: boolean
+    canCompress: boolean
+    blockedReason?: string
     onContext: () => void
     onStats: () => void
     onManual: (enabled: boolean) => void
 }) {
     const theme = props.api.theme.current
-    const canCompress = compressPermission(props.state, props.config) !== "deny"
+    const canCompress = props.canCompress
     return (
         <DcpFrame api={props.api} eyebrow="DCP">
             <Card theme={theme} title="Views">
@@ -191,11 +187,17 @@ export function PanelDialog(props: {
                         accent="primary"
                     />
                 ) : (
-                    <text fg={theme.textMuted}>Compression is denied by permissions.</text>
+                    <text fg={theme.textMuted}>
+                        {props.blockedReason ?? "Compression is denied by permissions."}
+                    </text>
                 )}
             </Card>
             <Card theme={theme} title="Session State">
-                <ManualModeToggle api={props.api} state={props.state} onToggle={props.onManual} />
+                <ManualModeToggle
+                    api={props.api}
+                    enabled={props.manualMode}
+                    onToggle={props.onManual}
+                />
                 <StatusPill
                     theme={theme}
                     label="Compression command"
@@ -208,18 +210,18 @@ export function PanelDialog(props: {
 }
 
 function ManualModeToggle(props: {
-    api: TuiApi
-    state: SessionState
+    api: ViewApi
+    enabled: boolean
     onToggle: (enabled: boolean) => void
 }) {
     const theme = props.api.theme.current
-    const enabled = !!props.state.manualMode
+    const enabled = props.enabled
     const track = enabled ? theme.success : theme.error
     return (
         <box flexDirection="row" justifyContent="space-between" paddingLeft={1} paddingRight={1}>
             <box width={22}>
-                <text fg={theme.primary} attributes={TextAttributes.BOLD}>
-                    Manual mode
+                <text fg={theme.primary}>
+                    <b>Manual mode</b>
                 </text>
             </box>
             <box

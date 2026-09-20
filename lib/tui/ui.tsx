@@ -1,28 +1,40 @@
 /** @jsxImportSource @opentui/solid */
 
-import { TextAttributes } from "@opentui/core"
+import type { BoxRenderable, ScrollBoxRenderable } from "@opentui/core"
 import type { JSX } from "solid-js"
 import { pct } from "./format"
-import type { Theme, ThemeColor, TuiApi } from "./types"
+import type { Theme, ThemeColor, ViewApi } from "./types"
+
+// header (1-2) + divider (1) + footer (2) + gaps (3) + bottom padding (1)
+const FRAME_OVERHEAD = 9
 
 export function DcpFrame(props: {
-    api: TuiApi
+    api: ViewApi
     title?: string
     eyebrow: string
     children: JSX.Element
     onBack?: () => void
 }) {
     const theme = props.api.theme.current
+    let body: ScrollBoxRenderable | undefined
+    let inner: BoxRenderable | undefined
+    function available() {
+        const height = props.api.renderer.height
+        return Math.max(10, height - Math.floor(height / 4) - 2) - FRAME_OVERHEAD
+    }
+    function resize() {
+        if (body) body.height = Math.min(inner?.height || available(), available())
+    }
     return (
         <box paddingLeft={3} paddingRight={3} paddingBottom={1} gap={1}>
             <box flexDirection="row" justifyContent="space-between">
                 <box flexDirection="column">
-                    <text fg={theme.primary} attributes={TextAttributes.BOLD}>
-                        {props.eyebrow}
+                    <text fg={theme.primary}>
+                        <b>{props.eyebrow}</b>
                     </text>
                     {props.title ? (
-                        <text fg={theme.text} attributes={TextAttributes.BOLD}>
-                            {props.title}
+                        <text fg={theme.text}>
+                            <b>{props.title}</b>
                         </text>
                     ) : null}
                 </box>
@@ -31,7 +43,21 @@ export function DcpFrame(props: {
                 </text>
             </box>
             <box height={1} border={["bottom"]} borderColor={theme.borderSubtle} />
-            {props.children}
+            <scrollbox
+                height={available()}
+                scrollY
+                ref={(r: ScrollBoxRenderable) => {
+                    body = r
+                    // Use the host renderer rather than a separate OpenTUI/Solid context.
+                    props.api.renderer.on("resize", resize)
+                    r.once("destroyed", () => props.api.renderer.off("resize", resize))
+                    resize()
+                }}
+            >
+                <box ref={(r: BoxRenderable) => (inner = r)} onSizeChange={resize}>
+                    {props.children}
+                </box>
+            </scrollbox>
             <box flexDirection="row" justifyContent="space-between" paddingTop={1}>
                 {props.onBack ? (
                     <FooterButton
@@ -89,8 +115,8 @@ export function Card(props: { theme: Theme; title: string; children: JSX.Element
             borderColor={accent}
             gap={1}
         >
-            <text fg={accent} attributes={TextAttributes.BOLD}>
-                {props.title}
+            <text fg={accent}>
+                <b>{props.title}</b>
             </text>
             {props.children}
         </box>
@@ -104,8 +130,8 @@ export function Metric(props: { theme: Theme; label: string; value: string; hint
                 <text fg={props.theme.textMuted}>{props.label}</text>
             </box>
             <box flexDirection="row" gap={1} flexGrow={1}>
-                <text fg={props.theme.text} attributes={TextAttributes.BOLD}>
-                    {props.value}
+                <text fg={props.theme.text}>
+                    <b>{props.value}</b>
                 </text>
                 {props.hint ? <text fg={props.theme.textMuted}>{props.hint}</text> : null}
             </box>
@@ -132,8 +158,8 @@ export function Progress(props: {
                     <text fg={props.theme.text}>{props.label}</text>
                 </box>
                 <box flexDirection="row" gap={1} flexGrow={1}>
-                    <text fg={props.theme.text} attributes={TextAttributes.BOLD}>
-                        {pct(props.value, props.total)}
+                    <text fg={props.theme.text}>
+                        <b>{pct(props.value, props.total)}</b>
                     </text>
                     <text fg={props.theme.textMuted}>{props.detail}</text>
                 </box>
@@ -156,8 +182,8 @@ export function PromptRow(props: {
     return (
         <box flexDirection="row" gap={2}>
             <box width={22}>
-                <text fg={accent} attributes={TextAttributes.BOLD}>
-                    {props.command}
+                <text fg={accent}>
+                    <b>{props.command}</b>
                 </text>
             </box>
             <box flexGrow={1}>
@@ -177,12 +203,12 @@ export function StatusPill(props: {
     return (
         <box flexDirection="row" justifyContent="space-between" paddingLeft={1} paddingRight={1}>
             <box width={22}>
-                <text fg={props.theme.primary} attributes={TextAttributes.BOLD}>
-                    {props.label}
+                <text fg={props.theme.primary}>
+                    <b>{props.label}</b>
                 </text>
             </box>
-            <text fg={accent} attributes={TextAttributes.BOLD}>
-                {props.value}
+            <text fg={accent}>
+                <b>{props.value}</b>
             </text>
         </box>
     )
@@ -205,8 +231,8 @@ export function ActionRow(props: {
         >
             <box flexDirection="row" gap={2}>
                 <box width={12}>
-                    <text fg={accent} attributes={TextAttributes.BOLD}>
-                        {props.title}
+                    <text fg={accent}>
+                        <b>{props.title}</b>
                     </text>
                 </box>
                 <text fg={props.theme.text}>{props.detail}</text>

@@ -70,7 +70,7 @@ export function getFilePathsFromParameters(tool: string, parameters: unknown): s
     const params = parameters as Record<string, any>
 
     // 1. apply_patch uses patchText with embedded paths
-    if (tool === "apply_patch" && typeof params.patchText === "string") {
+    if ((tool === "apply_patch" || tool === "patch") && typeof params.patchText === "string") {
         const pathRegex = /\*\*\* (?:Add|Delete|Update) File: ([^\n\r]+)/g
         let match
         while ((match = pathRegex.exec(params.patchText)) !== null) {
@@ -95,6 +95,11 @@ export function getFilePathsFromParameters(tool: string, parameters: unknown): s
     // 3. Default check for common filePath parameter (read, write, edit, etc)
     if (typeof params.filePath === "string") {
         paths.push(params.filePath)
+    }
+
+    // V2 file tools use path rather than filePath.
+    if (["read", "write", "edit"].includes(tool) && typeof params.path === "string") {
+        paths.push(params.path)
     }
 
     // Return unique non-empty paths
@@ -129,4 +134,26 @@ export function isToolNameProtected(toolName: string, patterns: string[]): boole
     }
 
     return globPatterns.some((pattern) => matchesGlob(toolName, pattern))
+}
+
+export function isToolProtected(
+    tool: string,
+    input: unknown,
+    tools: string[],
+    files: string[],
+    metadata?: Record<string, unknown>,
+): boolean {
+    const calls = [{ tool, input }]
+    // V2 Code Mode keeps nested inputs, but only one combined output. Protect
+    // that output as a whole when any nested call matches the user's rules.
+    if (tool === "execute" && Array.isArray(metadata?.toolCalls)) {
+        for (const call of metadata.toolCalls) {
+            if (call && typeof call.tool === "string") calls.push(call)
+        }
+    }
+    return calls.some(
+        (call) =>
+            isToolNameProtected(call.tool, tools) ||
+            isFilePathProtected(getFilePathsFromParameters(call.tool, call.input), files),
+    )
 }

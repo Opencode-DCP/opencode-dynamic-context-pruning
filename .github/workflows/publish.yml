@@ -48,7 +48,7 @@ jobs:
 
             - name: Install dependencies
               if: steps.package.outputs.published == 'false'
-              run: npm ci
+              run: npm ci --legacy-peer-deps
 
             - name: Format check
               if: steps.package.outputs.published == 'false'
