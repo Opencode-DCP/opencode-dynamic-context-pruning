@@ -1,4 +1,9 @@
-export const COMPRESS_MESSAGE = `Collapse selected individual messages in the conversation into detailed summaries.
+import type { IdFormat } from "../message-ids"
+
+export function messagePrompt(format: IdFormat = "xml"): string {
+    const compact = format === "compact"
+    const message = compact ? "@4@" : "mNNNN"
+    return `Collapse selected individual messages in the conversation into detailed summaries.
 
 THE SUMMARY
 Your summary must be EXHAUSTIVE. Capture file paths, function signatures, decisions made, constraints discovered, key findings, tool outcomes, and user intent details that matter... EVERYTHING that preserves the value of the selected message after the raw message is removed.
@@ -13,20 +18,20 @@ If a message contains no significant technical decisions, code changes, or user 
 MESSAGE IDS
 You specify individual raw messages by ID using the injected IDs visible in the conversation:
 
-- \`mNNNN\` IDs identify raw messages
+- \`${message}\` IDs identify raw messages
 
-Each message has an ID inside XML metadata tags like \`<dcp-message-id priority="high">m0007</dcp-message-id>\`.
+${compact ? "Each message has an ID like `@7@ [high]`." : 'Each message has an ID inside XML metadata tags like `<dcp-message-id priority="high">m0007</dcp-message-id>`.'}
 The same ID tag appears in every tool output of the message it belongs to — each unique ID identifies one complete message.
-Treat these tags as message metadata only, not as content to summarize. Use only the inner \`mNNNN\` value as the \`messageId\`.
-The \`priority\` attribute indicates relative context cost. You MUST compress high-priority messages when their full text is no longer necessary for the active task.
+Treat these tags as message metadata only, not as content to summarize. ${compact ? "Copy the whole ID, including both `@` characters, into `messageId`, without the priority label." : "Use only the inner `mNNNN` value as the `messageId`."}
+${compact ? "The `[low]`, `[medium]`, and `[high]` labels indicate relative context cost." : "The `priority` attribute indicates relative context cost."} You MUST compress high-priority messages when their full text is no longer necessary for the active task.
 If prior compress-tool results are present, always compress and summarize them minimally only as part of a broader compression pass. Do not invoke the compress tool solely to re-compress an earlier compression result.
-Messages marked as \`<dcp-message-id>BLOCKED</dcp-message-id>\` cannot be compressed.
+Messages marked as \`${compact ? "@blocked@" : "<dcp-message-id>BLOCKED</dcp-message-id>"}\` cannot be compressed.
 
 Rules:
 
 - Pick each \`messageId\` directly from injected IDs visible in context.
-- Only use raw message IDs of the form \`mNNNN\`.
-- Ignore XML attributes such as \`priority\` when copying the ID; use only the inner \`mNNNN\` value.
+- Only use raw message IDs of the form \`${message}\`.
+- ${compact ? "Ignore priority labels when copying an ID: use `@7@`, not `@7@ [high]`. Summary IDs like `@b1@` are not valid message targets." : "Ignore XML attributes such as `priority` when copying the ID; use only the inner `mNNNN` value."}
 - Do not invent IDs. Use only IDs that are present in context.
 
 BATCHING
@@ -41,3 +46,6 @@ Do not compress away still-active instructions, unresolved questions, or constra
 Prioritize the earliest messages in the context as they will be the least relevant to the active task.
 General cleanup should be done periodically between other normal compression tool passes, not as the primary form of compression.
 `
+}
+
+export const COMPRESS_MESSAGE = messagePrompt()

@@ -60,6 +60,7 @@ export async function setup(ctx: Plugin.Context) {
         logger,
         ctx.location.directory,
         config.experimental.customPrompts,
+        "compact",
     )
     const sessions = new Map<string, SessionState>()
     const queues = new Map<string, Promise<unknown>>()
@@ -127,7 +128,7 @@ export async function setup(ctx: Plugin.Context) {
         const { data: agent } = await ctx.agent.get({ agentID: selected })
         let state = sessions.get(sessionID)
         if (!state) {
-            state = createSessionState()
+            state = createSessionState("compact")
             sessions.set(sessionID, state)
         }
         const messages = history(entries, session)
@@ -190,7 +191,7 @@ export async function setup(ctx: Plugin.Context) {
                     agent: event.agent,
                     model: event.model,
                 })
-                stripHallucinations(view.messages)
+                stripHallucinations(view.messages, state.idFormat)
                 assignMessageRefs(state, view.messages)
                 // Compaction may select only a prefix; block origins can be in the retained tail.
                 syncCompressionBlocks(state, logger, messages)
@@ -245,7 +246,7 @@ export async function setup(ctx: Plugin.Context) {
             (config.compress.mode === "message"
                 ? createCompressMessageTool
                 : createCompressRangeTool)({ client, state, logger, config, prompts })
-        const definition = define(createSessionState())
+        const definition = define(createSessionState("compact"))
         await ctx.tool.transform((editor) =>
             editor.add({
                 name: "compress",

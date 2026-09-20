@@ -1,6 +1,6 @@
 import type { PluginConfig } from "../config"
 import type { SessionState } from "../state"
-import { parseBoundaryId } from "../message-ids"
+import { parseBoundaryId, type IdFormat } from "../message-ids"
 import { isIgnoredUserMessage, isProtectedUserMessage } from "../messages/query"
 import { resolveAnchorMessageId, resolveBoundaryIds, resolveSelection } from "./search"
 import { COMPRESSED_BLOCK_HEADER } from "./state"
@@ -80,39 +80,43 @@ export function formatIssues(skippedIssues: string[], skippedCount: number): str
     return `Unable to compress any messages. Found ${skippedCount} ${issueNoun}:\n${issueLines}`
 }
 
-const ISSUE_TEMPLATES: Record<string, [singular: string, plural: string]> = {
-    blocked: [
-        "refers to a protected message and cannot be compressed.",
-        "refer to protected messages and cannot be compressed.",
-    ],
-    "invalid-format": [
-        "is invalid. Use an injected raw message ID of the form mNNNN.",
-        "are invalid. Use injected raw message IDs of the form mNNNN.",
-    ],
-    "block-id": [
-        "is invalid here. Block IDs like bN are not allowed; use an mNNNN message ID instead.",
-        "are invalid here. Block IDs like bN are not allowed; use mNNNN message IDs instead.",
-    ],
-    "not-in-context": [
-        "is not available in the current conversation context. Choose an injected mNNNN ID visible in context.",
-        "are not available in the current conversation context. Choose injected mNNNN IDs visible in context.",
-    ],
-    protected: [
-        "refers to a protected message and cannot be compressed.",
-        "refer to protected messages and cannot be compressed.",
-    ],
-    "already-compressed": [
-        "is already part of an active compression.",
-        "are already part of active compressions.",
-    ],
-    duplicate: [
-        "was selected more than once in this batch.",
-        "were each selected more than once in this batch.",
-    ],
+function issueTemplates(format: IdFormat): Record<string, [singular: string, plural: string]> {
+    const message = format === "compact" ? "@4@" : "mNNNN"
+    const block = format === "compact" ? "@b1@" : "bN"
+    return {
+        blocked: [
+            "refers to a protected message and cannot be compressed.",
+            "refer to protected messages and cannot be compressed.",
+        ],
+        "invalid-format": [
+            `is invalid. Use an injected raw message ID of the form ${message}.`,
+            `are invalid. Use injected raw message IDs of the form ${message}.`,
+        ],
+        "block-id": [
+            `is invalid here. Block IDs like ${block} are not allowed; use an injected ${message} message ID instead.`,
+            `are invalid here. Block IDs like ${block} are not allowed; use ${message} message IDs instead.`,
+        ],
+        "not-in-context": [
+            `is not available in the current conversation context. Choose an injected ${message} ID visible in context.`,
+            `are not available in the current conversation context. Choose injected ${message} IDs visible in context.`,
+        ],
+        protected: [
+            "refers to a protected message and cannot be compressed.",
+            "refer to protected messages and cannot be compressed.",
+        ],
+        "already-compressed": [
+            "is already part of an active compression.",
+            "are already part of active compressions.",
+        ],
+        duplicate: [
+            "was selected more than once in this batch.",
+            "were each selected more than once in this batch.",
+        ],
+    }
 }
 
-function formatSkippedGroup(kind: string, messageIds: string[]): string {
-    const templates = ISSUE_TEMPLATES[kind]
+function formatSkippedGroup(kind: string, messageIds: string[], format: IdFormat): string {
+    const templates = issueTemplates(format)[kind]
     const ids = messageIds.join(", ")
     const single = messageIds.length === 1
     const prefix = single ? "messageId" : "messageIds"
@@ -124,7 +128,7 @@ function formatSkippedGroup(kind: string, messageIds: string[]): string {
     return `${prefix} ${ids} ${single ? templates[0] : templates[1]}`
 }
 
-function groupSkippedIssues(issues: SkippedIssue[]): string[] {
+function groupSkippedIssues(issues: SkippedIssue[], format: IdFormat): string[] {
     const groups = new Map<string, string[]>()
     const order: string[] = []
 
@@ -140,7 +144,7 @@ function groupSkippedIssues(issues: SkippedIssue[]): string[] {
 
     return order.map((kind) => {
         const ids = groups.get(kind)!
-        return formatSkippedGroup(kind, ids)
+        return formatSkippedGroup(kind, ids, format)
     })
 }
 
@@ -185,7 +189,7 @@ export function resolveMessages(
 
     return {
         plans,
-        skippedIssues: groupSkippedIssues(issues),
+        skippedIssues: groupSkippedIssues(issues, state.idFormat),
         skippedCount: issues.length,
     }
 }
@@ -196,11 +200,12 @@ function resolveMessage(
     state: SessionState,
     config: PluginConfig,
 ): ResolvedMessageCompression {
-    if (entry.messageId.toUpperCase() === "BLOCKED") {
-        throw new SoftIssue("blocked", "BLOCKED", "protected message")
+    const blocked = state.idFormat === "compact" ? "@blocked@" : "BLOCKED"
+    if (entry.messageId.toLowerCase() === blocked.toLowerCase()) {
+        throw new SoftIssue("blocked", blocked, "protected message")
     }
 
-    const parsed = parseBoundaryId(entry.messageId)
+    const parsed = parseBoundaryId(entry.messageId, state.idFormat)
 
     if (!parsed) {
         throw new SoftIssue("invalid-format", entry.messageId, "invalid format")

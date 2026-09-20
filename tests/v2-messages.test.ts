@@ -101,7 +101,7 @@ test("V2 projection preserves all native content without edits", () => {
 test("V2 ID injection preserves signatures, media and tool pairing", () => {
     const native = transcript()
     const view = project(native, entries(native), session)
-    const state = createSessionState()
+    const state = createSessionState("compact")
     assignMessageRefs(state, view.messages)
     injectMessageIds(state, config, view.messages, new Map())
     const restored = view.restore()
@@ -109,14 +109,15 @@ test("V2 ID injection preserves signatures, media and tool pairing", () => {
     assert.equal(restored[1]!.content[0], native[1]!.content[0])
     assert.equal(restored[2]!.content[0], native[2]!.content[0])
     assert.equal(restored[3]!.content[1], native[3]!.content[1])
-    assert.match(JSON.stringify(restored[3]!.content[0]), /m0002/)
-    assert.ok(!JSON.stringify(native).includes("m0002"), "native input must not be mutated")
+    assert.match(JSON.stringify(restored[3]!.content[0]), /@2@/)
+    assert.doesNotMatch(JSON.stringify(restored), /dcp-message-id|m0002/)
+    assert.ok(!JSON.stringify(native).includes("@2@"), "native input must not be mutated")
 })
 
 test("V2 tool pruning replaces only marked results", () => {
     const native = transcript()
     const view = project(native, entries(native), session)
-    const state = createSessionState()
+    const state = createSessionState("compact")
     state.prune.tools.set("call_one", 100)
     prune(state, logger, config, view.messages)
     const restored = view.restore()
@@ -128,7 +129,7 @@ test("V2 tool pruning replaces only marked results", () => {
 test("V2 compression removes the assistant and its ID-less results together", () => {
     const native = transcript()
     const view = project(native, entries(native), session)
-    const state = createSessionState()
+    const state = createSessionState("compact")
     state.prune.messages.byMessageId.set("msg_assistant", {
         tokenCount: 100,
         allBlockIds: [1],
@@ -149,7 +150,7 @@ test("V2 leaves non-durable plugin messages and checkpoint tool results intact",
 test("V2 inserts summaries after native checkpoints without an ordinary user message", () => {
     const native = transcript().filter((message) => message.role !== "user")
     const view = project(native, entries(native), session)
-    const state = createSessionState()
+    const state = createSessionState("compact")
     state.prune.messages.byMessageId.set("msg_assistant", {
         tokenCount: 100,
         allBlockIds: [1],

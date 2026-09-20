@@ -56,6 +56,12 @@ Use [package.json](package.json) for dependency requirements and
 Host-specific behavior is implemented in [index.ts](index.ts),
 [tui.tsx](tui.tsx), and [lib/v2/](lib/v2/).
 
+V2 uses `@4@` message IDs and `@b1@` summary IDs. Compression inputs include the
+whole marker; range summaries use `@b1@` placeholders for nested summaries.
+Message-mode priority labels look like `@4@ [high]`; `@blocked@` marks content
+that cannot be selected. V1 uses XML ID tags. Custom prompt overrides must describe
+the ID format of the host they run on.
+
 ## Local Installation
 
 After building, add this checkout's absolute path to your OpenCode configuration.

@@ -176,6 +176,7 @@ export const injectMessageIds = (
         const tag = formatMessageIdTag(
             isBlockedMessage ? "BLOCKED" : messageRef,
             priority ? { priority } : undefined,
+            state.idFormat,
         )
 
         if (message.info.role === "user") {

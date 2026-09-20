@@ -5,6 +5,7 @@ import { isMessageCompacted } from "../state/utils"
 import { createSyntheticUserMessage, replaceBlockIdsWithBlocked } from "./utils"
 import { getLastUserMessage } from "./query"
 import type { UserMessage } from "@opencode-ai/sdk/v2"
+import { formatBlockRef } from "../message-ids"
 
 const PRUNED_TOOL_OUTPUT_REPLACEMENT =
     "[Output removed to save context - information superseded or no longer needed]"
@@ -198,10 +199,18 @@ const filterCompressedRanges = (
 
                 if (userMessage) {
                     const userInfo = userMessage.info as UserMessage
+                    // Persisted summaries can outlive the host's tag format.
+                    let renderedSummary = rawSummaryContent
+                    if (state.idFormat === "compact") {
+                        renderedSummary = renderedSummary.replace(
+                            /<dcp-message-id>b(\d+)<\/dcp-message-id>\s*$/i,
+                            (_, id) => formatBlockRef(Number(id), "compact"),
+                        )
+                    }
                     const summaryContent =
                         config.compress.mode === "message"
-                            ? replaceBlockIdsWithBlocked(rawSummaryContent)
-                            : rawSummaryContent
+                            ? replaceBlockIdsWithBlocked(renderedSummary, state.idFormat)
+                            : renderedSummary
                     const summarySeed = `${summary.blockId}:${summary.anchorMessageId}`
                     result.push(
                         createSyntheticUserMessage(userMessage, summaryContent, summarySeed),

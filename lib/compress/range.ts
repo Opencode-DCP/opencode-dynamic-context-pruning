@@ -1,7 +1,8 @@
 import { tool } from "@opencode-ai/plugin"
 import type { ToolContext } from "./types"
 import { countTokens } from "../token-utils"
-import { RANGE_FORMAT_EXTENSION } from "../prompts/extensions/tool"
+import { rangeFormat } from "../prompts/extensions/tool"
+import { formatMessageRef, formatBlockRef, type IdFormat } from "../message-ids"
 import { finalizeSession, prepareSession, type NotificationEntry } from "./pipeline"
 import {
     appendProtectedPromptInfo,
@@ -26,7 +27,7 @@ import {
 } from "./state"
 import type { CompressRangeToolArgs } from "./types"
 
-function buildSchema() {
+function buildSchema(format: IdFormat) {
     return {
         topic: tool.schema
             .string()
@@ -37,11 +38,13 @@ function buildSchema() {
                     startId: tool.schema
                         .string()
                         .describe(
-                            "Message or block ID marking the beginning of range (e.g. m0001, b2)",
+                            `Message or block ID marking the beginning of range (e.g. ${formatMessageRef(1, format)}, ${formatBlockRef(2, format)})`,
                         ),
                     endId: tool.schema
                         .string()
-                        .describe("Message or block ID marking the end of range (e.g. m0012, b5)"),
+                        .describe(
+                            `Message or block ID marking the end of range (e.g. ${formatMessageRef(12, format)}, ${formatBlockRef(5, format)})`,
+                        ),
                     summary: tool.schema
                         .string()
                         .describe("Complete technical summary replacing all content in range"),
@@ -58,8 +61,8 @@ export function createCompressRangeTool(ctx: ToolContext): ReturnType<typeof too
     const runtimePrompts = ctx.prompts.getRuntimePrompts()
 
     return tool({
-        description: runtimePrompts.compressRange + RANGE_FORMAT_EXTENSION,
-        args: buildSchema(),
+        description: runtimePrompts.compressRange + rangeFormat(ctx.state.idFormat),
+        args: buildSchema(ctx.state.idFormat),
         async execute(args, toolCtx) {
             const input = args as CompressRangeToolArgs
             validateArgs(input)
@@ -87,7 +90,10 @@ export function createCompressRangeTool(ctx: ToolContext): ReturnType<typeof too
             let totalCompressedMessages = 0
 
             for (const plan of resolvedPlans) {
-                const parsedPlaceholders = parseBlockPlaceholders(plan.entry.summary)
+                const parsedPlaceholders = parseBlockPlaceholders(
+                    plan.entry.summary,
+                    ctx.state.idFormat,
+                )
                 const missingBlockIds = validateSummaryPlaceholders(
                     parsedPlaceholders,
                     plan.selection.requiredBlockIds,
@@ -136,6 +142,7 @@ export function createCompressRangeTool(ctx: ToolContext): ReturnType<typeof too
                     missingBlockIds,
                     searchContext.summaryByBlockId,
                     injected.consumedBlockIds,
+                    ctx.state.idFormat,
                 )
 
                 preparedPlans.push({
@@ -151,7 +158,11 @@ export function createCompressRangeTool(ctx: ToolContext): ReturnType<typeof too
 
             for (const preparedPlan of preparedPlans) {
                 const blockId = allocateBlockId(ctx.state)
-                const storedSummary = wrapCompressedSummary(blockId, preparedPlan.finalSummary)
+                const storedSummary = wrapCompressedSummary(
+                    blockId,
+                    preparedPlan.finalSummary,
+                    ctx.state.idFormat,
+                )
                 const summaryTokens = countTokens(storedSummary)
 
                 const applied = applyCompressionState(

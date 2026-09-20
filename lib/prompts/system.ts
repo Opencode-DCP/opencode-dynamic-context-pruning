@@ -1,9 +1,14 @@
-export const SYSTEM = `
+import type { IdFormat } from "../message-ids"
+
+export function systemPrompt(format: IdFormat = "xml"): string {
+    const markers =
+        format === "compact" ? "`@4@`, `@b1@`, `@blocked@`, priority labels" : "`<dcp-message-id>`"
+    return `
 You operate in a context-constrained environment. Manage context continuously to avoid buildup and preserve retrieval quality. Efficient context management is paramount for your agentic performance.
 
 The ONLY tool you have for context management is \`compress\`. It replaces older conversation content with technical summaries you produce.
 
-\`<dcp-message-id>\` and \`<dcp-system-reminder>\` tags are environment-injected metadata. Do not output them.
+${markers} and \`<dcp-system-reminder>\` tags are environment-injected metadata. Do not output them.
 
 THE PHILOSOPHY OF COMPRESS
 \`compress\` transforms conversation content into dense, high-fidelity summaries. This is not cleanup - it is crystallization. Your summary becomes the authoritative record of what transpired.
@@ -31,3 +36,6 @@ Evaluate conversation signal-to-noise REGULARLY. Use \`compress\` deliberately w
 
 It is of your responsibility to keep a sharp, high-quality context window for optimal performance.
 `
+}
+
+export const SYSTEM = systemPrompt()

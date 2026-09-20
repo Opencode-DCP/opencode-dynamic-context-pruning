@@ -1,4 +1,5 @@
 import type { CompressionTimingState } from "../compress/timing"
+import type { IdFormat } from "../message-ids"
 import { Message, Part } from "@opencode-ai/sdk/v2"
 
 export interface WithParts {
@@ -92,6 +93,7 @@ export interface Nudges {
 }
 
 export interface SessionState {
+    idFormat: IdFormat
     sessionId: string | null
     isSubAgent: boolean
     manualMode: false | "active" | "compress-pending"

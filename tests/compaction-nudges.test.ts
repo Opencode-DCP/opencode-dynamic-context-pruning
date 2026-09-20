@@ -7,7 +7,7 @@ import type { RuntimePrompts } from "../lib/prompts/store"
 import { createSessionState, type WithParts } from "../lib/state"
 
 test("compaction replays existing nudges without changing the cached prefix or adding anchors", () => {
-    const state = createSessionState()
+    const state = createSessionState("compact")
     const logger = new Logger(false)
     const config = {
         compress: {

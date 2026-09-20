@@ -23,7 +23,7 @@ export interface RecompressCommandContext {
 
 function parseBlockIdArg(arg: string): number | null {
     const normalized = arg.trim().toLowerCase()
-    const blockRef = parseBlockRef(normalized)
+    const blockRef = parseBlockRef(normalized) ?? parseBlockRef(normalized, "compact")
     if (blockRef !== null) {
         return blockRef
     }

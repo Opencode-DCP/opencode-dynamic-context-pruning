@@ -46,6 +46,7 @@ export const injectExtendedSubAgentResults = async (
                 if (cachedResult) {
                     part.state.output = stripHallucinationsFromString(
                         mergeSubagentResult(part.state.output, cachedResult),
+                        state.idFormat,
                     )
                 }
                 continue
@@ -76,6 +77,7 @@ export const injectExtendedSubAgentResults = async (
             state.subAgentResultCache.set(part.callID, subAgentResultText)
             part.state.output = stripHallucinationsFromString(
                 mergeSubagentResult(part.state.output, subAgentResultText),
+                state.idFormat,
             )
         }
     }

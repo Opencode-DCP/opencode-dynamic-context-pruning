@@ -51,15 +51,21 @@ export function resolveBoundaryIds(
 ): { startReference: BoundaryReference; endReference: BoundaryReference } {
     const lookup = buildBoundaryLookup(context, state)
     const issues: string[] = []
-    const parsedStartId = parseBoundaryId(startId)
-    const parsedEndId = parseBoundaryId(endId)
+    const parsedStartId = parseBoundaryId(startId, state.idFormat)
+    const parsedEndId = parseBoundaryId(endId, state.idFormat)
+    const messageExample = state.idFormat === "compact" ? "@4@" : "mNNNN"
+    const blockExample = state.idFormat === "compact" ? "@b1@" : "bN"
 
     if (parsedStartId === null) {
-        issues.push("startId is invalid. Use an injected message ID (mNNNN) or block ID (bN).")
+        issues.push(
+            `startId is invalid. Use an injected message ID (${messageExample}) or block ID (${blockExample}).`,
+        )
     }
 
     if (parsedEndId === null) {
-        issues.push("endId is invalid. Use an injected message ID (mNNNN) or block ID (bN).")
+        issues.push(
+            `endId is invalid. Use an injected message ID (${messageExample}) or block ID (${blockExample}).`,
+        )
     }
 
     if (issues.length > 0) {
@@ -252,7 +258,7 @@ function buildBoundaryLookup(
         if (rawIndex === undefined) {
             continue
         }
-        const blockRef = formatBlockRef(summary.blockId)
+        const blockRef = formatBlockRef(summary.blockId, state.idFormat)
         if (!lookup.has(blockRef)) {
             lookup.set(blockRef, {
                 kind: "compressed-block",

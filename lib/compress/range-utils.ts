@@ -1,5 +1,6 @@
 import type { CompressionBlock, SessionState } from "../state"
 import { resolveAnchorMessageId, resolveBoundaryIds, resolveSelection } from "./search"
+import type { IdFormat } from "../message-ids"
 import type {
     BoundaryReference,
     CompressRangeToolArgs,
@@ -100,9 +101,12 @@ export function validateNonOverlapping(plans: ResolvedRangeCompression[]): void 
     }
 }
 
-export function parseBlockPlaceholders(summary: string): ParsedBlockPlaceholder[] {
+export function parseBlockPlaceholders(
+    summary: string,
+    format: IdFormat = "xml",
+): ParsedBlockPlaceholder[] {
     const placeholders: ParsedBlockPlaceholder[] = []
-    const regex = new RegExp(BLOCK_PLACEHOLDER_REGEX)
+    const regex = format === "compact" ? /@b([1-9]\d*)@/gi : new RegExp(BLOCK_PLACEHOLDER_REGEX)
 
     let match: RegExpExecArray | null
     while ((match = regex.exec(summary)) !== null) {
@@ -228,6 +232,7 @@ export function appendMissingBlockSummaries(
     missingBlockIds: number[],
     summaryByBlockId: Map<number, CompressionBlock>,
     consumedBlockIds: number[],
+    format: IdFormat = "xml",
 ): InjectedSummaryResult {
     const consumedSeen = new Set<number>(consumedBlockIds)
     const consumed = [...consumedBlockIds]
@@ -243,7 +248,8 @@ export function appendMissingBlockSummaries(
             throw new Error(`Compressed block not found: (b${blockId})`)
         }
 
-        missingSummaries.push(`\n### (b${blockId})\n${restoreSummary(target.summary)}`)
+        const label = format === "compact" ? `compressed block ${blockId}` : `(b${blockId})`
+        missingSummaries.push(`\n### ${label}\n${restoreSummary(target.summary)}`)
         consumedSeen.add(blockId)
         consumed.push(blockId)
     }
@@ -274,6 +280,7 @@ function restoreSummary(summary: string): string {
     const withoutLeadingBreaks = afterHeader.replace(/^(?:\r?\n)+/, "")
     return withoutLeadingBreaks
         .replace(/(?:\r?\n)*<dcp-message-id>b\d+<\/dcp-message-id>\s*$/i, "")
+        .replace(/(?:\r?\n)*@b[1-9]\d*@\s*$/i, "")
         .replace(/(?:\r?\n)+$/, "")
 }
 
