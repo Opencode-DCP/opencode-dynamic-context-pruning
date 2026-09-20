@@ -109,7 +109,9 @@ export async function createMock(WebSocketServer) {
             return events("## Objective\nDCP_NATIVE_SUMMARY: preserve the completed test work.")
         if (!tool || text.includes("LAB_SUMMARY") || text.includes("function_call_output"))
             return events()
-        const ref = text.match(/<dcp-message-id[^>]*>(m\d+)<\/dcp-message-id>/)?.[1]
+        const ref =
+            text.match(/@[1-9]\d*@/)?.[0] ??
+            text.match(/<dcp-message-id[^>]*>(m\d+)<\/dcp-message-id>/)?.[1]
         if (!ref) return events("MISSING_DCP_IDS")
         const message = tool.parameters?.properties?.content?.items?.properties?.messageId
         const item = message

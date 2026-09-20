@@ -77,9 +77,9 @@ export async function commands(cli, options, sessionID) {
         assert.equal((await snapshot()).manualMode, true)
         await command("manual off")
         assert.equal((await snapshot()).manualMode, false)
-        await command("decompress b1")
+        await command("decompress @b1@")
         assert.equal((await snapshot()).context.prunedMessageCount, 0)
-        await command("recompress b1")
+        await command("recompress @b1@")
         assert.deepEqual((await snapshot()).stats, before.stats)
 
         const create = async (effect) =>

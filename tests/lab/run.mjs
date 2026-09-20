@@ -32,6 +32,7 @@ try {
         ["v2", "http", "message"],
         ["v2", "websocket", "message"],
         ["v1", "http", "range"],
+        ["v1", "http", "message"],
     ]) {
         const root = `/lab/${version}-${transport}-${mode}`
         const directory = join(root, "project")
@@ -154,7 +155,23 @@ try {
                 2,
                 "compression must cause exactly one additional model step",
             )
-            assert.match(JSON.stringify(primary[0].body.input), /dcp-message-id/)
+            if (version === "v2") {
+                assert.match(JSON.stringify(primary[0].body.input), /@1@/)
+                for (const request of primary) {
+                    assert.doesNotMatch(
+                        JSON.stringify(request.body),
+                        /dcp-message-id|mNNNN|m000\d|XML metadata/,
+                    )
+                }
+                assert.match(
+                    JSON.stringify(primary[1].body.input),
+                    mode === "range" ? /@b1@/ : /@blocked@/,
+                )
+                if (mode === "message")
+                    assert.match(JSON.stringify(primary[0].body.input), /@1@ \[low\]/)
+            } else {
+                assert.match(JSON.stringify(primary[0].body.input), /dcp-message-id/)
+            }
             assert.match(JSON.stringify(primary[1].body.input), /LAB_SUMMARY/)
             assert.ok(
                 !JSON.stringify(primary[1].body.input).includes("OLD_PAYLOAD"),
