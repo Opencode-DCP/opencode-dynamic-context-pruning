@@ -1,7 +1,7 @@
 {
     "$schema": "https://json.schemastore.org/package.json",
     "name": "@tarquinen/opencode-dcp",
-    "version": "3.1.15",
+    "version": "3.2.0",
     "type": "module",
     "workspaces": [
         "tests/logger"
