@@ -458,10 +458,7 @@ export function validateConfigTypes(config: Record<string, any>): ValidationErro
                 })
             }
 
-            if (
-                compress.pollCooldown !== undefined &&
-                typeof compress.pollCooldown !== "number"
-            ) {
+            if (compress.pollCooldown !== undefined && typeof compress.pollCooldown !== "number") {
                 errors.push({
                     key: "compress.pollCooldown",
                     expected: "number",

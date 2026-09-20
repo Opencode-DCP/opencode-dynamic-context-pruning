@@ -5,10 +5,7 @@ import { isContextOverLimits, isPollOnlyTurn } from "../lib/messages/inject/util
 import { wrapCompressedSummary } from "../lib/compress/state"
 import { createSessionState, type WithParts } from "../lib/state"
 import type { CompressionBlock } from "../lib/state"
-import {
-    getCurrentTokenUsage,
-    isReportedTokensStaleAfterDcpCompression,
-} from "../lib/token-utils"
+import { getCurrentTokenUsage, isReportedTokensStaleAfterDcpCompression } from "../lib/token-utils"
 
 function buildConfig(maxContextLimit: number, minContextLimit = 1): PluginConfig {
     return {
@@ -333,9 +330,7 @@ function buildPostDcpCompressionMessages(): WithParts[] {
                     cache: { read: 3000, write: 0 },
                 },
             } as WithParts["info"],
-            parts: [
-                textPart("msg-asst-pre-compress", sessionID, "pa2", repeatedWord("done", 100)),
-            ],
+            parts: [textPart("msg-asst-pre-compress", sessionID, "pa2", repeatedWord("done", 100))],
         },
         {
             info: {
@@ -411,13 +406,7 @@ test("isContextOverLimits keeps emergency nudge when the estimated transformed v
 
     const staleTotal = 50000 + 800 + 200 + 3000
     // max limit below both the stale total AND the estimated transformed view.
-    const result = isContextOverLimits(
-        buildConfig(100, 1),
-        state,
-        undefined,
-        undefined,
-        messages,
-    )
+    const result = isContextOverLimits(buildConfig(100, 1), state, undefined, undefined, messages)
 
     assert.equal(result.reportedStale, true)
     assert.equal(result.overMaxLimit, true)

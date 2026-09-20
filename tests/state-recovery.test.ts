@@ -170,13 +170,20 @@ function buildForkMessages(sessionID: string): WithParts[] {
                 time: { created: 400 },
             } as WithParts["info"],
             parts: [
-                compressToolPart("msg-parent-compress", sessionID, "call-parent-compress", "Fork prefix", [
-                    {
-                        startId: "m0001",
-                        endId: "m0002",
-                        summary: "Captured the inherited read output and the assistant layout summary.",
-                    },
-                ]),
+                compressToolPart(
+                    "msg-parent-compress",
+                    sessionID,
+                    "call-parent-compress",
+                    "Fork prefix",
+                    [
+                        {
+                            startId: "m0001",
+                            endId: "m0002",
+                            summary:
+                                "Captured the inherited read output and the assistant layout summary.",
+                        },
+                    ],
+                ),
             ],
         },
     ]
@@ -374,7 +381,14 @@ test("recovery integrates with ensureSessionInitialized when no persisted state 
     const messages = buildForkMessages(sessionID)
 
     // Clean any stale persisted state for this session id.
-    const stateFile = join(testDataHome, "opencode", "storage", "plugin", "dcp", `${sessionID}.json`)
+    const stateFile = join(
+        testDataHome,
+        "opencode",
+        "storage",
+        "plugin",
+        "dcp",
+        `${sessionID}.json`,
+    )
     try {
         rmSync(stateFile, { force: true })
     } catch {
@@ -404,8 +418,5 @@ test("recovery integrates with ensureSessionInitialized when no persisted state 
 
     assert.equal(state.sessionId, sessionID)
     assert.ok(state.prune.messages.blocksById.size >= 1)
-    assert.match(
-        state.prune.messages.blocksById.get(1)?.summary || "",
-        /inherited read output/,
-    )
+    assert.match(state.prune.messages.blocksById.get(1)?.summary || "", /inherited read output/)
 })

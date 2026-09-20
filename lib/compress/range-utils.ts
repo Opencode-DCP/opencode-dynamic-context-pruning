@@ -1,10 +1,7 @@
 import type { CompressionBlock, ProtectedContent, SessionState } from "../state"
 import { resolveAnchorMessageId, resolveBoundaryIds, resolveSelection } from "./search"
 import type { IdFormat } from "../message-ids"
-import {
-    getBlockProtectedContent,
-    renderProtectedContent,
-} from "./protected-content"
+import { getBlockProtectedContent, renderProtectedContent } from "./protected-content"
 import type {
     BoundaryReference,
     CompressRangeToolArgs,

@@ -112,7 +112,9 @@ async function runOnce(contextAccounting: boolean, label: string): Promise<void>
     const start = performance.now()
     await handler({}, { messages: [...messages] })
     const elapsed = performance.now() - start
-    console.log(`${label}: ${elapsed.toFixed(1)}ms (snapshot=${state.lastContextSnapshot ? "yes" : "no"})`)
+    console.log(
+        `${label}: ${elapsed.toFixed(1)}ms (snapshot=${state.lastContextSnapshot ? "yes" : "no"})`,
+    )
 }
 
 async function main() {

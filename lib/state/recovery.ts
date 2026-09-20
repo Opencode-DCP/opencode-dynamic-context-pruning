@@ -65,7 +65,9 @@ export interface RecoveryResult {
     warnings: string[]
 }
 
-function isRangeInput(input: CompressRangeToolArgs | CompressMessageToolArgs): input is CompressRangeToolArgs {
+function isRangeInput(
+    input: CompressRangeToolArgs | CompressMessageToolArgs,
+): input is CompressRangeToolArgs {
     const content = (input as CompressRangeToolArgs).content
     return Array.isArray(content) && content.some((entry) => typeof entry?.startId === "string")
 }

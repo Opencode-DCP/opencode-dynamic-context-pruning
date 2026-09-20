@@ -19,10 +19,7 @@ import type { PluginConfig } from "../config"
 import type { SessionState, WithParts } from "../state"
 import { countAllMessageTokens, countTokens, extractCompletedToolOutput } from "../token-utils"
 import { getActiveSummaryTokenUsage, isMessageCompacted } from "../state/utils"
-import {
-    estimateTransformedTokens,
-    resolveContextTokenLimit,
-} from "../messages/inject/utils"
+import { estimateTransformedTokens, resolveContextTokenLimit } from "../messages/inject/utils"
 import type { AssistantMessage } from "@opencode-ai/sdk/v2"
 
 export interface ReportedTokenReport {
@@ -205,7 +202,9 @@ export function buildContextSnapshot(
         const parts = Array.isArray(msg.parts) ? msg.parts : []
         justCompressed = parts.some(
             (part) =>
-                part.type === "tool" && part.tool === "compress" && part.state?.status === "completed",
+                part.type === "tool" &&
+                part.tool === "compress" &&
+                part.state?.status === "completed",
         )
         break
     }
@@ -252,9 +251,7 @@ export function formatContextSnapshot(snapshot: ContextAccountingSnapshot): stri
     lines.push(
         `  Transformed:        ${snapshot.transformedMessageCount} (~${snapshot.transformedEstimatedTokens.toLocaleString()} tok)`,
     )
-    lines.push(
-        `  Estimated sent:     ~${snapshot.estimatedTransformedTokens.toLocaleString()} tok`,
-    )
+    lines.push(`  Estimated sent:     ~${snapshot.estimatedTransformedTokens.toLocaleString()} tok`)
     lines.push(
         `  Blocks:             ${snapshot.activeBlockCount} active / ${snapshot.totalBlockCount} total`,
     )
@@ -269,16 +266,16 @@ export function formatContextSnapshot(snapshot: ContextAccountingSnapshot): stri
         }
     }
     lines.push(`  Model context:      ${snapshot.modelContextLimit?.toLocaleString() ?? "unknown"}`)
-    lines.push(`  DCP max threshold:  ${snapshot.effectiveMaxContextLimit?.toLocaleString() ?? "unset"} (max ${snapshot.maxContextLimit?.toLocaleString() ?? "unset"} + buffer ${snapshot.summaryBufferExtension.toLocaleString()})`)
+    lines.push(
+        `  DCP max threshold:  ${snapshot.effectiveMaxContextLimit?.toLocaleString() ?? "unset"} (max ${snapshot.maxContextLimit?.toLocaleString() ?? "unset"} + buffer ${snapshot.summaryBufferExtension.toLocaleString()})`,
+    )
     lines.push(`  DCP min threshold:  ${snapshot.minContextLimit?.toLocaleString() ?? "unset"}`)
     lines.push(`  Over max limit:     ${snapshot.overMaxLimit}`)
     lines.push(`  Over min limit:     ${snapshot.overMinLimit}`)
     lines.push(`  Just compressed:    ${snapshot.justCompressed}`)
     lines.push(`  Reported stale:     ${snapshot.reportedStale}`)
     if (snapshot.lastDcpCompression > 0) {
-        lines.push(
-            `  Last DCP compress:  ${new Date(snapshot.lastDcpCompression).toISOString()}`,
-        )
+        lines.push(`  Last DCP compress:  ${new Date(snapshot.lastDcpCompression).toISOString()}`)
     }
     return lines.join("\n")
 }

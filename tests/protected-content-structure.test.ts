@@ -15,7 +15,11 @@ import {
 import { wrapCompressedSummary } from "../lib/compress/state"
 import type { BoundaryReference } from "../lib/compress/types"
 
-function createBlock(blockId: number, body: string, protectedContent?: CompressionBlock["protectedContent"]): CompressionBlock {
+function createBlock(
+    blockId: number,
+    body: string,
+    protectedContent?: CompressionBlock["protectedContent"],
+): CompressionBlock {
     return {
         blockId,
         runId: blockId,

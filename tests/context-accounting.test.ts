@@ -127,7 +127,14 @@ function buildMessages(): WithParts[] {
             } as WithParts["info"],
             parts: [
                 textPart("msg-asst-1", sessionID, "p2", "replying"),
-                toolPart("msg-asst-1", sessionID, "call-1", "read", '{"filePath":"a.ts"}', "A".repeat(400)),
+                toolPart(
+                    "msg-asst-1",
+                    sessionID,
+                    "call-1",
+                    "read",
+                    '{"filePath":"a.ts"}',
+                    "A".repeat(400),
+                ),
             ],
         },
         {
