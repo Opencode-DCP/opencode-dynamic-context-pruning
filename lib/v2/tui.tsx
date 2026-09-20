@@ -10,6 +10,7 @@ export async function setup(ctx: Plugin.Context) {
     const options = () => ({ location: ctx.location ?? ctx.data.location.default() })
     if (!(await client.status({}, options())).enabled) return
     const api: ViewApi = {
+        renderer: ctx.renderer,
         theme: {
             get current() {
                 return panelTheme(ctx.theme)

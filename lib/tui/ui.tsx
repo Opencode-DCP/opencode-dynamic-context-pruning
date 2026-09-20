@@ -1,8 +1,12 @@
 /** @jsxImportSource @opentui/solid */
 
+import type { BoxRenderable, ScrollBoxRenderable } from "@opentui/core"
 import type { JSX } from "solid-js"
 import { pct } from "./format"
 import type { Theme, ThemeColor, ViewApi } from "./types"
+
+// header (1-2) + divider (1) + footer (2) + gaps (3) + bottom padding (1)
+const FRAME_OVERHEAD = 9
 
 export function DcpFrame(props: {
     api: ViewApi
@@ -12,6 +16,15 @@ export function DcpFrame(props: {
     onBack?: () => void
 }) {
     const theme = props.api.theme.current
+    let body: ScrollBoxRenderable | undefined
+    let inner: BoxRenderable | undefined
+    function available() {
+        const height = props.api.renderer.height
+        return Math.max(10, height - Math.floor(height / 4) - 2) - FRAME_OVERHEAD
+    }
+    function resize() {
+        if (body) body.height = Math.min(inner?.height || available(), available())
+    }
     return (
         <box paddingLeft={3} paddingRight={3} paddingBottom={1} gap={1}>
             <box flexDirection="row" justifyContent="space-between">
@@ -30,7 +43,21 @@ export function DcpFrame(props: {
                 </text>
             </box>
             <box height={1} border={["bottom"]} borderColor={theme.borderSubtle} />
-            {props.children}
+            <scrollbox
+                height={available()}
+                scrollY
+                ref={(r: ScrollBoxRenderable) => {
+                    body = r
+                    // Use the host renderer rather than a separate OpenTUI/Solid context.
+                    props.api.renderer.on("resize", resize)
+                    r.once("destroyed", () => props.api.renderer.off("resize", resize))
+                    resize()
+                }}
+            >
+                <box ref={(r: BoxRenderable) => (inner = r)} onSizeChange={resize}>
+                    {props.children}
+                </box>
+            </scrollbox>
             <box flexDirection="row" justifyContent="space-between" paddingTop={1}>
                 {props.onBack ? (
                     <FooterButton
