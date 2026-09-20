@@ -1,17 +1,18 @@
 import type { SessionState } from "../../state"
+import { formatBlockRef } from "../../message-ids"
 
 export function buildCompressedBlockGuidance(state: SessionState): string {
     const refs = Array.from(state.prune.messages.activeBlockIds)
         .filter((id) => Number.isInteger(id) && id > 0)
         .sort((a, b) => a - b)
-        .map((id) => `b${id}`)
+        .map((id) => formatBlockRef(id, state.idFormat))
     const blockCount = refs.length
     const blockList = blockCount > 0 ? refs.join(", ") : "none"
 
     return [
         "Compressed block context:",
         `- Active compressed blocks in this session: ${blockCount} (${blockList})`,
-        "- If your selected compression range includes any listed block, include each required placeholder exactly once in the summary using `(bN)`.",
+        `- If your selected compression range includes any listed block, include each required placeholder exactly once in the summary using \`${state.idFormat === "compact" ? "@b1@" : "(bN)"}\`.`,
     ].join("\n")
 }
 

@@ -18,6 +18,7 @@ const requiredRepoFiles = [
     "dist/index.d.ts",
     "dist/tui.d.ts",
     "tui.tsx",
+    "server.js",
     "README.md",
     "LICENSE",
 ]
@@ -28,6 +29,7 @@ const requiredTarballFiles = [
     "dist/index.d.ts",
     "dist/tui.d.ts",
     "tui.tsx",
+    "server.js",
     "README.md",
     "LICENSE",
 ]
@@ -216,7 +218,8 @@ function validatePackedFiles() {
         encoding: "utf8",
     })
 
-    const [result] = JSON.parse(output)
+    // npm versions return either an array or an object keyed by package name.
+    const [result] = Object.values(JSON.parse(output))
     if (!result || !Array.isArray(result.files)) {
         fail("npm pack --dry-run --json did not return file metadata")
     }

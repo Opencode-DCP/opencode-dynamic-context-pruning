@@ -4,6 +4,16 @@ import { homedir } from "os"
 import { parse } from "jsonc-parser/lib/esm/main.js"
 import type { PluginInput } from "@opencode-ai/plugin"
 
+type ConfigContext = Pick<PluginInput, "directory"> & {
+    client: {
+        tui: {
+            showToast(input: {
+                body: { title: string; message: string; variant: "warning"; duration: number }
+            }): unknown
+        }
+    }
+}
+
 type Permission = "ask" | "allow" | "deny"
 type CompressMode = "range" | "message"
 
@@ -609,7 +619,7 @@ export function validateConfigTypes(config: Record<string, any>): ValidationErro
 }
 
 function showConfigWarnings(
-    ctx: PluginInput,
+    ctx: ConfigContext,
     configPath: string,
     configData: Record<string, any>,
     isProject: boolean,
@@ -725,7 +735,7 @@ function findOpencodeDir(startDir: string): string | null {
     return null
 }
 
-function getConfigPaths(ctx?: PluginInput): {
+function getConfigPaths(ctx?: ConfigContext): {
     global: string | null
     configDir: string | null
     project: string | null
@@ -951,7 +961,7 @@ function mergeLayer(config: PluginConfig, data: Record<string, any>): PluginConf
     }
 }
 
-function scheduleParseWarning(ctx: PluginInput, title: string, message: string): void {
+function scheduleParseWarning(ctx: ConfigContext, title: string, message: string): void {
     setTimeout(() => {
         try {
             ctx.client.tui.showToast({
@@ -966,7 +976,7 @@ function scheduleParseWarning(ctx: PluginInput, title: string, message: string):
     }, 7000)
 }
 
-export function getConfig(ctx: PluginInput): PluginConfig {
+export function getConfig(ctx: ConfigContext): PluginConfig {
     let config = deepCloneConfig(defaultConfig)
     const configPaths = getConfigPaths(ctx)
 

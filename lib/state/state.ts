@@ -13,6 +13,7 @@ import {
     collectTurnNudgeAnchors,
 } from "./utils"
 import { getLastUserMessage } from "../messages/query"
+import type { IdFormat } from "../message-ids"
 
 export const checkSession = async (
     client: any,
@@ -63,8 +64,9 @@ export const checkSession = async (
     await refreshManualMode(state, lastSessionId, logger, manualModeDefault)
 }
 
-export function createSessionState(): SessionState {
+export function createSessionState(idFormat: IdFormat = "xml"): SessionState {
     return {
+        idFormat,
         sessionId: null,
         isSubAgent: false,
         manualMode: false,

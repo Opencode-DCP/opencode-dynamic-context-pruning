@@ -31,7 +31,7 @@ export const injectExtendedSubAgentResults = async (
         const parts = Array.isArray(message.parts) ? message.parts : []
 
         for (const part of parts) {
-            if (part.type !== "tool" || part.tool !== "task" || !part.callID) {
+            if (part.type !== "tool" || !["task", "subagent"].includes(part.tool) || !part.callID) {
                 continue
             }
             if (state.prune.tools.has(part.callID)) {
@@ -46,6 +46,7 @@ export const injectExtendedSubAgentResults = async (
                 if (cachedResult) {
                     part.state.output = stripHallucinationsFromString(
                         mergeSubagentResult(part.state.output, cachedResult),
+                        state.idFormat,
                     )
                 }
                 continue
@@ -76,6 +77,7 @@ export const injectExtendedSubAgentResults = async (
             state.subAgentResultCache.set(part.callID, subAgentResultText)
             part.state.output = stripHallucinationsFromString(
                 mergeSubagentResult(part.state.output, subAgentResultText),
+                state.idFormat,
             )
         }
     }

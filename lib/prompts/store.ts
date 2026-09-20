@@ -2,9 +2,10 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync, statSync } from "fs
 import { join, dirname } from "path"
 import { homedir } from "os"
 import type { Logger } from "../logger"
-import { SYSTEM as SYSTEM_PROMPT } from "./system"
-import { COMPRESS_RANGE as COMPRESS_RANGE_PROMPT } from "./compress-range"
-import { COMPRESS_MESSAGE as COMPRESS_MESSAGE_PROMPT } from "./compress-message"
+import { systemPrompt } from "./system"
+import { rangePrompt } from "./compress-range"
+import { messagePrompt } from "./compress-message"
+import type { IdFormat } from "../message-ids"
 import { CONTEXT_LIMIT_NUDGE } from "./context-limit-nudge"
 import { TURN_NUDGE } from "./turn-nudge"
 import { ITERATION_NUDGE } from "./iteration-nudge"
@@ -123,13 +124,15 @@ const DCP_SYSTEM_REMINDER_TAG_REGEX =
     /^\s*<dcp-system-reminder\b[^>]*>[\s\S]*<\/dcp-system-reminder>\s*$/i
 const DEFAULTS_README_FILE = "README.md"
 
-const BUNDLED_EDITABLE_PROMPTS: Record<EditablePromptField, string> = {
-    system: SYSTEM_PROMPT,
-    compressRange: COMPRESS_RANGE_PROMPT,
-    compressMessage: COMPRESS_MESSAGE_PROMPT,
-    contextLimitNudge: CONTEXT_LIMIT_NUDGE,
-    turnNudge: TURN_NUDGE,
-    iterationNudge: ITERATION_NUDGE,
+function bundledPrompts(format: IdFormat): Record<EditablePromptField, string> {
+    return {
+        system: systemPrompt(format),
+        compressRange: rangePrompt(format),
+        compressMessage: messagePrompt(format),
+        contextLimitNudge: CONTEXT_LIMIT_NUDGE,
+        turnNudge: TURN_NUDGE,
+        iterationNudge: ITERATION_NUDGE,
+    }
 }
 
 const INTERNAL_PROMPT_EXTENSIONS = {
@@ -137,14 +140,9 @@ const INTERNAL_PROMPT_EXTENSIONS = {
     subagentExtension: SUBAGENT_SYSTEM_EXTENSION,
 }
 
-function createBundledRuntimePrompts(): RuntimePrompts {
+function createBundledRuntimePrompts(bundled: Record<EditablePromptField, string>): RuntimePrompts {
     return {
-        system: BUNDLED_EDITABLE_PROMPTS.system,
-        compressRange: BUNDLED_EDITABLE_PROMPTS.compressRange,
-        compressMessage: BUNDLED_EDITABLE_PROMPTS.compressMessage,
-        contextLimitNudge: BUNDLED_EDITABLE_PROMPTS.contextLimitNudge,
-        turnNudge: BUNDLED_EDITABLE_PROMPTS.turnNudge,
-        iterationNudge: BUNDLED_EDITABLE_PROMPTS.iterationNudge,
+        ...bundled,
         manualExtension: INTERNAL_PROMPT_EXTENSIONS.manualExtension,
         subagentExtension: INTERNAL_PROMPT_EXTENSIONS.subagentExtension,
     }
@@ -326,12 +324,19 @@ export class PromptStore {
     private readonly paths: PromptPaths
     private readonly customPromptsEnabled: boolean
     private runtimePrompts: RuntimePrompts
+    private readonly bundled: Record<EditablePromptField, string>
 
-    constructor(logger: Logger, workingDirectory: string, customPromptsEnabled = false) {
+    constructor(
+        logger: Logger,
+        workingDirectory: string,
+        customPromptsEnabled = false,
+        idFormat: IdFormat = "xml",
+    ) {
         this.logger = logger
         this.paths = resolvePromptPaths(workingDirectory)
         this.customPromptsEnabled = customPromptsEnabled
-        this.runtimePrompts = createBundledRuntimePrompts()
+        this.bundled = bundledPrompts(idFormat)
+        this.runtimePrompts = createBundledRuntimePrompts(this.bundled)
 
         if (this.customPromptsEnabled) {
             this.ensureDefaultFiles()
@@ -344,7 +349,7 @@ export class PromptStore {
     }
 
     reload(): void {
-        const nextPrompts = createBundledRuntimePrompts()
+        const nextPrompts = createBundledRuntimePrompts(this.bundled)
 
         if (!this.customPromptsEnabled) {
             this.runtimePrompts = nextPrompts
@@ -352,7 +357,7 @@ export class PromptStore {
         }
 
         for (const definition of PROMPT_DEFINITIONS) {
-            const bundledSource = BUNDLED_EDITABLE_PROMPTS[definition.runtimeField]
+            const bundledSource = this.bundled[definition.runtimeField]
             const bundledEditable = toEditablePromptText(definition, bundledSource)
             const bundledRuntime = wrapRuntimePromptContent(definition, bundledEditable)
             const fallbackValue = bundledRuntime || bundledSource.trim()
@@ -429,10 +434,10 @@ export class PromptStore {
         for (const definition of PROMPT_DEFINITIONS) {
             const bundledEditable = toEditablePromptText(
                 definition,
-                BUNDLED_EDITABLE_PROMPTS[definition.runtimeField],
+                this.bundled[definition.runtimeField],
             )
             const managedContent = buildDefaultPromptFileContent(
-                bundledEditable || BUNDLED_EDITABLE_PROMPTS[definition.runtimeField],
+                bundledEditable || this.bundled[definition.runtimeField],
             )
             const filePath = join(this.paths.defaultsDir, definition.fileName)
 

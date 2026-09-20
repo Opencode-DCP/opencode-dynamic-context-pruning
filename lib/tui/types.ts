@@ -2,8 +2,22 @@ import type { TuiPluginModule } from "@opencode-ai/plugin/tui"
 import type { buildStatsReport } from "../commands/stats"
 
 export type TuiApi = Parameters<NonNullable<TuiPluginModule["tui"]>>[0]
-export type Theme = TuiApi["theme"]["current"]
-export type ThemeColor = Exclude<keyof Theme, "thinkingOpacity" | "_hasSelectedListItemText">
+export type Theme = Pick<
+    TuiApi["theme"]["current"],
+    | "primary"
+    | "accent"
+    | "text"
+    | "textMuted"
+    | "background"
+    | "backgroundElement"
+    | "borderSubtle"
+    | "selectedListItemText"
+    | "success"
+    | "warning"
+    | "error"
+>
+export type ThemeColor = keyof Theme
+export type ViewApi = { theme: { readonly current: Theme }; ui: { dialog: { clear(): void } } }
 export type StatsReport = Awaited<ReturnType<typeof buildStatsReport>>
 
 export type DcpCommand = {

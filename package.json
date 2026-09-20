@@ -3,6 +3,9 @@
     "name": "@tarquinen/opencode-dcp",
     "version": "3.1.15",
     "type": "module",
+    "workspaces": [
+        "tests/logger"
+    ],
     "description": "OpenCode plugin that optimizes token usage by pruning obsolete tool outputs from conversation context",
     "main": "./dist/index.js",
     "types": "./dist/index.d.ts",
@@ -27,8 +30,9 @@
         "check:package": "npm run build && npm run verify:package",
         "prepublishOnly": "npm run check:package",
         "dev": "opencode plugin dev",
-        "typecheck": "tsc --noEmit",
-        "test": "node --import tsx --test tests/*.test.ts",
+        "sandbox": "node scripts/sandbox.mjs",
+        "typecheck": "tsc --noEmit && npm run typecheck --workspace=tests/logger",
+        "test": "node --import tsx --test tests/*.test.ts && npm test --workspace=tests/logger",
         "format": "prettier --write .",
         "format:check": "prettier --check .",
         "dcp": "tsx scripts/print.ts"
@@ -53,7 +57,7 @@
     "author": "tarquinen",
     "license": "AGPL-3.0-or-later",
     "peerDependencies": {
-        "@opencode-ai/plugin": ">=1.4.3"
+        "@opencode-ai/plugin": ">=1.18.29"
     },
     "dependencies": {
         "@anthropic-ai/tokenizer": "^0.0.4",
@@ -64,7 +68,9 @@
         "solid-js": "^1.9.12"
     },
     "devDependencies": {
-        "@opencode-ai/plugin": "^1.4.3",
+        "@opencode-ai/plugin": "^1.18.29",
+        "@opencode/plugin": "^2.0.4",
+        "@opencode/theme": "^2.0.4",
         "@types/node": "^25.5.0",
         "prettier": "^3.8.1",
         "tsup": "^8.5.1",
@@ -78,6 +84,7 @@
     "files": [
         "dist/",
         "lib/",
+        "server.js",
         "tui.tsx",
         "README.md",
         "LICENSE"

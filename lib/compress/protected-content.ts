@@ -1,10 +1,6 @@
 import type { SessionState } from "../state"
 import { isIgnoredUserMessage } from "../messages/query"
-import {
-    getFilePathsFromParameters,
-    isFilePathProtected,
-    isToolNameProtected,
-} from "../protected-patterns"
+import { isToolProtected } from "../protected-patterns"
 import {
     buildSubagentResultText,
     getSubAgentId,
@@ -131,16 +127,15 @@ export async function appendProtectedTools(
         const parts = Array.isArray(message.parts) ? message.parts : []
         for (const part of parts) {
             if (part.type === "tool" && part.callID) {
-                let isToolProtected = isToolNameProtected(part.tool, protectedTools)
-
-                if (!isToolProtected && protectedFilePatterns.length > 0) {
-                    const filePaths = getFilePathsFromParameters(part.tool, part.state?.input)
-                    if (isFilePathProtected(filePaths, protectedFilePatterns)) {
-                        isToolProtected = true
-                    }
-                }
-
-                if (isToolProtected) {
+                if (
+                    isToolProtected(
+                        part.tool,
+                        part.state.input,
+                        protectedTools,
+                        protectedFilePatterns,
+                        "metadata" in part.state ? part.state.metadata : undefined,
+                    )
+                ) {
                     const title = `Tool: ${part.tool}`
                     let output = ""
 
@@ -153,7 +148,7 @@ export async function appendProtectedTools(
 
                     if (
                         allowSubAgents &&
-                        part.tool === "task" &&
+                        (part.tool === "task" || part.tool === "subagent") &&
                         part.state?.status === "completed" &&
                         typeof part.state?.output === "string"
                     ) {

@@ -1,5 +1,5 @@
 import type { CompressionBlock, PruneMessagesState, SessionState } from "../state"
-import { formatBlockRef, formatMessageIdTag } from "../message-ids"
+import { formatBlockRef, formatMessageIdTag, type IdFormat } from "../message-ids"
 import type { AppliedCompressionResult, CompressionStateInput, SelectionResolution } from "./types"
 
 export const COMPRESSED_BLOCK_HEADER = "[Compressed conversation section]"
@@ -49,9 +49,13 @@ export function attachCompressionDuration(
     return updates
 }
 
-export function wrapCompressedSummary(blockId: number, summary: string): string {
+export function wrapCompressedSummary(
+    blockId: number,
+    summary: string,
+    format: IdFormat = "xml",
+): string {
     const header = COMPRESSED_BLOCK_HEADER
-    const footer = formatMessageIdTag(formatBlockRef(blockId))
+    const footer = formatMessageIdTag(formatBlockRef(blockId, format), undefined, format)
     const body = summary.trim()
     if (body.length === 0) {
         return `${header}\n${footer}`

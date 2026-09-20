@@ -18,6 +18,7 @@ import {
 } from "./lib/hooks"
 import { configureClientAuth, isSecureMode } from "./lib/auth"
 import { startAutoUpdate } from "./lib/update"
+import { setup } from "./lib/v2"
 
 const server: Plugin = (async (ctx) => {
     const config = getConfig(ctx)
@@ -134,4 +135,4 @@ const server: Plugin = (async (ctx) => {
     }
 }) satisfies Plugin
 
-export default server
+export default { id: "opencode-dcp", setup, server }
