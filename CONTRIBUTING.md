@@ -197,3 +197,7 @@ uv run --with pexpect --with pyte tests/lab/ui.py <lab-output-directory> v1
 
 These check the panel, Context, Stats, persisted manual-mode toggle, and closing
 the dialog. Terminal transcripts and screen snapshots are saved in the lab output.
+
+To check another V2 release, build the lab image with `--build-arg V2=VERSION`
+and pass that image's tag as the final argument to `ui.py`. Use a separate copy of
+the lab output when testing different releases so their databases stay independent.

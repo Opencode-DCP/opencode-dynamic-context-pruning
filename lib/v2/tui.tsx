@@ -3,6 +3,7 @@ import type { Plugin } from "@opencode/plugin/tui"
 import { ContextDialog, PanelDialog, StatsDialog, StatusDialog } from "../tui/dialogs"
 import type { ViewApi } from "../tui/types"
 import { rpc } from "./rpc"
+import { panelTheme } from "./theme"
 
 export async function setup(ctx: Plugin.Context) {
     const client = ctx.client.rpc(rpc)
@@ -11,20 +12,7 @@ export async function setup(ctx: Plugin.Context) {
     const api: ViewApi = {
         theme: {
             get current() {
-                const theme = ctx.theme.contextual.overlay
-                return {
-                    primary: theme.text.action.primary.default,
-                    accent: theme.text.action.secondary.default,
-                    text: theme.text.default,
-                    textMuted: theme.text.subdued,
-                    background: theme.background.default,
-                    backgroundElement: theme.background.surface.offset,
-                    borderSubtle: theme.border.default,
-                    selectedListItemText: theme.background.default,
-                    success: theme.text.feedback.success.default,
-                    warning: theme.text.feedback.warning.default,
-                    error: theme.text.feedback.error.default,
-                }
+                return panelTheme(ctx.theme)
             },
         },
         ui: { dialog: { clear: () => ctx.ui.dialog.clear() } },
