@@ -16,7 +16,6 @@ const { values } = parseArgs({
     options: {
         help: { type: "boolean", short: "h" },
         fresh: { type: "boolean" },
-        update: { type: "boolean" },
         v1: { type: "boolean" },
         v2: { type: "boolean" },
         opencode: { type: "string" },
@@ -32,14 +31,14 @@ if (values.help) {
 
 Open isolated OpenCode with this checkout's DCP and bundled test logger.
 Sessions and scratch files persist. Both plugins are rebuilt on every launch.
+Each launch uses the latest stable release of the selected major version.
 
-  --v1                Use V1 (default: 1.18.29, HTTP), with its own saved state
+  --v1                Use V1 over HTTP, with its own saved state
   --v2                Use V2 (default), with its own saved state
   --fresh             Start a new empty sandbox; keep old ones
   --logs              Show the latest raw/readable log paths and capture counts
   --path              Print the current sandbox's host directory
-  --update            Remember the latest release of the selected major version
-  --opencode VERSION  Remember an exact version (V1 requires 1.18.29+)
+  --opencode VERSION  Use an exact version for this launch (V1 requires 1.18.29+)
   --model MODEL       Remember a provider/model (otherwise OpenCode selects one)
   --transport TYPE    V2: websocket or http; V1: http only
 
@@ -95,28 +94,22 @@ async function main() {
         throw new Error("An interactive terminal is required. For automation, use -- run <prompt>.")
 
     const settingsPath = join(state, "settings.json")
-    const settings = json(settingsPath, {
-        version: major === 1 ? "1.18.29" : "2.0.4",
-        transport: major === 1 ? "http" : undefined,
-    })
-    if (values.update && values.opencode)
-        throw new Error("Choose --update or --opencode, not both.")
-    if (values.update) {
-        const versions = JSON.parse(
-            execFileSync(
-                "npm",
-                ["view", major === 1 ? "opencode-ai@1" : "@opencode/cli@2", "version", "--json"],
-                {
-                    encoding: "utf8",
-                },
-            ),
-        )
-        settings.version = Array.isArray(versions) ? versions.at(-1) : versions
+    const saved = json(settingsPath, {})
+    const settings = {
+        model: values.model ?? saved.model,
+        transport: values.transport ?? saved.transport ?? (major === 1 ? "http" : undefined),
     }
-    if (values.opencode) settings.version = values.opencode
-    if (values.model) settings.model = values.model
-    if (values.transport) settings.transport = values.transport
-    const version = /^(1|2)\.(\d+)\.(\d+)(-[\w.-]+)?$/.exec(settings.version)
+    const packageName = major === 1 ? "opencode-ai" : "@opencode/cli"
+    let release = values.opencode
+    if (!release) {
+        const versions = JSON.parse(
+            execFileSync("npm", ["view", `${packageName}@${major}`, "version", "--json"], {
+                encoding: "utf8",
+            }),
+        )
+        release = Array.isArray(versions) ? versions.at(-1) : versions
+    }
+    const version = /^(1|2)\.(\d+)\.(\d+)(-[\w.-]+)?$/.exec(release)
     if (!version || Number(version[1]) !== major)
         throw new Error(
             `--opencode requires an exact ${major}.x version matching the selected host.`,
@@ -158,14 +151,14 @@ async function main() {
         }
     }
     command("docker", ["info", "--format", "{{.ServerVersion}}"])
-    const image = `dcp-sandbox:${settings.version}`
-    console.log(`Preparing OpenCode ${settings.version} container (cached after first build)…`)
+    const image = `dcp-sandbox:${release}`
+    console.log(`Preparing OpenCode ${release} container (cached after first build)…`)
     command("docker", [
         "build",
         "--build-arg",
-        `VERSION=${settings.version}`,
+        `VERSION=${release}`,
         "--build-arg",
-        `PACKAGE=${major === 1 ? "opencode-ai" : "@opencode/cli"}`,
+        `PACKAGE=${packageName}`,
         "-t",
         image,
         join(repo, "scripts/sandbox"),
@@ -190,9 +183,16 @@ async function main() {
         save(settingsPath, settings)
         save(current, profile)
         save(join(home, "latest.json"), stamp)
-        save(join(input, "launch.json"), { ...settings, major, packages, stamp, args: cli })
+        save(join(input, "launch.json"), {
+            ...settings,
+            version: release,
+            major,
+            packages,
+            stamp,
+            args: cli,
+        })
         console.log(
-            `OpenCode ${settings.version} · ${settings.model || "default model"} · ${settings.transport || "provider transport"}`,
+            `OpenCode ${release} · ${settings.model || "default model"} · ${settings.transport || "provider transport"}`,
         )
         console.log(`Workspace: ${join(home, "project")}`)
         console.log(`DCP config: ${join(home, "home/config/opencode/dcp.jsonc")}`)

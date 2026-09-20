@@ -93,7 +93,8 @@ npm run sandbox                 # OpenCode V2
 npm run sandbox -- --v1         # OpenCode V1
 ```
 
-Each launch rebuilds DCP and the test logger and prepares a clean Docker image. Run
+Each launch uses the latest stable OpenCode release for the selected major version,
+rebuilds DCP and the test logger, and prepares a clean Docker image. Run
 `npm run sandbox -- --help` for available options and defaults. Each launch copies
 all saved authentication from the matching host version: V1's `auth.json`, or V2's
 credential records and account selections. OpenCode handles provider authentication
@@ -117,8 +118,7 @@ npm run sandbox -- --fresh                 # New profile; keep old runs
 npm run sandbox -- --logs                  # Latest log paths and capture counts
 npm run sandbox -- --path                  # Current profile's host directory
 npm run sandbox -- -- --continue           # Resume a session
-npm run sandbox -- --update                # Remember the latest release
-npm run sandbox -- --opencode VERSION       # Pin a release to test
+npm run sandbox -- --opencode VERSION      # Use an exact release for this launch
 npm run sandbox -- --transport http        # Select V2's transport
 npm run sandbox -- --model PROVIDER/MODEL   # Select a model available to your account
 ```
@@ -126,8 +126,9 @@ npm run sandbox -- --model PROVIDER/MODEL   # Select a model available to your a
 Replace `VERSION`, `PROVIDER`, and `MODEL` with the release and model you want to test.
 Without a saved model choice, OpenCode selects its default. A V2 transport override
 applies to the selected model.
-Add `--v1` to manage the V1 sandbox. Model, transport, and version choices persist;
-updates are explicit. `--fresh` selects a new profile for subsequent launches.
+Add `--v1` to manage the V1 sandbox. Model and transport choices persist.
+An exact version override applies only to that launch; otherwise the latest stable
+release is selected. `--fresh` selects a new profile for subsequent launches.
 You can edit `dcp.jsonc` and CLI preferences; `opencode.json` is launcher-managed.
 Set `DCP_SANDBOX_DIR` to choose another state directory.
 
