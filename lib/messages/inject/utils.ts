@@ -36,7 +36,8 @@ export interface LastUserModelContext {
 export interface LastNonIgnoredMessage {
     message: WithParts
     index: number
-}export function getNudgeFrequency(config: PluginConfig): number {
+}
+export function getNudgeFrequency(config: PluginConfig): number {
     return Math.max(1, Math.floor(config.compress.nudgeFrequency || 1))
 }
 
@@ -148,10 +149,7 @@ export interface ContextLimitsResult {
  * injected active summaries. This is the local, explainable counterpart to the
  * provider-reported total.
  */
-export function estimateTransformedTokens(
-    state: SessionState,
-    messages: WithParts[],
-): number {
+export function estimateTransformedTokens(state: SessionState, messages: WithParts[]): number {
     let total = 0
     for (const message of messages) {
         if (isMessageCompacted(state, message)) {
@@ -202,8 +200,7 @@ export function isContextOverLimits(
 
     const overMaxLimit =
         maxContextLimit === undefined ? false : effectiveMaxTokens > maxContextLimit
-    const overMinLimit =
-        minContextLimit === undefined ? true : currentTokens >= minContextLimit
+    const overMinLimit = minContextLimit === undefined ? true : currentTokens >= minContextLimit
 
     return {
         overMaxLimit,
@@ -451,7 +448,15 @@ export function applyAnchoredNudges(
         return
     }
 
-    const compressedBlockGuidance = buildCompressedBlockGuidance(state)
+    const hasAnyAnchor =
+        state.nudges.contextLimitAnchors.size > 0 ||
+        turnNudgeAnchors.size > 0 ||
+        state.nudges.iterationNudgeAnchors.size > 0
+    if (!hasAnyAnchor) {
+        return
+    }
+
+    const compressedBlockGuidance = buildCompressedBlockGuidance(state, messages)
     applyRangeModeAnchoredNudge(
         state.nudges.contextLimitAnchors,
         messages,

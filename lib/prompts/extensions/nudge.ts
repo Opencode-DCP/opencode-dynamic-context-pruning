@@ -1,7 +1,8 @@
-import type { SessionState } from "../../state"
+import type { SessionState, WithParts } from "../../state"
 import { formatBlockRef } from "../../message-ids"
+import { renderReclaimableGuidance } from "../../messages/inject/reclaimable"
 
-export function buildCompressedBlockGuidance(state: SessionState): string {
+export function buildCompressedBlockGuidance(state: SessionState, messages?: WithParts[]): string {
     const refs = Array.from(state.prune.messages.activeBlockIds)
         .filter((id) => Number.isInteger(id) && id > 0)
         .sort((a, b) => a - b)
@@ -15,9 +16,16 @@ export function buildCompressedBlockGuidance(state: SessionState): string {
         `- If your selected compression range includes any listed block, include each required placeholder exactly once in the summary using \`${state.idFormat === "compact" ? "@b1@" : "(bN)"}\`.`,
     ]
 
+    if (messages) {
+        const reclaimableGuidance = renderReclaimableGuidance(state, messages)
+        if (reclaimableGuidance) {
+            lines.push(reclaimableGuidance)
+        }
+    }
+
     if (blockCount >= 2) {
         lines.push(
-            "- MERGING PRIORITY: When context is still filling up, prefer consolidating multiple already-compressed blocks into ONE parent block. Set startId/endId to the outermost boundary (e.g. from b1 to b6) so DCP consumes all intermediate blocks, and write a single condensed summary. This reclaims the space taken by each child summary.",
+            "- MERGING BLOCKS: Consolidating multiple active blocks into ONE parent (startId/endId = outermost boundary, e.g. from b1 to b6, with every required `(bN)` placeholder) reclaims the space each child summary takes. Use it when several large blocks exist; otherwise follow the reclaimable map above.",
         )
     }
 
@@ -28,7 +36,7 @@ export function buildCompressedBlockGuidance(state: SessionState): string {
     }
 
     lines.push(
-        "- NO SINGLE-MESSAGE COMPRESSIONS: Compressing one fresh message into a new summary block adds context instead of saving it. If the only compressible range you can find is a single small message, do NOT compress it - merge existing blocks first, or pick a larger closed range.",
+        "- NO SINGLE-MESSAGE COMPRESSIONS: Compressing one fresh message into a new summary block adds context instead of saving it. If the only compressible range you can find is a single small message, do NOT compress it - go to the largest reclaimable region instead.",
     )
 
     lines.push(

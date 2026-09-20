@@ -129,7 +129,14 @@ export function createChatMessageTransformHandler(
             })
         }
 
-        await checkSession(client, state, logger, output.messages, config.manualMode.enabled, config)
+        await checkSession(
+            client,
+            state,
+            logger,
+            output.messages,
+            config.manualMode.enabled,
+            config,
+        )
 
         syncCompressPermissionState(state, config, hostPermissions, output.messages)
 
@@ -145,9 +152,7 @@ export function createChatMessageTransformHandler(
         buildToolIdList(state, output.messages)
 
         const accountingEnabled = config.experimental.contextAccounting === true
-        const rawStats = accountingEnabled
-            ? estimateMessageSetStats(output.messages)
-            : undefined
+        const rawStats = accountingEnabled ? estimateMessageSetStats(output.messages) : undefined
         const coverage = accountingEnabled ? computeCoverage(state, output.messages) : undefined
         const uncoveredTools = accountingEnabled
             ? collectUncoveredToolOutputs(state, output.messages)
@@ -248,6 +253,8 @@ export function createCommandExecuteHandler(
             if (effectivePermission === "deny") {
                 return
             }
+
+            assignMessageRefs(state, messages)
 
             const args = (input.arguments || "").trim().split(/\s+/).filter(Boolean)
             const isCompressCommand = input.command === "dcp-compress"
