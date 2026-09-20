@@ -1,8 +1,6 @@
 /** @jsxImportSource @opentui/solid */
 
-import type { BoxRenderable } from "@opentui/core"
-import { useTerminalDimensions } from "@opentui/solid"
-import { createSignal } from "solid-js"
+import type { BoxRenderable, ScrollBoxRenderable } from "@opentui/core"
 import type { JSX } from "solid-js"
 import { pct } from "./format"
 import type { Theme, ThemeColor, ViewApi } from "./types"
@@ -18,13 +16,15 @@ export function DcpFrame(props: {
     onBack?: () => void
 }) {
     const theme = props.api.theme.current
-    const dimensions = useTerminalDimensions()
+    let body: ScrollBoxRenderable | undefined
     let inner: BoxRenderable | undefined
-    const [naturalHeight, setNaturalHeight] = createSignal(0)
-    const available = () =>
-        Math.max(10, dimensions().height - Math.floor(dimensions().height / 4) - 2)
-    const bodyHeight = () =>
-        Math.min(naturalHeight() || available() - FRAME_OVERHEAD, available() - FRAME_OVERHEAD)
+    function available() {
+        const height = props.api.renderer.height
+        return Math.max(10, height - Math.floor(height / 4) - 2) - FRAME_OVERHEAD
+    }
+    function resize() {
+        if (body) body.height = Math.min(inner?.height || available(), available())
+    }
     return (
         <box paddingLeft={3} paddingRight={3} paddingBottom={1} gap={1}>
             <box flexDirection="row" justifyContent="space-between">
@@ -43,11 +43,18 @@ export function DcpFrame(props: {
                 </text>
             </box>
             <box height={1} border={["bottom"]} borderColor={theme.borderSubtle} />
-            <scrollbox height={bodyHeight()} scrollY>
-                <box
-                    ref={(r: BoxRenderable) => (inner = r)}
-                    onSizeChange={() => inner && setNaturalHeight(inner.height)}
-                >
+            <scrollbox
+                height={available()}
+                scrollY
+                ref={(r: ScrollBoxRenderable) => {
+                    body = r
+                    // Use the host renderer rather than a separate OpenTUI/Solid context.
+                    props.api.renderer.on("resize", resize)
+                    r.once("destroyed", () => props.api.renderer.off("resize", resize))
+                    resize()
+                }}
+            >
+                <box ref={(r: BoxRenderable) => (inner = r)} onSizeChange={resize}>
                     {props.children}
                 </box>
             </scrollbox>

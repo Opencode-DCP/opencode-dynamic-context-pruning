@@ -17,7 +17,11 @@ export type Theme = Pick<
     | "error"
 >
 export type ThemeColor = keyof Theme
-export type ViewApi = { theme: { readonly current: Theme }; ui: { dialog: { clear(): void } } }
+export type ViewApi = {
+    theme: { readonly current: Theme }
+    renderer: Pick<TuiApi["renderer"], "height" | "on" | "off">
+    ui: { dialog: { clear(): void } }
+}
 export type StatsReport = Awaited<ReturnType<typeof buildStatsReport>>
 
 export type DcpCommand = {
