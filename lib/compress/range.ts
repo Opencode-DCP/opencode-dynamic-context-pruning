@@ -28,6 +28,7 @@ import {
 } from "./state"
 import type { CompressRangeToolArgs } from "./types"
 import type { ProtectedContent } from "../state"
+import { isSingleBlockRewrap, recondenseBlockInPlace } from "./recondense"
 
 function buildSchema(format: IdFormat) {
     return {
@@ -189,8 +190,25 @@ export function createCompressRangeTool(ctx: ToolContext): ReturnType<typeof too
             }
 
             const runId = allocateRunId(ctx.state)
+            let recondensedCount = 0
+            let skippedRewrapCount = 0
 
             for (const preparedPlan of preparedPlans) {
+                const rewrapBlockId = isSingleBlockRewrap(ctx.state, preparedPlan.selection)
+                if (rewrapBlockId !== null) {
+                    const result = recondenseBlockInPlace(
+                        ctx.state,
+                        rewrapBlockId,
+                        preparedPlan.entry.summary,
+                    )
+                    if (result.replaced) {
+                        recondensedCount++
+                    } else {
+                        skippedRewrapCount++
+                    }
+                    continue
+                }
+
                 const blockId = allocateBlockId(ctx.state)
                 const storedSummary = wrapCompressedSummary(
                     blockId,
@@ -230,9 +248,34 @@ export function createCompressRangeTool(ctx: ToolContext): ReturnType<typeof too
                 })
             }
 
+            if (recondensedCount > 0) {
+                ctx.state.lastDcpCompression = Date.now()
+            }
+
             await finalizeSession(ctx, toolCtx, rawMessages, notifications, input.topic)
 
-            return `Compressed ${totalCompressedMessages} messages into ${COMPRESSED_BLOCK_HEADER}.`
+            const resultParts: string[] = []
+            if (totalCompressedMessages > 0 || notifications.length > 0) {
+                resultParts.push(
+                    `Compressed ${totalCompressedMessages} messages into ${COMPRESSED_BLOCK_HEADER}.`,
+                )
+            }
+            if (recondensedCount > 0) {
+                resultParts.push(
+                    `Recondensed ${recondensedCount} existing block(s) in place (no new block).`,
+                )
+            }
+            if (skippedRewrapCount > 0) {
+                resultParts.push(
+                    `Skipped ${skippedRewrapCount} compression(s) that only re-wrapped an already-compressed block without shrinking it.`,
+                )
+            }
+            if (resultParts.length === 0) {
+                resultParts.push(
+                    "No compression was performed: the requested range would only re-wrap already-compressed content without adding new coverage or shrinking the summary.",
+                )
+            }
+            return resultParts.join("\n")
         },
     })
 }
