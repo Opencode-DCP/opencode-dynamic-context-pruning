@@ -142,7 +142,7 @@ async function prepareRangePlans(
 
     for (const plan of plans) {
         const condense = config.compress.recursiveCondense === true
-        const parsedPlaceholders = parseBlockPlaceholders(plan.entry.summary)
+        const parsedPlaceholders = parseBlockPlaceholders(plan.entry.summary, state.idFormat)
         const missingBlockIds = validateSummaryPlaceholders(
             parsedPlaceholders,
             plan.selection.requiredBlockIds,
@@ -192,6 +192,7 @@ async function prepareRangePlans(
             missingBlockIds,
             searchContext.summaryByBlockId,
             injected.consumedBlockIds,
+            state.idFormat,
             condense,
         )
 
@@ -227,7 +228,7 @@ async function replayRangeCall(
     let created = 0
     for (const plan of prepared) {
         const blockId = allocateBlockId(state)
-        const storedSummary = wrapCompressedSummary(blockId, plan.finalSummary)
+        const storedSummary = wrapCompressedSummary(blockId, plan.finalSummary, state.idFormat)
         const summaryTokens = countTokens(storedSummary)
 
         applyCompressionState(
@@ -289,7 +290,11 @@ async function replayMessageCall(
         )
 
         const blockId = allocateBlockId(state)
-        const storedSummary = wrapCompressedSummary(blockId, summaryWithTools.summaryText)
+        const storedSummary = wrapCompressedSummary(
+            blockId,
+            summaryWithTools.summaryText,
+            state.idFormat,
+        )
         const summaryTokens = countTokens(storedSummary)
 
         applyCompressionState(

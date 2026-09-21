@@ -316,9 +316,7 @@ export function appendMissingBlockSummaries(
 
         if (condense) {
             if (blockProtected.length > 0) {
-                missingSummaries.push(
-                    `\n### ${label}\n${renderProtectedContent(blockProtected)}`,
-                )
+                missingSummaries.push(`\n### ${label}\n${renderProtectedContent(blockProtected)}`)
             } else {
                 missingSummaries.push(`\n### ${label}\n${formatCondensedBlockRef(blockId)}`)
             }
