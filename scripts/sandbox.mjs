@@ -19,6 +19,7 @@ const { values } = parseArgs({
         v1: { type: "boolean" },
         v2: { type: "boolean" },
         opencode: { type: "string" },
+        dcp: { type: "string" },
         model: { type: "string" },
         transport: { type: "string" },
         logs: { type: "boolean" },
@@ -29,8 +30,8 @@ const { values } = parseArgs({
 if (values.help) {
     console.log(`Usage: dcp-sandbox [options] [-- OpenCode arguments]
 
-Open isolated OpenCode with this checkout's DCP and bundled test logger.
-Sessions and scratch files persist. Both plugins are rebuilt on every launch.
+Open isolated OpenCode with DCP and the bundled test logger.
+Sessions and scratch files persist. Local plugins are rebuilt on every launch.
 Each launch uses the latest stable release of the selected major version.
 
   --v1                Use V1 over HTTP, with its own saved state
@@ -39,12 +40,15 @@ Each launch uses the latest stable release of the selected major version.
   --logs              Show the latest raw/readable log paths and capture counts
   --path              Print the current sandbox's host directory
   --opencode VERSION  Use an exact version for this launch (V1 requires 1.18.29+)
+  --dcp VERSION       Use npm DCP (e.g. latest or 3.2.0); default: local checkout
   --model MODEL       Remember a provider/model (otherwise OpenCode selects one)
   --transport TYPE    V2: websocket or http; V1: http only
 
 Examples:
   dcp-sandbox
   dcp-sandbox --v1
+  dcp-sandbox --dcp latest --fresh
+  dcp-sandbox --opencode 2.0.12 --dcp 3.2.0
   dcp-sandbox --v1 --logs
   dcp-sandbox -- --continue
   dcp-sandbox -- run --format json "Reply with OK."
@@ -99,6 +103,7 @@ async function main() {
         model: values.model ?? saved.model,
         transport: values.transport ?? saved.transport ?? (major === 1 ? "http" : undefined),
     }
+    const dcp = values.dcp ?? "local"
     const packageName = major === 1 ? "opencode-ai" : "@opencode/cli"
     let release = values.opencode
     if (!release) {
@@ -163,10 +168,12 @@ async function main() {
         image,
         join(repo, "scripts/sandbox"),
     ])
-    console.log("Building DCP and request logger…")
+    console.log(dcp === "local" ? "Building DCP and request logger…" : "Building request logger…")
     if (!existsSync(join(repo, "node_modules"))) command("npm", ["ci", "--legacy-peer-deps"])
     const packages = []
-    for (const directory of [repo, join(repo, "tests/logger")]) {
+    const directories = [join(repo, "tests/logger")]
+    if (dcp === "local") directories.unshift(repo)
+    for (const directory of directories) {
         command("npm", ["run", "build"], directory)
         const packed = JSON.parse(
             command(
@@ -187,6 +194,10 @@ async function main() {
             ...settings,
             version: release,
             major,
+            dcp:
+                dcp === "local"
+                    ? "/lab/plugins/node_modules/@tarquinen/opencode-dcp"
+                    : `@tarquinen/opencode-dcp@${dcp}`,
             packages,
             stamp,
             args: cli,
@@ -194,6 +205,7 @@ async function main() {
         console.log(
             `OpenCode ${release} · ${settings.model || "default model"} · ${settings.transport || "provider transport"}`,
         )
+        console.log(`DCP: ${dcp === "local" ? "local checkout" : `@tarquinen/opencode-dcp@${dcp}`}`)
         console.log(`Workspace: ${join(home, "project")}`)
         console.log(`DCP config: ${join(home, "home/config/opencode/dcp.jsonc")}`)
         console.log(`Readable logs: ${join(home, "logs", stamp, "readable")}`)
