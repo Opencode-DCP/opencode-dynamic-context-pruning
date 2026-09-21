@@ -191,3 +191,33 @@ test("buildCompressedBlockGuidance embeds the reclaimable cost map", () => {
     assert.match(guidance, /RECLAIMABLE CONTEXT MAP/)
     assert.match(guidance, /m0001\.\.m0002/)
 })
+
+test("renderReclaimableGuidance uses compact block refs for compact sessions", () => {
+    const state = createSessionState("compact")
+    const messages = [
+        buildMessage("big-1", "user", "A".repeat(20000)),
+        buildSyntheticSummary("msg_dcp_summary_a", "[Compressed conversation section]"),
+    ]
+    assignRefs(state, messages)
+    addActiveBlock(state, 7, 1200)
+
+    const guidance = renderReclaimableGuidance(state, messages)
+    assert.match(guidance, /@b7@/)
+    assert.doesNotMatch(guidance, /b7 \(~/)
+})
+
+test("buildCompressedBlockGuidance keeps the merge example in the session id format", () => {
+    const state = createSessionState("compact")
+    const messages = [
+        buildMessage("big-1", "user", "A".repeat(20000)),
+        buildSyntheticSummary("msg_dcp_summary_a", "[Compressed conversation section]"),
+    ]
+    assignRefs(state, messages)
+    addActiveBlock(state, 1, 1200)
+    addActiveBlock(state, 2, 900)
+
+    const guidance = buildCompressedBlockGuidance(state, messages)
+    assert.match(guidance, /@b1@/)
+    assert.match(guidance, /@bN@/)
+    assert.doesNotMatch(guidance, /from b1 to b2/)
+})

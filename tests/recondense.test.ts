@@ -147,3 +147,27 @@ test("recondenseBlockInPlace rewrites summary and keeps the same block id active
     assert.equal(state.prune.messages.activeBlockIds.size, 1)
     assert.ok((updated?.summaryTokens ?? 0) > 0)
 })
+
+test("stripSelfReferences removes compact-format self references", () => {
+    const body = "Merged @b7@ with more; plus ### compressed block 7 leftover"
+    const cleaned = stripSelfReferences(body, 7)
+    assert.equal(cleaned.includes("@b7@"), false)
+    assert.equal(cleaned.includes("### compressed block 7"), false)
+    assert.match(cleaned, /Merged with more/)
+})
+
+test("recondenseBlockInPlace writes a compact-format footer for compact sessions", () => {
+    const state = createSessionState("compact")
+    const block = seedActiveBlock(state, 1)
+    block.summaryTokens = 5000
+    block.summary = wrapCompressedSummary(1, "x".repeat(500), "compact")
+
+    const body = "leaner body without self refs"
+    const result = recondenseBlockInPlace(state, 1, body)
+    assert.equal(result.replaced, true)
+
+    const updated = state.prune.messages.blocksById.get(1)
+    assert.equal(updated?.summary, wrapCompressedSummary(1, body, "compact"))
+    assert.match(updated?.summary ?? "", /@b1@/)
+    assert.doesNotMatch(updated?.summary ?? "", /dcp-message-id/)
+})

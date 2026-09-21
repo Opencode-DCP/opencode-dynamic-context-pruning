@@ -25,7 +25,7 @@ export function buildCompressedBlockGuidance(state: SessionState, messages?: Wit
 
     if (blockCount >= 2) {
         lines.push(
-            "- MERGING BLOCKS: Consolidating multiple active blocks into ONE parent (startId/endId = outermost boundary, e.g. from b1 to b6, with every required `(bN)` placeholder) reclaims the space each child summary takes. Use it when several large blocks exist; otherwise follow the reclaimable map above.",
+            `- MERGING BLOCKS: Consolidating multiple active blocks into ONE parent (startId/endId = outermost boundary, e.g. from ${refs[0]} to ${refs[refs.length - 1]}, with every required \`${state.idFormat === "compact" ? "@bN@" : "(bN)"}\` placeholder) reclaims the space each child summary takes. Use it when several large blocks exist; otherwise follow the reclaimable map above.`,
         )
     }
 

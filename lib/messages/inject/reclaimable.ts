@@ -1,4 +1,5 @@
 import type { SessionState, WithParts } from "../../state"
+import { formatBlockRef } from "../../message-ids"
 import { isIgnoredUserMessage } from "../query"
 
 const SYNTHETIC_SUMMARY_ID_PREFIX = "msg_dcp_summary_"
@@ -202,7 +203,8 @@ export function renderReclaimableGuidance(state: SessionState, messages: WithPar
 
     if (topBlocks.length > 0) {
         const rendered = topBlocks.map(
-            (entry) => `b${entry.blockId} (~${formatTokens(entry.summaryTokens)})`,
+            (entry) =>
+                `${formatBlockRef(entry.blockId, state.idFormat)} (~${formatTokens(entry.summaryTokens)})`,
         )
         lines.push(
             `- Active compressed summaries (merge several into ONE parent when possible): ${rendered.join(", ")}`,

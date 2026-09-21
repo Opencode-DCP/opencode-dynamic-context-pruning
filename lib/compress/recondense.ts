@@ -8,6 +8,8 @@ const BLOCK_REF_PATTERNS = [
     (blockId: number) => new RegExp(`\\(b${blockId}\\)`, "g"),
     (blockId: number) => new RegExp(`\\{block_${blockId}\\}`, "g"),
     (blockId: number) => new RegExp(`\\[condensed block b${blockId}\\]`, "g"),
+    (blockId: number) => new RegExp(`### compressed block ${blockId}[^\\n]*\\n?`, "g"),
+    (blockId: number) => new RegExp(`@b${blockId}@`, "g"),
 ]
 
 export function stripSelfReferences(body: string, blockId: number): string {
@@ -83,7 +85,11 @@ export function recondenseBlockInPlace(
         return { replaced: false, summaryTokens: 0 }
     }
 
-    const wrapped = wrapCompressedSummary(blockId, stripSelfReferences(body, blockId))
+    const wrapped = wrapCompressedSummary(
+        blockId,
+        stripSelfReferences(body, blockId),
+        state.idFormat,
+    )
     const summaryTokens = countTokens(wrapped)
     if (block.summaryTokens > 0 && summaryTokens >= block.summaryTokens) {
         return { replaced: false, summaryTokens }
