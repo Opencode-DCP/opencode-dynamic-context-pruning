@@ -6,6 +6,9 @@ import { restoreAuth } from "./auth.mjs"
 
 process.umask(0o077)
 const launch = JSON.parse(await readFile("/input/launch.json", "utf8"))
+// Only install this launch's tarballs, even after switching away from local DCP.
+await mkdir("/lab/plugins", { recursive: true })
+await writeFile("/lab/plugins/package.json", JSON.stringify({ private: true }) + "\n")
 try {
     execFileSync(
         "npm",
@@ -26,7 +29,7 @@ try {
     process.exit(1)
 }
 const logger = "/lab/plugins/node_modules/opencode-request-logger"
-const dcp = "/lab/plugins/node_modules/@tarquinen/opencode-dcp"
+const dcp = launch.dcp
 const { createRelay } = await import(pathToFileURL(join(logger, "relay.mjs")))
 const { watch } = await import(pathToFileURL(join(logger, "readable.mjs")))
 const logs = join("/lab/logs", launch.stamp)
@@ -83,16 +86,27 @@ try {
         ) + "\n",
     )
     if (launch.major === 1) {
-        // Register the panel once, retaining later user terminal preferences.
+        // Keep the panel's source in sync, retaining user terminal preferences.
+        const path = join(config, "tui.json")
+        let tui = {}
         try {
-            await writeFile(
-                join(config, "tui.json"),
-                JSON.stringify({ plugin: [dcp] }, null, 2) + "\n",
-                { flag: "wx" },
-            )
+            tui = JSON.parse(await readFile(path, "utf8"))
         } catch (error) {
-            if (error.code !== "EEXIST") throw error
+            if (error.code !== "ENOENT") throw error
         }
+        const plugins = [dcp]
+        for (const plugin of tui.plugin ?? []) {
+            if (
+                typeof plugin === "string" &&
+                (plugin === "/lab/plugins/node_modules/@tarquinen/opencode-dcp" ||
+                    plugin === "@tarquinen/opencode-dcp" ||
+                    plugin.startsWith("@tarquinen/opencode-dcp@"))
+            )
+                continue
+            plugins.push(plugin)
+        }
+        tui.plugin = plugins
+        await writeFile(path, JSON.stringify(tui, null, 2) + "\n")
     }
     try {
         await writeFile(
