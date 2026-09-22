@@ -1,4 +1,5 @@
 import assert from "node:assert/strict"
+import "./lab/persistence-env"
 import test from "node:test"
 import type { Message } from "@opencode/ai/schema/messages"
 import { project } from "../lib/v2/messages"

@@ -1,4 +1,5 @@
 import assert from "node:assert/strict"
+import "./lab/persistence-env"
 import test from "node:test"
 import { isIgnoredUserMessage } from "../lib/messages/query"
 import type { WithParts } from "../lib/state"

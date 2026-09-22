@@ -16,6 +16,7 @@ import {
 } from "../state"
 import { assignMessageRefs } from "../message-ids"
 import { applyPendingManualTrigger } from "../commands/manual"
+import { deduplicate, purgeErrors } from "../strategies"
 import {
     buildPriorityMap,
     buildToolIdList,
@@ -194,10 +195,23 @@ export async function setup(ctx: Plugin.Context) {
                 stripHallucinations(view.messages, state.idFormat)
                 assignMessageRefs(state, view.messages)
                 // Compaction may select only a prefix; block origins can be in the retained tail.
-                syncCompressionBlocks(state, logger, messages)
+                const blocksChanged = syncCompressionBlocks(state, logger, messages)
                 syncToolCache(state, config, logger, view.messages)
                 buildToolIdList(state, view.messages)
+                // Mirror the compress-tool pipeline: the automatic strategies mark
+                // superseded/failed tool outputs for pruning on every request, not
+                // only while a compress tool call is being prepared. Without this,
+                // state.prune.tools stays empty forever on the V2 path.
+                const pruneToolsBefore = state.prune.tools.size
+                deduplicate(state, logger, config, view.messages)
+                purgeErrors(state, logger, config, view.messages)
+                const pruneToolsChanged = state.prune.tools.size > pruneToolsBefore
                 prune(state, logger, config, view.messages, view.summaryBase)
+                // Write through block-liveness and prune-marking changes so a
+                // server restart cannot lose them to a later stale save.
+                if (blocksChanged || pruneToolsChanged) {
+                    await saveSessionState(state, logger)
+                }
                 await injectExtendedSubAgentResults(
                     client,
                     state,
