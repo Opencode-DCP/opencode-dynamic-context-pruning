@@ -32,7 +32,8 @@
         "dev": "opencode plugin dev",
         "sandbox": "node scripts/sandbox.mjs",
         "typecheck": "tsc --noEmit && npm run typecheck --workspace=tests/logger",
-        "test": "node --import tsx --test tests/*.test.ts && npm test --workspace=tests/logger",
+        "test": "node --import tsx --test tests/*.test.ts && npm run --silent test:tui && npm test --workspace=tests/logger",
+        "test:tui": "if command -v bun >/dev/null 2>&1; then bun test tests/v2-tui-render.test.tsx; else echo '[dcp] bun not found: TUI render test skipped'; fi",
         "format": "prettier --write .",
         "format:check": "prettier --check .",
         "dcp": "tsx scripts/print.ts"
