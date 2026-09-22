@@ -4,6 +4,7 @@ import { compressToolName } from "../../config"
 import {
     appendGuidanceToDcpTag,
     buildCompressedBlockGuidance,
+    buildMessageOccupancyGuidance,
     renderMessagePriorityGuidance,
 } from "../../prompts/extensions/nudge"
 import type { RuntimePrompts } from "../../prompts/store"
@@ -360,7 +361,12 @@ export function applyAnchoredNudges(
         return
     }
 
-    const compressedBlockGuidance = buildCompressedBlockGuidance(state)
+    const compressedBlockGuidance = [
+        buildCompressedBlockGuidance(state),
+        buildMessageOccupancyGuidance(state, config, messages),
+    ]
+        .filter((section) => section.length > 0)
+        .join("\n\n")
     applyRangeModeAnchoredNudge(
         state.nudges.contextLimitAnchors,
         messages,
