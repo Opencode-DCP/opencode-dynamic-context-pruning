@@ -1,6 +1,6 @@
 import type { Plugin } from "@opencode/plugin"
 import { tool, type ToolDefinition } from "@opencode-ai/plugin"
-import { getConfig } from "../config"
+import { compressToolName, getConfig } from "../config"
 import { Logger } from "../logger"
 import { PromptStore } from "../prompts/store"
 import { createCompressMessageTool, createCompressRangeTool } from "../compress"
@@ -179,10 +179,11 @@ export async function setup(ctx: Plugin.Context) {
                     event.agent,
                 )
                 if (state.isSubAgent && !config.experimental.allowSubAgents) {
-                    delete event.tools.compress
+                    delete event.tools[compressToolName(config)]
                     return
                 }
-                if (state.compressPermission === "deny") delete event.tools.compress
+                if (state.compressPermission === "deny")
+                    delete event.tools[compressToolName(config)]
                 state.modelContextLimit = limits.get(`${event.model.providerID}/${event.model.id}`)
                 state.systemPromptTokens = countTokens(
                     event.system.map((part) => part.text).join("\n"),
@@ -263,7 +264,7 @@ export async function setup(ctx: Plugin.Context) {
         const definition = define(createSessionState("compact"))
         await ctx.tool.transform((editor) =>
             editor.add({
-                name: "compress",
+                name: compressToolName(config),
                 description: definition.description,
                 input: tool.schema.object(definition.args),
                 options: { codemode: false, permission: "compress" },

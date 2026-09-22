@@ -217,6 +217,10 @@ The `protectedTools` arrays in `commands` and `strategies` add to this default l
 
 For the `compress` tool, `compress.protectedTools` ensures specific tool outputs are appended to the compressed summary. By default it includes `task`, `skill`, `todowrite`, and `todoread`.
 
+### Tool name
+
+DCP's compress tool registers as `dcp_compress` by default (`compress.toolName`). Some gateway proxies inject their own `compress` tool into every completion request and shadow any host tool with that name (observed with the sleev gateway, whose `compress` schedules compressions but never applies them). If your stack has no such shadowing, you can set `compress.toolName: "compress"` to restore the legacy name; DCP still recognizes session parts recorded under the legacy name either way.
+
 ## Impact on Prompt Caching
 
 LLM providers cache prompts based on exact prefix matching. When DCP prunes content, it changes messages, which invalidates cached prefixes from that point forward.

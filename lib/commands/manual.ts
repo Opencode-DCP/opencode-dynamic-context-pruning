@@ -9,7 +9,7 @@
 
 import type { Logger } from "../logger"
 import type { SessionState, WithParts } from "../state"
-import type { PluginConfig } from "../config"
+import { compressToolName, type PluginConfig } from "../config"
 import { sendIgnoredMessage } from "../ui/notification"
 import { saveManualModeSetting } from "../state/persistence"
 import { getCurrentParams } from "../token-utils"
@@ -20,21 +20,22 @@ const MANUAL_MODE_ON = "Manual mode is now ON. Use /dcp-compress to trigger cont
 
 const MANUAL_MODE_OFF = "Manual mode is now OFF."
 
-const COMPRESS_TRIGGER_PROMPT = [
-    "<compress triggered manually>",
-    "Manual mode trigger received. You must now use the compress tool.",
-    "Find the most significant completed conversation content that can be compressed into a high-fidelity technical summary.",
-    "Follow the active compress mode, preserve all critical implementation details, and choose safe targets.",
-    "Return after compress with a brief explanation of what content was compressed.",
-].join("\n\n")
+const COMPRESS_TRIGGER_MARKER = "<compress triggered manually>"
 
-function getTriggerPrompt(
+export function getTriggerPrompt(
     tool: "compress",
     state: SessionState,
     config: PluginConfig,
     userFocus?: string,
 ): string {
-    const base = COMPRESS_TRIGGER_PROMPT
+    const toolName = compressToolName(config)
+    const base = [
+        COMPRESS_TRIGGER_MARKER,
+        `Manual mode trigger received. You must now use the ${toolName} tool.`,
+        "Find the most significant completed conversation content that can be compressed into a high-fidelity technical summary.",
+        "Follow the active compress mode, preserve all critical implementation details, and choose safe targets.",
+        `Return after ${toolName} with a brief explanation of what content was compressed.`,
+    ].join("\n\n")
     const compressedBlockGuidance =
         config.compress.mode === "message" ? "" : buildCompressedBlockGuidance(state)
 
