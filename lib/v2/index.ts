@@ -27,7 +27,7 @@ import {
     stripHallucinations,
     syncCompressionBlocks,
 } from "../messages"
-import { countTokens } from "../token-utils"
+import { countTokens, getCurrentTokenUsage } from "../token-utils"
 import { matchesGlob } from "../protected-patterns"
 import { history, project } from "./messages"
 import { analyzeContextTokens } from "../commands/context"
@@ -38,6 +38,18 @@ import { rpc } from "./rpc"
 // here: its text would enter the model's context, unlike V1 ignored messages.
 export async function report(logger: Logger, text: string, sessionID?: string) {
     logger.debug("V2 report (display pending)", { sessionID, text })
+}
+
+/** The host's `event.tools` expects a JSON Schema, not a zod schema. */
+function compressToolInputSchema(definition: ToolDefinition): Record<string, unknown> {
+    try {
+        return tool.schema.toJSONSchema(tool.schema.object(definition.args)) as Record<
+            string,
+            unknown
+        >
+    } catch {
+        return { type: "object", properties: {} }
+    }
 }
 
 export async function setup(ctx: Plugin.Context) {
@@ -142,17 +154,37 @@ export async function setup(ctx: Plugin.Context) {
             config.manualMode.enabled,
         )
         await checkSession(client, state, logger, messages, config.manualMode.enabled)
-        const rule = [...agent.permissions, ...(session.permissions ?? [])].findLast(
-            (rule) => matchesGlob("compress", rule.action) && matchesGlob("*", rule.resource),
+        // Only rules that name the "compress" action explicitly decide DCP's
+        // verdict. V2 hosts ship agents with catch-all deny/ask policies and
+        // treat unmatched actions as "ask"; honoring those wildcards here
+        // silently disabled compression everywhere (the tool got deleted from
+        // the request or `allowed()` threw). This mirrors v1, which injected
+        // an explicit allow unless the user configured the tool directly.
+        // Wildcard policies still apply to the host's own enforcement; the
+        // permission evaluate hook below aligns the two.
+        const rules = [...agent.permissions, ...(session.permissions ?? [])]
+        const explicitRule = rules.findLast(
+            (rule) =>
+                rule.action !== "*" &&
+                matchesGlob("compress", rule.action) &&
+                matchesGlob("*", rule.resource),
         )
         state.compressPermission =
             config.compress.permission === "deny"
                 ? "deny"
-                : rule?.effect === "deny"
+                : explicitRule?.effect === "deny"
                   ? "deny"
-                  : config.compress.permission === "ask" || rule?.effect === "ask"
+                  : config.compress.permission === "ask" || explicitRule?.effect === "ask"
                     ? "ask"
                     : "allow"
+        logger.info("DCP compress permission resolved", {
+            sessionID,
+            agent: selected,
+            permission: state.compressPermission,
+            source: explicitRule
+                ? `explicit rule ${explicitRule.action} -> ${explicitRule.effect}`
+                : "config default (wildcard host rules ignored)",
+        })
         return { state, entries, session, messages }
     }
 
@@ -164,6 +196,36 @@ export async function setup(ctx: Plugin.Context) {
             throw new Error(
                 "DCP: compress permission 'ask' is not supported by OpenCode V2's public plugin API yet. Compression was not performed.",
             )
+    }
+
+    // Lazy description/schema source for self-healing tool exposure; the
+    // per-session execution path (tool.transform below) keeps building its own
+    // session-bound definition.
+    let compressDefinition: ToolDefinition | undefined
+    const compressDefinitionFor = () =>
+        config.compress.permission === "deny"
+            ? undefined
+            : (compressDefinition ??= (config.compress.mode === "message"
+                  ? createCompressMessageTool
+                  : createCompressRangeTool)({
+                  client,
+                  state: createSessionState(),
+                  logger,
+                  config,
+                  prompts,
+              }))
+
+    // Align host enforcement with DCP's verdict. V2 hosts treat unmatched tool
+    // actions as "ask" and several built-in agents ship catch-all deny
+    // policies, so dcp_compress calls stall or fail even when DCP itself
+    // allows compression. Only the "compress" action is overridden, and only
+    // while DCP's own config is "allow" (explicit "deny"/"ask" configs keep
+    // host behavior untouched).
+    if (config.compress.permission === "allow") {
+        await ctx.permission.hook("evaluate", (evaluation) => {
+            if (evaluation.action !== "compress") return
+            evaluation.effect = "allow"
+        })
     }
 
     await ctx.model.transform((editor) => {
@@ -182,8 +244,21 @@ export async function setup(ctx: Plugin.Context) {
                     delete event.tools[compressToolName(config)]
                     return
                 }
-                if (state.compressPermission === "deny")
+                if (state.compressPermission === "deny") {
                     delete event.tools[compressToolName(config)]
+                } else if (event.tools[compressToolName(config)] === undefined) {
+                    // Self-heal tool exposure: if the host dropped or never
+                    // listed the plugin tool, the injected nudges reference a
+                    // phantom tool and the model can never compress (total,
+                    // silent failure). Re-add it from DCP's own definition.
+                    const definition = compressDefinitionFor()
+                    if (definition) {
+                        event.tools[compressToolName(config)] = {
+                            description: definition.description,
+                            input: compressToolInputSchema(definition),
+                        }
+                    }
+                }
                 state.modelContextLimit = limits.get(`${event.model.providerID}/${event.model.id}`)
                 state.systemPromptTokens = countTokens(
                     event.system.map((part) => part.text).join("\n"),
@@ -253,6 +328,16 @@ export async function setup(ctx: Plugin.Context) {
                     text,
                 }))
                 await logger.saveContext(event.sessionID, view.messages)
+                logger.debug("V2 hook applied", {
+                    sessionID: event.sessionID,
+                    kind,
+                    tokenUsage: getCurrentTokenUsage(state, view.messages),
+                    blocks: state.prune.messages.blocksById.size,
+                    pruneTools: state.prune.tools.size,
+                    compressPermission: state.compressPermission,
+                    toolExposed: event.tools[compressToolName(config)] !== undefined,
+                    manualMode: state.manualMode,
+                })
             }),
         )
 

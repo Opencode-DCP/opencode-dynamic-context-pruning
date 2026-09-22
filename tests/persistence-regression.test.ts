@@ -1,7 +1,7 @@
 import assert from "node:assert/strict"
 import test from "node:test"
 import { join } from "node:path"
-import { readFileSync } from "node:fs"
+import { readFileSync, mkdirSync, writeFileSync } from "node:fs"
 import { stateDir } from "./lab/persistence-env"
 import { createCompressMessageTool } from "../lib/compress/message"
 import {
@@ -360,6 +360,23 @@ test("manual mode setting survives a restart via the persisted state", async () 
 
     const persisted = await loadSessionState(sessionID, logger)
     assert.equal(persisted?.manualMode, true)
+})
+
+test("manual mode save refuses to overwrite an unreadable state file", async () => {
+    const sessionID = `ses_manual_guard_${Date.now()}`
+    const stateFile = join(stateDir, `${sessionID}.json`)
+    const garbage = "{ this is not valid json"
+    mkdirSync(stateDir, { recursive: true })
+    writeFileSync(stateFile, garbage, "utf-8")
+    const logger = new Logger(false)
+
+    await saveManualModeSetting(sessionID, true, logger)
+
+    assert.equal(
+        readFileSync(stateFile, "utf-8"),
+        garbage,
+        "manual-mode save must not destroy the unreadable file",
+    )
 })
 
 test("a real compaction summary still resets prune state by design", async () => {
