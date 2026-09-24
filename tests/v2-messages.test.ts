@@ -2,6 +2,7 @@ import assert from "node:assert/strict"
 import "./lab/persistence-env"
 import test from "node:test"
 import type { Message } from "@opencode/ai/schema/messages"
+import { Media } from "@opencode/ai/media"
 import { project } from "../lib/v2/messages"
 import { createSessionState, type CompressionBlock } from "../lib/state"
 import { assignMessageRefs } from "../lib/message-ids"
@@ -28,7 +29,7 @@ function transcript(): Message[] {
             id: "msg_user",
             role: "user",
             content: [
-                { type: "media", mediaType: "image/png", data: new Uint8Array([0, 255]) },
+                { type: "media", media: Media.bytes(new Uint8Array([0, 255]), "image/png") },
                 { type: "text", text: "Inspect this", cache: { type: "ephemeral" } },
             ],
         },

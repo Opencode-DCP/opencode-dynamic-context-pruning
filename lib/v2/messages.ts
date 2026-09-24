@@ -112,14 +112,16 @@ export function project(native: Message[], entries: History, session: Session) {
             let projected: Part | undefined
             if (part.type === "text")
                 projected = { ...base, id: `${message.id}:${index}`, type: "text", text: part.text }
-            if (part.type === "media")
+            if (part.type === "media") {
+                const inline = part.media.inline()
                 projected = {
                     ...base,
                     id: `${message.id}:${index}`,
                     type: "file",
-                    mime: part.mediaType,
-                    url: typeof part.data === "string" ? part.data : "",
+                    mime: part.media.mediaType,
+                    url: inline?.dataUrl ?? "",
                 }
+            }
             if (part.type === "tool-call") {
                 const result = results.get(part.id)
                 const entry = byID.get(message.id)

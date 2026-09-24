@@ -63,8 +63,8 @@
     "dependencies": {
         "@anthropic-ai/tokenizer": "^0.0.4",
         "@opencode-ai/sdk": "^1.4.3",
-        "@opentui/core": "^0.4.5",
-        "@opentui/solid": "^0.4.5",
+        "@opentui/core": "^0.5.12",
+        "@opentui/solid": "^0.5.12",
         "jsonc-parser": "^3.3.1",
         "solid-js": "^1.9.12"
     },
