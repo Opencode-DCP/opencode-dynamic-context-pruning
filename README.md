@@ -17,10 +17,11 @@ opencode plugin add @tarquinen/opencode-dcp@latest
 
 This installs the package and adds it to your global OpenCode config.
 
-## Related Project
+## Project Status
 
-[Sleev](https://sleev.ai) is a local proxy for coding agents, including Claude Code,
-Codex, and OpenCode. It provides context management through the `sleev` CLI:
+Development on DCP has slowed because most new context-management work has moved to [Sleev](https://sleev.ai) and the `sleev` CLI. Sleev is a local proxy for Claude Code, Codex, and OpenCode that builds on DCP's core ideas with newer context-management features and will work with any harness/client.
+
+DCP remains available for OpenCode plugin users, but new features are landing in Sleev first. If you are starting fresh, we recommend trying Sleev:
 
 ```bash
 npm i -g sleev
