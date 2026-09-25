@@ -132,11 +132,11 @@ export function createChatMessageTransformHandler(
 
         stripHallucinations(output.messages)
         cacheSystemPromptTokens(state, output.messages)
-        assignMessageRefs(state, output.messages)
         syncCompressionBlocks(state, logger, output.messages)
         syncToolCache(state, config, logger, output.messages)
         buildToolIdList(state, output.messages)
         prune(state, logger, config, output.messages)
+        assignMessageRefs(state, output.messages)
         await injectExtendedSubAgentResults(
             client,
             state,
