@@ -1,11 +1,14 @@
 import type { SessionState, WithParts } from "../../state"
 import type { PluginConfig } from "../../config"
+import { compressToolName } from "../../config"
 import {
     appendGuidanceToDcpTag,
     buildCompressedBlockGuidance,
+    buildMessageOccupancyGuidance,
     renderMessagePriorityGuidance,
 } from "../../prompts/extensions/nudge"
 import type { RuntimePrompts } from "../../prompts/store"
+import { withCompressToolName } from "../../prompts"
 import type { UserMessage } from "@opencode-ai/sdk/v2"
 import {
     type CompressionPriorityMap,
@@ -329,46 +332,57 @@ export function applyAnchoredNudges(
     compressionPriorities?: CompressionPriorityMap,
 ): void {
     const turnNudgeAnchors = collectTurnNudgeAnchors(state, config, messages)
+    const toolName = compressToolName(config)
+    const nudges = {
+        contextLimitNudge: withCompressToolName(prompts.contextLimitNudge, toolName),
+        turnNudge: withCompressToolName(prompts.turnNudge, toolName),
+        iterationNudge: withCompressToolName(prompts.iterationNudge, toolName),
+    }
 
     if (config.compress.mode === "message") {
         applyMessageModeAnchoredNudge(
             state.nudges.contextLimitAnchors,
             messages,
-            prompts.contextLimitNudge,
+            nudges.contextLimitNudge,
             compressionPriorities,
         )
         applyMessageModeAnchoredNudge(
             turnNudgeAnchors,
             messages,
-            prompts.turnNudge,
+            nudges.turnNudge,
             compressionPriorities,
         )
         applyMessageModeAnchoredNudge(
             state.nudges.iterationNudgeAnchors,
             messages,
-            prompts.iterationNudge,
+            nudges.iterationNudge,
             compressionPriorities,
         )
         return
     }
 
-    const compressedBlockGuidance = buildCompressedBlockGuidance(state)
+    const compressedBlockGuidance = [
+        buildCompressedBlockGuidance(state),
+        buildMessageOccupancyGuidance(state, config, messages),
+    ]
+        .filter((section) => section.length > 0)
+        .join("\n\n")
     applyRangeModeAnchoredNudge(
         state.nudges.contextLimitAnchors,
         messages,
-        prompts.contextLimitNudge,
+        nudges.contextLimitNudge,
         compressedBlockGuidance,
     )
     applyRangeModeAnchoredNudge(
         turnNudgeAnchors,
         messages,
-        prompts.turnNudge,
+        nudges.turnNudge,
         compressedBlockGuidance,
     )
     applyRangeModeAnchoredNudge(
         state.nudges.iterationNudgeAnchors,
         messages,
-        prompts.iterationNudge,
+        nudges.iterationNudge,
         compressedBlockGuidance,
     )
 }

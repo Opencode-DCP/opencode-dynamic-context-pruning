@@ -1,4 +1,5 @@
 import assert from "node:assert/strict"
+import "./lab/persistence-env"
 import test from "node:test"
 import type { PluginConfig } from "../lib/config"
 import { createTextCompleteHandler } from "../lib/hooks"
@@ -478,6 +479,29 @@ test("range-mode nudges append to existing text parts before tool outputs", () =
     const config = buildConfig("range")
 
     assignMessageRefs(state, messages)
+    state.prune.messages.blocksById.set(7, {
+        blockId: 7,
+        runId: 1,
+        active: true,
+        deactivatedByUser: false,
+        compressedTokens: 0,
+        summaryTokens: 0,
+        mode: "range",
+        topic: "Earlier notes",
+        startId: "m0001",
+        endId: "m0001",
+        anchorMessageId: "msg-assistant-1",
+        compressMessageId: "msg-origin",
+        includedBlockIds: [],
+        consumedBlockIds: [],
+        parentBlockIds: [],
+        directMessageIds: ["msg-assistant-1"],
+        directToolIds: [],
+        effectiveMessageIds: ["msg-assistant-1"],
+        effectiveToolIds: [],
+        createdAt: 1,
+        summary: "Earlier summary",
+    })
     state.prune.messages.activeBlockIds.add(7)
     state.nudges.contextLimitAnchors.add("msg-assistant-1")
 

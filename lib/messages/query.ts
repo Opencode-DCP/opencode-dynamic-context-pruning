@@ -19,6 +19,22 @@ export const getLastUserMessage = (
     return null
 }
 
+export {
+    LEGACY_COMPRESS_TOOL_NAME,
+    DEFAULT_COMPRESS_TOOL_NAME,
+} from "../tool-name"
+import { LEGACY_COMPRESS_TOOL_NAME, DEFAULT_COMPRESS_TOOL_NAME } from "../tool-name"
+
+/**
+ * True when a session message part belongs to DCP's compress tool. Accepts the
+ * legacy "compress" name so parts recorded by older sessions keep resolving
+ * after the tool was renamed (the sleev gateway shadows the name "compress" on
+ * the wire, which is why DCP's tool now registers as "dcp_compress").
+ */
+export const isCompressToolPart = (part: any): boolean =>
+    part?.type === "tool" &&
+    (part.tool === LEGACY_COMPRESS_TOOL_NAME || part.tool === DEFAULT_COMPRESS_TOOL_NAME)
+
 export const messageHasCompress = (message: WithParts): boolean => {
     if (!isMessageWithInfo(message)) {
         return false
@@ -31,7 +47,8 @@ export const messageHasCompress = (message: WithParts): boolean => {
     const parts = Array.isArray(message.parts) ? message.parts : []
     return parts.some(
         (part) =>
-            part.type === "tool" && part.tool === "compress" && part.state?.status === "completed",
+            isCompressToolPart(part) &&
+            (part as { state?: { status?: string } }).state?.status === "completed",
     )
 }
 
